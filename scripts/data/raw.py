@@ -1,18 +1,21 @@
+import os
 import requests
 import json
 from tqdm import tqdm
 import sys
 
-LANG=sys.argv[1]
-INPUT_PATH = f"../../data/raw/{LANG}_titles.jsonl"
-OUTPUT_PATH = f"../../data/raw/{LANG}_raw.jsonl"
+
+BASE_DIR = os.getenv("BASE_WCD")
+INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
+OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
+
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
 
 
-def get_wikitext(title):
-    URL = f"https://{LANG}.wikipedia.org/w/api.php"
+def get_wikitext(lang: str, title: str):
+    URL = f"https://{lang}.wikipedia.org/w/api.php"
     params = {
         "action": "query",
         "format": "json",
@@ -25,36 +28,82 @@ def get_wikitext(title):
     page = next(iter(r["query"]["pages"].values()))
     return page["revisions"][0]["slots"]["main"]["*"]
 
-def get_html(title):
-    url = f"https://{LANG}.wikipedia.org/w/api.php"
+def get_html(lang: str, title: str):
+    url = f"https://{lang}.wikipedia.org/w/api.php"
     params = {
         "action": "parse",
         "page": title,
         "format": "json",
         "prop": "text",
     }
-
-    response = requests.get(url, params=params, headers=headers)
-    data = response.json()
-
-    html = data["parse"]["text"]["*"]
-    return html
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=30)
+        response.raise_for_status()  # raises if HTTP code != 200
+        data = response.json()
+        return data["parse"]["text"]["*"]
+    except Exception as e:
+        print(f"Failed to fetch {url}: {e}")
+        return None
 
 def main():
-    with open(INPUT_PATH, "r", encoding="utf-8") as f:
-        titles = [json.loads(line)["title"] for line in f]
-        # titles = titles[:2]
+    languages  = [
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
+        "zh",  # Chinese
+        "ar",  # Arabic
+        "id"   # Indonesian
+    ]
 
-    out = []
-    for title in tqdm(titles):
-            text = get_html(title)
-            out.append({"title": title, "raw": text})
+    for lang in languages:
+        print(f"Running {lang} ...", flush=True)
 
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as out_f:
-        for x in out:
-            out_f.write(json.dumps(x, ensure_ascii=False) + "\n")
+        INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_all.jsonl")
+        OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_htmls.jsonl")
+        
+        
+        with open(INPUT_FILE, "r", encoding="utf-8") as f:
+            data = [json.loads(line) for line in f]
 
-    print(f"Saved {len(titles)} articles to {OUTPUT_PATH}")
+        # can restrict here
+        if lang == "en":
+            data = [x for x in data if x['source'] == 'fa']
+            print(f'Len data {len(data)}')
+
+        if lang in ["zh", "ru", "pt"]:
+            data = [x for x in data if x['source'] != 'views']
+            print(f'Len data {len(data)}')
+
+        data = data[:1000]
+
+        processed_titles = set()
+        if os.path.exists(OUTPUT_FILE):
+            with open(OUTPUT_FILE, "r", encoding="utf-8") as out_f:
+                for line in out_f:
+                    try:
+                        entry = json.loads(line)
+                        processed_titles.add(entry["title"])
+                    except Exception:
+                        continue
+            print(f"Skipping {len(processed_titles)} already processed articles")
+
+        with open(OUTPUT_FILE, "a", encoding="utf-8") as out_f:
+            for item in tqdm(data):
+                if item['title'] in processed_titles:
+                    continue
+                raw = get_html(lang, item['title'])
+                if not raw:
+                    continue
+                item.update({"raw": raw})
+                out_f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+        print(f"Saved {len(data)} articles to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
     main()

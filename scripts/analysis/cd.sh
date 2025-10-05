@@ -15,7 +15,7 @@ N=5000
 HP_SEARCH="" # "--hp_search"
 NOTES="first hu run"
 
-uv run cd_hp.py \
+uv run plm_hp_wandb.py \
     --data "$DATA" \
     --model "$MODEL" \
     --n "$N" \

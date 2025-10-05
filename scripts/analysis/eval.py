@@ -1,9 +1,18 @@
-#!/usr/bin/env python
+
+# need to get messages
+# do eval by lang
+
+
 import os, json, re, time, random
 import torch, evaluate
 from datasets import Dataset, DatasetDict, load_from_disk
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
 from peft import AutoPeftModelForCausalLM
+from collections import defaultdict
+from prompts import PROMPT
+
+acc_metric = evaluate.load("accuracy")
+f1_metric = evaluate.load("f1")
 
 BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
 FT_DIR   = os.path.join(BASE_DIR, "data/ft")
@@ -23,26 +32,33 @@ def save_jsonl(records, path):
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+def compute_all_metrics(preds, refs, scores=None):
+    acc = acc_metric.compute(predictions=preds, references=refs)["accuracy"]
+    f1  = f1_metric.compute(predictions=preds, references=refs, average="binary")["f1"]
+    return {"accuracy": acc, "f1": f1}
 
 def build_texts_labels(test_ds: Dataset):
     print(test_ds.column_names)
-    if "claim" in test_ds.column_names:
-        texts = test_ds["claim"]
-    elif "text" in test_ds.column_names:
-        texts = test_ds["text"]
-    elif "sentence" in test_ds.column_names:
-        texts = test_ds["sentence"]
-    elif "messages" in test_ds.column_names:
-        texts = test_ds["messages"]
-    else:
-        texts = [x["claim"] for x in test_ds]
+    claims = test_ds["claim"]
     labels = test_ds["label"]
-    return texts, labels
+    langs = test_ds["lang"] if "lang" in test_ds.column_names else ["all"] * len(labels)
+    
+    # build messages
+    messages = []
+    for c in claims:
+        user_msg = PROMPT.replace("{{claim}}", c)
+        msg = [
+            {"role": "system", "content": "You are a seasoned Wikipedia fact-checker."},
+            {"role": "user", "content": user_msg}
+        ]
+        messages.append(msg)
 
-def predict(model, tokenizer, texts, batch_size, is_llama=False):
+    return messages, labels, langs
+
+def predict(model, tokenizer, messages, batch_size, is_llama=False):
     preds = []
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i+batch_size]
+    for i in range(0, len(messages), batch_size):
+        batch = messages[i:i+batch_size]
         chat_texts = []
         for msg in batch:
             chat = tokenizer.apply_chat_template(
@@ -99,6 +115,7 @@ def eval(folder_path: str, batch_size: int = 8):
     ds = load_from_disk(folder_path)    
     test_ds = ds["test"]
 
+
     tokenizer = AutoTokenizer.from_pretrained(folder_path, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
@@ -113,28 +130,42 @@ def eval(folder_path: str, batch_size: int = 8):
         )
     model.eval()
 
-    texts, labels = build_texts_labels(test_ds)
+    messages, labels, langs = build_texts_labels(test_ds)
     is_llama = True if "llama" in folder_path else False
 
     start = time.time()
-    preds = predict(model, tokenizer, texts, batch_size, is_llama=is_llama)
-    valid = [(p, l) for p, l in zip(preds, labels) if p is not None]
+    preds = predict(model, tokenizer, messages, batch_size, is_llama=is_llama)
+
+    # include lang
+    valid = [(p, y, l) for p, y, l in zip(preds, labels, langs) if p is not None]
+
     if valid:
-        p_clean, y_clean = zip(*valid)
-        acc = evaluate.load("accuracy").compute(predictions=p_clean, references=y_clean)["accuracy"]
-        f1 = evaluate.load("f1").compute(predictions=p_clean, references=y_clean, average="binary")["f1"]
+        p_clean, y_clean, l_clean = zip(*valid)
+        overall = compute_all_metrics(list(p_clean), list(y_clean))
     else:
-        acc, f1 = 0.0, 0.0
+        overall = {"accuracy": 0.0, "f1": 0.0}
+
+    by_lang = {}
+    if valid:
+        bucket = defaultdict(lambda: {"preds": [], "refs": []})
+        for p, y, g in zip(p_clean, y_clean, l_clean):
+            bucket[g]["preds"].append(p)
+            bucket[g]["refs"].append(y)
+        for g, d in bucket.items():
+            by_lang[g] = compute_all_metrics(d["preds"], d["refs"])
+            
     end = time.time()
 
     res = {
         "folder": folder_path,
         "n_total": len(labels),
         "n_scored": len(valid),
-        "accuracy": acc,
-        "f1": f1,
-        "time_min": (end - start) / 60.0
+        "time_min": (end - start) / 60.0,
+        "accuracy": overall["accuracy"],
+        "f1": overall["f1"],
+        "by_lang": by_lang
     }
+
     return res
 
 def main():

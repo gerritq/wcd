@@ -1,11 +1,17 @@
+import os
 import re
 import json 
 from nltk.tokenize import sent_tokenize
 import sys
 
+import nltk
+nltk.download('punkt_tab')
+
 LANG=sys.argv[1]
-INPUT_PATH = f"../../data/raw/{LANG}_txt.jsonl"
-OUTPUT_PATH = f"../../data/sets/{LANG}_sents.jsonl"
+BASE_DIR = os.getenv("BASE_WCD", ".")
+INPUT_PATH = os.path.join(BASE_DIR, f"data/raw/{LANG}_txt.jsonl") 
+OUTPUT_PATH = os.path.join(BASE_DIR, f"data/proc/{LANG}_sents.jsonl")
+
 DROP_SECTIONS={'en': ['references', 'list', 'see also', 'notes', 'bibliography', 'further reading', 'external links', 'discography', 'filmography'],
                'pt': ["referências", "lista", "ver também", "notas", "bibliografia", "leitura adicional", "ligações externas", "discografia", "filmografia", "videografia"],
                'hu': ['hivatkozások','jegyzetek','lásd még','bibliográfia','további irodalom','külső hivatkozások','discográfia','filmográfia'],
@@ -72,22 +78,15 @@ def proc_sentence(item):
     
     # strict label
     if not citation and not item['p_any_citation']:
-        label_1 = 0
-        label_2 = 0
+        label = 0
     elif citation:
-        label_1 = 1
-        label_2 = 1
+        label = 1
     else:
         return None
-    # if not citation and item['p_ends_with_citation']:
-    #     return None
-    #     label_1 = 1
-    #     label_2 = 0
 
     item.update({"has_citation": citation,
                  "claim": sentence_clean,
-                 'label_1': label_1,
-                 'label_2': label_2})
+                 'label': label})
     return item
 
 def main():

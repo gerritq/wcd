@@ -14,10 +14,11 @@ from transformers import (
     set_seed
 )
 from peft import LoraConfig, get_peft_model
+from prompts import PROMPT
+from datasets import load_from_disk
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data", type=str, required=True)
-parser.add_argument("--n", type=int, default=3000)
 parser.add_argument("--model", type=str, required=True)
 parser.add_argument("--batch_size", type=int, default=2)
 parser.add_argument("--epochs", type=int, default=3)
@@ -40,42 +41,19 @@ BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
 MAX_LENGTH = 256
 SEED = 42
 
-PROMPT = """Your task is to determine whether a claim needs a citation (label=1) or no citation (label=0).
 
-Claim: "{{claim}}"
-
-Output the label in the following format:
-{"label": <label>}
-"""
 
 set_seed(SEED)
 random.seed(SEED)
 
-def load_data():
-    if args.data in ["cn_fa","cn_fa_ss","cn_fa_ss_nl"]:
-        with open(os.path.join(BASE_DIR, f"data/sets/{args.data}.jsonl"), "r", encoding="utf-8") as f:
-            return [json.loads(l) for l in f]
-    data = []
-    with open(os.path.join(BASE_DIR, f"data/sets/{args.data}.jsonl"), "r", encoding="utf-8") as f:
-        for line in f:
-            obj = json.loads(line)
-            obj["label"] = obj.pop("label_2")
-            data.append(obj)
-    return data
-
-def build_dataset():
-    data = load_data()
-    random.shuffle(data)
-    k = args.n // 2
-    pos = [x for x in data if x["label"] == 1][:k]
-    neg = [x for x in data if x["label"] == 0][:k]
-    data = pos + neg
+def build_messages(dataset: Dataset) -> Dataset:
+    data = list(dataset)  # convert to list of dicts
     random.shuffle(data)
 
     samples = []
     for x in data:
-        claim = x["claim"] if "claim" in x else x.get("text", "")
-        label = x["label"]
+        claim = x["claim"] 
+        label = int(x["label"])
         user_msg = PROMPT.replace("{{claim}}", claim)
         messages = [
             {"role": "system", "content": "You are a seasoned Wikipedia fact-checker."},
@@ -83,7 +61,21 @@ def build_dataset():
             {"role": "assistant", "content": json.dumps({"label": label})}
         ]
         samples.append({"messages": messages, "label": label})
+
     return Dataset.from_list(samples)
+
+def load_data():
+    if args.data in ["cn_fa","cn_fa_ss","cn_fa_ss_nl"]:
+        with open(os.path.join(BASE_DIR, f"data/proc/{args.data}.jsonl"), "r", encoding="utf-8") as f:
+            return [json.loads(l) for l in f]
+    data = []
+    with open(os.path.join(BASE_DIR, f"data/proc/{args.data}.jsonl"), "r", encoding="utf-8") as f:
+        for line in f:
+            obj = json.loads(line)
+            obj["label"] = obj.pop("label_2")
+            data.append(obj)
+    return data
+
 
 def preprocess(dataset, tokenizer):
     def tokenize_fn(example):
@@ -97,14 +89,12 @@ def preprocess(dataset, tokenizer):
 
 def main():
     start = time.time()
-
-    ds = build_dataset()
-    split = ds.train_test_split(test_size=0.1, seed=SEED)
-    train_ds, test_ds = split["train"], split["test"]
-
-    save_dir = os.path.join(BASE_DIR, f"data/ft/lora_{args.model}_{args.data}")
+    save_dir = os.path.join(BASE_DIR, f"data/ft/{args.data.split('_')[0]}_lora_{args.model}")
     os.makedirs(save_dir, exist_ok=True)
-    DatasetDict({"train": train_ds, "test": test_ds}).save_to_disk(save_dir)
+    
+    ds = load_from_disk(os.path.join(BASE_DIR, f"data/sets/{args.data}"))
+    train_ds, test_ds = build_messages(ds["train"]), build_messages(ds["test"])
+    
 
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     if tokenizer.pad_token is None:
