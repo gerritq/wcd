@@ -9,10 +9,11 @@ SEED = 42
 random.seed(SEED)
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
+IN_DIR = os.path.join(BASE_DIR, "data/sents")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets")
 
 def load_data(lang: str) -> List[Dict[str, Any]]:
-    path = os.path.join(BASE_DIR, f"data/proc/{lang}_sents.jsonl")
+    path = os.path.join(IN_DIR, f"{lang}_sents.jsonl")
     data = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -34,7 +35,9 @@ def build_monolingual_dataset(lang: str, n: int) -> DatasetDict:
 
     items = []
     for x in data:
-        items.append({"claim": x['claim'], "label": int(x["label"])})
+        # change label_conservative here to test
+        items.append({"claim": x['claim'], 
+                      "label": int(x["label"])})
     ds = Dataset.from_list(items)
     split = ds.train_test_split(test_size=0.1, seed=SEED)
     return DatasetDict({"train": split["train"], "test": split["test"]})
@@ -95,19 +98,33 @@ def save_dataset(ds: DatasetDict, out_dir: str) -> None:
 
 def main():
 
-    langs = ['en', 'pt', 'hu', 'pl']
-    n = 5000
+    languages  = [
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
+        # "zh",  # Chinese
+        # "ar",  # Arabic
+        "id"   # Indonesian
+    ]
+    
+    n = 10000
 
     for lang in langs:
         # mono
         ds = build_monolingual_dataset(lang, n)
-        out_dir = os.path.join(OUT_DIR, f"{lang}_{n}")
+        out_dir = os.path.join(OUT_DIR, f"{lang}")
         save_dataset(ds, out_dir)
 
     # multilingual
-    ds = build_multilingual_dataset(langs, n)
-    out_dir = os.path.join(OUT_DIR, f"multi_{n}")
-    save_dataset(ds, out_dir)
+    # ds = build_multilingual_dataset(langs, n)
+    # out_dir = os.path.join(OUT_DIR, f"multi_{n}")
+    # save_dataset(ds, out_dir)
 
 if __name__ == "__main__":
     main()

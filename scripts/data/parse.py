@@ -1,11 +1,12 @@
+import os
 import json
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-import sys
+from skip_sections import DROP_SECTIONS
 
-LANG=sys.argv[1]
-INPUT_PATH = f"../../data/raw/{LANG}_raw.jsonl"
-OUTPUT_PATH = f"../../data/raw/{LANG}_txt.jsonl"
+BASE_DIR = os.getenv("BASE_WCD")
+INPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
+OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/parsed")
 
 def clean_paragraphs(paragraphs):
     
@@ -19,9 +20,8 @@ def clean_paragraphs(paragraphs):
 
     return out
 
-
-def parse_html(html):
-    soup = BeautifulSoup(html, 'html.parser')
+def parse_html(html: str, DROP_SECTIONS_LANG: dict):
+    soup = BeautifulSoup(html, 'lxml')
     
     sections = []
     current_section = {"header": "Lead", "paragraphs": []}
@@ -32,9 +32,20 @@ def parse_html(html):
             if current_section["paragraphs"]:
                 sections.append(current_section)
             current_section = {"header": tag.get_text(), "paragraphs": []}
+        
+        # rm block quote
         elif tag.name == 'p':
+            # drop if blockquote
             if tag.find_parent("blockquote"):
                 continue  
+            # drop if other quote
+            if tag.find_parent("div", class_="templatequotecite"):
+                continue
+            # drop if small
+            if any(child.name == "small" for child in tag.children if child.name):
+                continue
+
+            # get txt
             text = tag.get_text()
             if text:
                 current_section["paragraphs"].append(text)
@@ -42,22 +53,50 @@ def parse_html(html):
     if current_section["paragraphs"]:
         sections.append(current_section)
 
-    for x in sections:
-        x['paragraphs'] = clean_paragraphs(x['paragraphs'])
+    sections_out = []
+    for s in sections:
+        if s['header'].lower().strip() in DROP_SECTIONS_LANG:
+            continue
+        s['paragraphs'] = clean_paragraphs(s['paragraphs'])
+        sections_out.append(s)
 
-    return sections
+    return sections_out
 
 
 def main():
 
-    with open(INPUT_PATH, "r", encoding="utf-8") as f:
-        data = [json.loads(line) for line in f]
+    languages  = [
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
+        "zh",  # Chinese
+        "ar",  # Arabic
+        "id"   # Indonesian
+    ]
 
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as out_f:
-        for x in tqdm(data):
-            x['text'] = parse_html(x['raw'])
-            del x['raw']
-            out_f.write(json.dumps(x) + "\n")
+    for lang in languages:
+        print(f"Running {lang} ...", flush=True)
+
+        INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_htmls.jsonl")
+        OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_parsed.jsonl")
+        
+        DROP_SECTIONS_LANG = DROP_SECTIONS[lang]
+
+        with open(INPUT_FILE, "r", encoding="utf-8") as f:
+            data = [json.loads(line) for line in f]
+            # data = data[:100]
+
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as out_f:
+            for x in tqdm(data):
+                x['text'] = parse_html(x['raw'], DROP_SECTIONS_LANG)
+                del x['raw']
+                out_f.write(json.dumps(x) + "\n")
     
 if __name__ == "__main__":
     main()

@@ -3,8 +3,9 @@ import random
 import numpy as np
 import evaluate
 import torch
-
-from datasets import Dataset, ClassLabel, DatasetDict
+import argparse
+import os
+from datasets import load_from_disk
 from transformers import (
     AutoTokenizer, 
     AutoModelForSequenceClassification, 
@@ -12,100 +13,125 @@ from transformers import (
     TrainingArguments, 
     Trainer
 )
+from utils import MODEL_MAPPING
+import time
 
 
-# --- Settings ---
-LANG = 'en'
-INPUT_PATH = f"../../data/sets/{LANG}_sents.jsonl"
-MODEL_NAME = "bert-base-uncased"
-MAX_LENGTH = 256
+parser = argparse.ArgumentParser()
+parser.add_argument("--lang", type=str, required=True)
+parser.add_argument("--model", type=str, required=True)
+parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--epochs", type=int, default=5)
+args = parser.parse_args()
+
+BASE_DIR = os.getenv("BASE_WCD")
+DATA_DIR = os.path.join(BASE_DIR, "data/sets")
+OUTPUT_DIR = os.path.join(BASE_DIR, "data/scores")
+
+MODEL_ID = MODEL_MAPPING[args.model]
 SEED = 42
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
 
-def generate_dataset():
-    with open(INPUT_PATH, "r", encoding="utf-8") as f:
-        data_in = [json.loads(line) for line in f]
-        data=[]
-        for x in data_in:
-            x = {k: v for k,v in x.items() if k in ['sentence_clean', 'label_2']}
-            x['label'] = x.pop('label_2')
-            data.append(x)
+set_seed(SEED)
+random.seed(SEED)
 
-    random.shuffle(data)
+accuracy_metric = evaluate.load("accuracy")
+f1_metric = evaluate.load("f1")
 
-    positives = [x for x in data if x['label'] == 1][:3000]
-    negatives = [x for x in data if x['label'] == 0][:3000]
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
-    # Combine and shuffle again
-    data = positives + negatives
-    print("N", len(data))
-    random.shuffle(data)
-
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+def tokenise_data(data, tokenizer):
+    
 
     def tokenize(example):
         return tokenizer(
-            example["sentence_clean"],
+            example["claim"],
             padding="max_length",
             truncation=True,
-            max_length=MAX_LENGTH,
         )
-
-    dataset = Dataset.from_list(data)
-
-    split = dataset.train_test_split(test_size=0.2, seed=SEED)
-    val_test = split["test"].train_test_split(test_size=0.5, seed=SEED)
-    dataset_dict = DatasetDict({
-        "train": split["train"],
-        "val": val_test["train"],
-        "test": val_test["test"]
-    })
-
-    dataset = dataset_dict.map(tokenize, batched=True)
+    dataset = data.map(tokenize, batched=True)
     return dataset
 
-def main():
-    dataset = generate_dataset()
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
 
-    accuracy_metric = evaluate.load("accuracy")
-    f1_metric = evaluate.load("f1")
+    acc = accuracy_metric.compute(predictions=predictions, references=labels)
+    f1 = f1_metric.compute(predictions=predictions, references=labels, average="binary")
+
+    return {
+        "accuracy": acc["accuracy"],
+        "f1": f1["f1"]
+        }
+
+def main():
+    start = time.time()
+
+    ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
+    train_tok = tokenise_data(ds["train"], tokenizer)
+    test_tok = tokenise_data(ds["test"], tokenizer)
 
     def model_init():
         return AutoModelForSequenceClassification.from_pretrained(
-            "bert-base-uncased", num_labels=2
+            MODEL_ID, 
+            num_labels=2
         )
-
-    def compute_metrics(eval_pred):
-        logits, labels = eval_pred
-        predictions = np.argmax(logits, axis=-1)
-
-        acc = accuracy_metric.compute(predictions=predictions, references=labels)
-        f1 = f1_metric.compute(predictions=predictions, references=labels, average="binary")
-
-        return {
-            "accuracy": acc["accuracy"],
-            "f1": f1["f1"]
-        }
 
     training_args = TrainingArguments(
         output_dir=None,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=5,
-        # learning_rate=2e-5,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        num_train_epochs=args.epochs,
         eval_strategy="epoch",
+        logging_strategy="epoch",
         )
 
     trainer = Trainer(
         model_init=model_init,
         args=training_args,
-        train_dataset=dataset["train"],
-        eval_dataset=dataset["val"],
+        train_dataset=train_tok,
+        eval_dataset=test_tok,
         compute_metrics=compute_metrics,
     )
 
     trainer.train()
+
+    # eval on test
+    metrics = trainer.evaluate(eval_dataset=test_tok)
+    
+    # collect losses
+    train_losses = []
+    eval_losses = []
+    
+    print(trainer.state.log_history)
+
+    for log in trainer.state.log_history:
+        if "loss" in log:
+            train_losses.append({"epoch": log.get("epoch"), "loss": log["loss"]})
+        if "eval_loss" in log:
+            eval_losses.append({"epoch": log.get("epoch"), "eval_loss": log["eval_loss"]})
+
+    end = time.time()
+    
+    meta = {
+        "data": args.lang,
+        "model": MODEL_ID,
+        "train_n": len(ds['train']),
+        "val_n": len(ds['test']),
+        "epochs": args.epochs,
+        "batch_size": training_args.per_device_train_batch_size,
+        "learning_rate": training_args.learning_rate,
+        "test_metrics": metrics,
+        "train_losses": train_losses,
+        "eval_losses": eval_losses,
+        "time_mins": (end - start) / 60.0,
+        "cuda_max_memory_allocation": torch.cuda.max_memory_allocated() / 1024**2
+    }
+
+    out_dir = os.path.join(BASE_DIR, f"data/models/{args.model}_{args.lang}")
+    model.save_pretrained(out_dir)
+    tokenizer.save_pretrained(out_dir)
 
 
 if __name__ == "__main__":

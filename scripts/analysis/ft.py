@@ -5,7 +5,7 @@ import random
 import torch
 import time
 import evaluate
-from datasets import Dataset, DatasetDict
+from datasets import load_from_disk
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -14,26 +14,19 @@ from transformers import (
     DataCollatorForLanguageModeling,
     set_seed
 )
+from utils import MODEL_MAPPING
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data", type=str, required=True)
-parser.add_argument("--n", type=int, default=3000)
+parser.add_argument("--lang", type=str, required=True)
 parser.add_argument("--model", type=str, required=True)
-parser.add_argument("--batch_size", type=int, default=2)
-parser.add_argument("--epochs", type=int, default=3)
+parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--epochs", type=int, default=5)
 args = parser.parse_args()
 
-model_id = {
-    "llama_3_70b": "meta-llama/Meta-Llama-3-70B-Instruct",
-    "llama_3_3b": "meta-llama/Meta-Llama-3-3B-Instruct",
-    "llama_3_8b": "meta-llama/Meta-Llama-3-8B-Instruct",
-    "qwen8b": "Qwen/Qwen3-8B",
-    "qwen3b": "Qwen/Qwen3-30B-A3B",
-    "qwen06b": "Qwen/Qwen3-0.6B",
-    "qwen32b": "Qwen/Qwen3-32B"
-}.get(args.model)
+BASE_DIR = os.getenv("BASE_WCD")
+DATA_DIR = os.path.join(BASE_DIR, "data/sets")
+OUTPUT_DIR = os.path.join(BASE_DIR, "data/scores")
 
-BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
 MAX_LENGTH = 256
 SEED = 42
 
@@ -100,6 +93,10 @@ def save_jsonl(records, path):
 
 def main():
     start = time.time()
+
+
+    ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
+
 
     ds = build_dataset()
     split = ds.train_test_split(test_size=0.1, seed=SEED)

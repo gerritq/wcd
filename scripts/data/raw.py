@@ -4,7 +4,6 @@ import json
 from tqdm import tqdm
 import sys
 
-
 BASE_DIR = os.getenv("BASE_WCD")
 INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
 OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
@@ -53,12 +52,12 @@ def main():
         "it",  # Italian
         "pt",  # Portuguese
         "ro",  # Romanian
-        "ru",  # Russian
-        "uk",  # Ukrainian
-        "bg",  # Bulgarian
-        "zh",  # Chinese
-        "ar",  # Arabic
-        "id"   # Indonesian
+        # "ru",  # Russian
+        # "uk",  # Ukrainian
+        # "bg",  # Bulgarian
+        # "zh",  # Chinese
+        # "ar",  # Arabic
+        # "id"   # Indonesian
     ]
 
     for lang in languages:
@@ -80,7 +79,7 @@ def main():
             data = [x for x in data if x['source'] != 'views']
             print(f'Len data {len(data)}')
 
-        data = data[:1000]
+        # data = data[:1000]
 
         processed_titles = set()
         if os.path.exists(OUTPUT_FILE):

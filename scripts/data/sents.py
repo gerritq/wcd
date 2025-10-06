@@ -3,20 +3,19 @@ import re
 import json 
 from nltk.tokenize import sent_tokenize
 import sys
-
 import nltk
 nltk.download('punkt_tab')
+from tqdm import tqdm
+from skip_sections import DROP_SECTIONS
 
-LANG=sys.argv[1]
 BASE_DIR = os.getenv("BASE_WCD", ".")
-INPUT_PATH = os.path.join(BASE_DIR, f"data/raw/{LANG}_txt.jsonl") 
-OUTPUT_PATH = os.path.join(BASE_DIR, f"data/proc/{LANG}_sents.jsonl")
+INPUT_DIR = os.path.join(BASE_DIR, f"data/raw/parse") 
+OUTPUT_DIR = os.path.join(BASE_DIR, f"data/sents")
 
-DROP_SECTIONS={'en': ['references', 'list', 'see also', 'notes', 'bibliography', 'further reading', 'external links', 'discography', 'filmography'],
-               'pt': ["referências", "lista", "ver também", "notas", "bibliografia", "leitura adicional", "ligações externas", "discografia", "filmografia", "videografia"],
-               'hu': ['hivatkozások','jegyzetek','lásd még','bibliográfia','további irodalom','külső hivatkozások','discográfia','filmográfia'],
-               'pl': ['przypisy', 'uwagi', 'zobacz też', 'bibliografia', 'dalsza lektura', 'linki zewnętrzne', 'dyskografia', 'filmografia']}
-DROP_SECTIONS = DROP_SECTIONS[LANG]
+# DROP_SECTIONS={'en': ['references', 'list', 'see also', 'notes', 'bibliography', 'further reading', 'external links', 'discography', 'filmography'],
+#                'pt': ["referências", "lista", "ver também", "notas", "bibliografia", "leitura adicional", "ligações externas", "discografia", "filmografia", "videografia"],
+#                'hu': ['hivatkozások','jegyzetek','lásd még','bibliográfia','további irodalom','külső hivatkozások','discográfia','filmográfia'],
+#                'pl': ['przypisy', 'uwagi', 'zobacz też', 'bibliografia', 'dalsza lektura', 'linki zewnętrzne', 'dyskografia', 'filmografia']}
 
 def txt_ends_with_citation(txt):
     """is this d or w in the regex?"""
@@ -25,8 +24,15 @@ def txt_ends_with_citation(txt):
 def has_citation(text):
     return bool(re.search(r'\[\d+\]', text))
 
-def remove_citations(text):
-    return re.sub(r'\[\w+\]', '', text) # also rm notes, and others
+def remove_citations(x):
+    x = re.sub(r'\[[\w\s]+\]', '', x) # rm [19], and also notes and others
+    x = x.strip()
+    return x # also rm notes, and others
+
+def clean_citation(x: str) -> str:
+    # rm white space around references: eg [ 19] [ citation needed]
+    x = re.sub(r'\[(\s*[\w\s]+\s*)\]', lambda m: f"[{m.group(1).strip()}]", x)
+    return x
 
 def modify_sent_tokenise(text):
     sentences = sent_tokenize(text)
@@ -59,7 +65,7 @@ def proc_article(article):
 
     return sents
 
-def proc_sentence(item):
+def proc_sentence(item, DROP_SECTIONS):
     sentence = item['sentence'].strip()
     citation = txt_ends_with_citation(sentence) # has_citation(sentence)
 
@@ -72,8 +78,7 @@ def proc_sentence(item):
         (len(sentence_clean) < 15) or
         (sentence_clean[0].isalpha() and not sentence_clean[0].isupper()) or
         (not bool(re.search(r'[.!?]"?$' , sentence_clean)))
-        
-    ):
+        ):
         return None
     
     # strict label
@@ -91,24 +96,45 @@ def proc_sentence(item):
 
 def main():
 
-    with open(INPUT_PATH, "r", encoding="utf-8") as f:
-        data = [json.loads(line) for line in f]
+    languages  = [
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
+        "zh",  # Chinese
+        "ar",  # Arabic
+        "id"   # Indonesian
+    ]
+    for lang in languages:
+        print(f"Running {lang} ...", flush=True)
+        DROP_SECTIONS = DROP_SECTIONS[lang]
 
-    all_sents = []
-    for article in data:
-        all_sents.extend(proc_article(article))
+        INPUT_FILE = os.path.join(INPUT_DIR, f"{lang}_htmls.jsonl")
+        OUTPUT_FILE = os.path.join(OUTPUT_DIR, f"{lang}_sents.jsonl")
 
-    out_sents = []
-    for sent in all_sents:
-        item = proc_sentence(sent)
-        if item:
-            out_sents.append(item)
+        with open(INPUT_FILE, "r", encoding="utf-8") as f:
+            data = [json.loads(line) for line in f]
+
+        all_sents = []
+        for article in tqdm(data):
+            all_sents.extend(proc_article(article))
+
+        out_sents = []
+        for sent in all_sents:
+            item = proc_sentence(sent, DROP_SECTIONS)
+            if item:
+                out_sents.append(item)
 
 
-    
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as out_f:
-        for x in out_sents:
-            out_f.write(json.dumps(x, ensure_ascii=False) + "\n")
+        
+        with open(OUTPUT_PATH, "w", encoding="utf-8") as out_f:
+            for x in out_sents:
+                out_f.write(json.dumps(x, ensure_ascii=False) + "\n")
 
     # x = data[0]
     # p = x['text'][3]['paragraphs'][1]
