@@ -2,7 +2,7 @@
 #SBATCH --job-name=l8-m
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=03:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
@@ -18,18 +18,18 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # "qwen06b": "Qwen/Qwen3-0.6B",
 # "qwen32b": "Qwen/Qwen3-32B"
 
-DATASETS=("multi_5000") #"cn_fa" "cn_fa_ss" "cn_fa_ss_nl"
+LANGUAGES=("ct_english")
 MODELS=(
-  "llama_3_8b"
+  "llama3_1b"
 )
-BATCH=4
+BATCH=8
 EPOCHS=5
 
-for DATA in "${DATASETS[@]}"; do
+for LANGUAGE in "${LANGUAGES[@]}"; do
   for MODEL in "${MODELS[@]}"; do
     echo "Running with DATA=$DATA, MODEL=$MODEL"
-    uv run ft_peft.py \
-      --data "$DATA" \
+    uv run peft_run.py \
+      --lang "$LANGUAGE" \
       --model "$MODEL" \
       --batch_size $BATCH \
       --epochs $EPOCHS

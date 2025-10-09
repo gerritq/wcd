@@ -4,77 +4,32 @@ import argparse
 import random
 import evaluate
 import torch
-from datasets import Dataset
+from datasets import load_from_disk
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
 import re
+from utils import MODEL_MAPPING
+from prompts import PROMPT
 import time
 print(os.environ['HF_HOME'])
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data", type=str, required=True)
-parser.add_argument("--n", type=int, default=300)
+parser.add_argument("--lang", type=str, required=True)
 parser.add_argument("--model", type=str, required=True)
-parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--epochs", type=int, default=5)
 args = parser.parse_args()
 
-model_id = {
-    "llama_3_70b": "meta-llama/Meta-Llama-3-70B-Instruct",
-    "llama_3_8b": "meta-llama/Meta-Llama-3-8B-Instruct",
-    "qwen8b": "Qwen/Qwen3-8B",
-    "qwen3b": "Qwen/Qwen3-30B-A3B",
-    "qwen06b": "Qwen/Qwen3-0.6B",
-    "qwen32b": "Qwen/Qwen3-32B"
-}.get(args.model)
+BASE_DIR = os.getenv("BASE_WCD")
+DATA_DIR = os.path.join(BASE_DIR, "data/sets")
+OUTPUT_DIR = os.path.join(BASE_DIR, "data/scores")
 
-BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
-MAX_LENGTH = 128
-SEED = 42
+MODEL_ID = MODEL_MAPPING[args.model]
+set_seed(SEED)
+random.seed(SEED)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-PROMPT = """Your task is to determine whether a claim needs a citation (label=1) or no citation (label=0).
-
-Claim: ""{{claim}}""
-
-Output the label in the following format:
-{"label": <label>}
-
-Do not add any other text.
-# """
-
-# PROMPT = """Do you think the following claim needs a citation (YES) or no citation (NO)?
-
-# Claim: ""{{claim}}""
-
-# Only answer with YES or NO. Not other text.
-# """
-
-if args.data not in ["pl_sents","hu_sents","pt_sents","en_sents","cn_fa","cn_fa_ss","cn_fa_ss_nl"]:
-    raise ValueError(f"args.data '{args.data}' not available")
 
 set_seed(SEED)
 random.seed(SEED)
-
-def load_data():
-    if args.data in ["cn_fa","cn_fa_ss","cn_fa_ss_nl"]:
-        with open(os.path.join(BASE_DIR, f"data/sets/{args.data}.jsonl"), "r", encoding="utf-8") as f:
-            return [json.loads(l) for l in f]
-    data = []
-    with open(os.path.join(BASE_DIR, f"data/sets/{args.data}.jsonl"), "r", encoding="utf-8") as f:
-        for line in f:
-            obj = json.loads(line)
-            obj["label"] = obj.pop("label_2")
-            data.append(obj)
-    return data
-
-def build_testset():
-    data = load_data()
-    random.shuffle(data)
-    k = args.n // 2
-    pos = [x for x in data if x["label"] == 1][:k]
-    neg = [x for x in data if x["label"] == 0][:k]
-    data = pos + neg
-    random.shuffle(data)
-    return Dataset.from_list(data)
 
 def format_prompt(text: str) -> str:
     return PROMPT.replace("{{claim}}", text)

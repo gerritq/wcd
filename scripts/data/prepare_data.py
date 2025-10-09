@@ -2,7 +2,7 @@ import os
 import json
 import random
 from typing import List, Dict, Any
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, Features, ClassLabel, Value
 from collections import defaultdict
 
 SEED = 42
@@ -12,24 +12,63 @@ BASE_DIR = os.getenv("BASE_WCD", ".")
 IN_DIR = os.path.join(BASE_DIR, "data/sents")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets")
 
-def load_data(lang: str) -> List[Dict[str, Any]]:
-    path = os.path.join(IN_DIR, f"{lang}_sents.jsonl")
-    data = []
+def load_data(lang: str, n: int) -> list:
+    target_per_label = n // 2  
+
+    # load data
+    path = os.path.join(IN_DIR, f"{lang}_sents.json")
     with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                obj = json.loads(line)
-                data.append(obj)
-            except Exception:
+        try:
+            data = json.load(f)
+        except Exception:
+            data = []
+
+    # bucket by source and label
+    data_by_source_label = defaultdict(list)
+    for item in data:
+        key = f"{item['source']}_{item['label']}"
+        data_by_source_label[key].append(item)
+
+    data_out = []
+    for label in [0, 1]:
+        collected = []
+        remaining = target_per_label
+        for source in ["fa", "good", "views"]:  # high to low quality
+            key = f"{source}_{label}"
+            if key not in data_by_source_label:
                 continue
-    return data
+            random.shuffle(data_by_source_label[key])
+            take = min(remaining, len(data_by_source_label[key]))
+            collected.extend(data_by_source_label[key][:take])
+            remaining -= take
+            if remaining == 0:
+                break
+        data_out.extend(collected)
+
+    random.shuffle(data_out)
+    label_dist = defaultdict(int)
+    source_label_dist = defaultdict(lambda: defaultdict(int))
+    for x in data_out:
+        label_dist[x["label"]] += 1
+        source_label_dist[x["source"]][x["label"]] += 1
+
+    print(f"Len total data {len(data_out)}")
+    print(f"Label distribution: {dict(label_dist)}")
+    print("Source × Label distribution:")
+    for src, lbls in source_label_dist.items():
+        print(f"  {src}: {dict(lbls)}")
+    return data_out
 
 def build_monolingual_dataset(lang: str, n: int) -> DatasetDict:
-    data = load_data(lang)
+    data = load_data(lang, n)
     random.shuffle(data)
+    assert len(data) == n, "Data length error."
+
     k = n // 2
     pos = [x for x in data if x["label"] == 1][:k]
     neg = [x for x in data if x["label"] == 0][:k]
+    assert len(pos) == k, "Positive data does not meet min length."
+    assert len(neg) == k, "Negative data does not meet min length."
     data = pos + neg
     random.shuffle(data)
 
@@ -39,7 +78,13 @@ def build_monolingual_dataset(lang: str, n: int) -> DatasetDict:
         items.append({"claim": x['claim'], 
                       "label": int(x["label"])})
     ds = Dataset.from_list(items)
-    split = ds.train_test_split(test_size=0.1, seed=SEED)
+    ds = ds.cast_column("label", ClassLabel(num_classes=2, names=["0", "1"])) # needed to use stratify below
+    split = ds.train_test_split(test_size=0.1, seed=SEED, stratify_by_column="label")
+    
+    label_dist = defaultdict(int)
+    for x in split['test']:
+        label_dist[x["label"]] += 1
+    print(f"Test set label balance {dict(label_dist)}")
     return DatasetDict({"train": split["train"], "test": split["test"]})
 
 def build_multilingual_dataset(langs: List[str], n: int, test_share: float = .1) -> DatasetDict:
@@ -99,23 +144,24 @@ def save_dataset(ds: DatasetDict, out_dir: str) -> None:
 def main():
 
     languages  = [
-        "en",  # English
+        # "en",  # English
         "nl",  # Dutch
         "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
+        # "it",  # Italian
+        # "pt",  # Portuguese
         "ro",  # Romanian
-        "ru",  # Russian
-        "uk",  # Ukrainian
-        "bg",  # Bulgarian
+        # "ru",  # Russian
+        # "uk",  # Ukrainian
+        # "bg",  # Bulgarian
         # "zh",  # Chinese
         # "ar",  # Arabic
-        "id"   # Indonesian
+        # "id"   # Indonesian
     ]
     
-    n = 10000
+    n = 5000
 
-    for lang in langs:
+    for lang in languages:
+        print(f"\nRUNNING {lang} ...", flush=True)
         # mono
         ds = build_monolingual_dataset(lang, n)
         out_dir = os.path.join(OUT_DIR, f"{lang}")

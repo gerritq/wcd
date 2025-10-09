@@ -66,17 +66,17 @@ def parse_html(html: str, DROP_SECTIONS_LANG: dict):
 def main():
 
     languages  = [
-        "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
-        "ro",  # Romanian
-        "ru",  # Russian
+        # "en",  # English
+        # "nl",  # Dutch
+        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        # "it",  # Italian
+        # "pt",  # Portuguese
+        # "ro",  # Romanian
+        # "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
-        "zh",  # Chinese
-        "ar",  # Arabic
+        # "zh",  # Chinese
+        # "ar",  # Arabic
         "id"   # Indonesian
     ]
 
