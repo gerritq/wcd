@@ -5,65 +5,29 @@ import stanza
 from tqdm import tqdm
 from stanza.pipeline.core import Pipeline
 import torch
+
 """
-General
-- treat ar and zh separately
-- drop multipel white space!!!!
-DONE
+[senza fonte]
+[citation needed]
 
-General segmenation check:
-- single quote needsd to be appended to previous, if sentence starts with reference, same; 
-DONE
-- check that a sentence does not start with citations
-!!!
-- accoutn for noise in the reference splitting case
-!!
+2.
+  {
+    "title": "2С3",
+    "section": "История создания",
+    "source": "fa",
+    "context": "Основным применением таких САУ было непосредственное сопровождение пехоты и танков и стрельба по вражеским целям прямой наводкой.",
+    "p_ends_with_citation": true,
+    "p_any_citation": true,
+    "sentence": "В то же время в западных странах и США имелись САУ, предназначенные для ведения огня с закрытых позиций[прим.",
+    "has_citation": false,
+    "claim": "В то же время в западных странах и США имелись САУ, предназначенные для ведения огня с закрытых позиций[прим.",
+    "label": 1,
+    "label_conservative": null
+  },
 
-- manual splitting of those that did not work: <START>A observação da Guerra das Malvinas, travada em 1982 entre a Argentina e o Reino Unido, fez a Marinha do Brasil perceber sua fraqueza num hipotético conflito no Atlântico Sul.[1] Aeronaves argentinas afundaram ou danificaram vários navios britânicos com mísseis antinavio e bombas, e só não fizeram mais dano devido às baixas pesadas que sofreram para as aeronaves britânicas com mísseis ar-ar.<END>
-!!
-
-- what the heck: Na ausência do 1.º GAE, o Minas Gerais foi reduzido ao papel de porta-helicópteros.[1]:20
--- rm double brackets, and also add that to the cleaning
-- do the next sentence begins with citations ...
-
-Corrections
-- en:  -Beyoncé reflecting on 4 to GQ in 2024[7]
--- rm div class templatequotecite
-DONE
-
-- en: She intended 4 to help change that status, commenting, \"Figuring out a way to get R&B back on the radio is challenging ..
--- avoid spliiting ... ?
-
-- it: Area direttiva
--- can rm text in bold, though it is in a paragraph; but this is also dropped bc of length
-
-- it: Nota: in corsivo i calciatori che hanno lasciato la società a stagione in corso.
--- rm small
-
-- label
--- label 99 is a claim in a paragaph with citation, but has no direct citation
--- we could train a classifier on those and check whether they make a difference?
--- question is do we inlcude them to 1 or do we drop them?
-
-- en: Buses in Chennai were branded with the promotional slogan "Namma Chess, Namma Pride" (trans.
--- add custom words
-
-- cleaning
--- no open parantheses
-
-- checks
--- add a check that no brackets are in the cleaned sentences!!
-
-- drop sections in parsing
--- any(section in item['section'].lower() for section in DROP_SECTIONS_LANG) or
--- add to this also bold etc
-
-
-- pt
--- cleaning of cap or things that are behind citations ...
--- see here: https://pt.wikipedia.org/wiki/1.%C2%BA_Esquadr%C3%A3o_de_Avi%C3%B5es_de_Intercepta%C3%A7%C3%A3o_e_Ataque
-- -177 as well!!!!!
 """
+
+
 
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
@@ -85,6 +49,13 @@ LANG_MAP = {
     "id": "id",
 }
 
+# VARs
+QUOTES = "\"'‘’“”«»‹›„‚"
+QUOTES = re.escape(QUOTES)
+END_PUNCT = ".!?"
+END_PUNCT = re.escape(END_PUNCT)
+SENT_STARTS_WITH_QUOTE=0
+
 # for code in set(LANG_MAP.values()):
 #     print(f"Downloading {code}")
 #     stanza.download(code, processors="tokenize", verbose=False)
@@ -98,8 +69,12 @@ def clean(x: str):
 
     # special cleaning operations from screening the data
     # saw in pt but not in all articles, eg https://pt.wikipedia.org/wiki/1.%C2%BA_Esquadr%C3%A3o_de_Avi%C3%B5es_de_Intercepta%C3%A7%C3%A3o_e_Ataque
-    x = re.sub(r"(\]):\s?([\d-]+|cap\.?\s?\d+)", r"\1", x) # first group: [19]:12-13, second group: [19]:cap. 3
+    x = re.sub(r"(\]):\s?([\d\-–]+|cap\.?\s?\d+)", r"\1", x) # first group: [19]:12-13, second group: [19]:cap. 3
 
+    # eg en https://en.wikipedia.org/wiki/1964_Illinois_House_of_Representatives_election
+
+    # no space between quotes and punction, eg nl https://nl.wikipedia.org/wiki/Sacharias_Jansen
+    x = re.sub( rf"([{QUOTES}])\s*([?.!])", r"\1\2", x)
 
     return x.strip()
 
@@ -108,20 +83,35 @@ def clean_citation(x: str) -> str:
     x = re.sub(r'\[(\s*[\w\s]+\s*)\]', lambda m: f"[{m.group(1).strip()}]", x)
     # clean white space between references
     x = re.sub(r'\]\s+\[', '][', x)
+    # clean whitespace between punction and citation
+    x = re.sub(r'([.?!"])\s+\[', r'\1[', x)
+    # clean whitespace between citation and punction
+    x = re.sub(r'\]\s+([^\w\s])', r']\1', x)
+    # insert whitespace betwee reference]-text, , eg nl https://nl.wikipedia.org/wiki/Sacharias_Jansen
+    x = re.sub(r"(\])(\w)", r"\1 \2", x)
+
+    # do we want to reverse??
+    x = re.sub(r'([.?!]["\'”’]?)(\s*(?:\[[\w\s\?]+\])+)', r'\2\1', x) # ? in the second group as for some language citation needed has a question mark inlcuded, eg pt, nl
     return x
 
 def ends_with_citation(x):
     """is this d or w in the regex?"""
     # accounts for both references after and before end token
     x = x.strip()
-    return (bool(re.search(r'(?:\[\d+\])$', x)) or  # matches .[90]
-            bool(re.search(r'(?:\[\d+\])+[\'"”]?[.?!][\'"”]?$', x)) 
-            )# this matches...[90]. or [90]? or ...
+    # return (bool(re.search(r'(?:\[\d+\])$', x)) or  # matches .[90]
+    #         bool(re.search(r'(?:\[\d+\])+[\'"”]?[.?!][\'"”]?$', x)) 
+    #         )# this matches...[90]. or [90]? or ...
+
+    return bool(re.search(rf'(?:\[(\d+|\w\s\d+)\])+(\[[\w\s]+\])*[.?!:;{QUOTES}]*$', x))
+    
 
 def has_citation(text):
-    return bool(re.search(r'\[\d+\]', text))
+    # account for citations like [r 1], eg en https://en.wikipedia.org/wiki/1964_Illinois_House_of_Representatives_election
+    return bool(re.search(r'\[(\d+|\w\s\d+)\]', text))
 
 def remove_citations(x):
+    if not x:
+        return None
     x = re.sub(r'\[[\w\s]+\]', '', x) # rm [19], and also notes and others
     x = x.strip()
     return x # also rm notes, and others
@@ -133,18 +123,29 @@ def remove_citations(x):
 
 def split_sentences2(text: str, lang: str, nlp: Pipeline):
     """takes a clean text!"""
+    global SENT_STARTS_WITH_QUOTE
     doc = nlp(text)
     sentences = [s.text.strip() for s in doc.sentences]
+
+    # for n turns, check whether there are cases where the split was not succefull.abs
+    # failed_split_pattern
 
     # corrections
     corrected = []
     for s in sentences:
-        if bool(re.search(r'^(\[\d+\])+$', s)): # sentece is one or more references, eg [2] or [2][3]
+        if bool(re.search(rf'^(\[\d+\])+[{END_PUNCT}]?$', s)): # sentece is one or more references, eg [2] or [2][3]
             if corrected:
                 corrected[-1] = corrected[-1].rstrip() + s
         else:
             corrected.append(s)
 
+
+    # some checks
+    for c in corrected:
+        if c.strip().startswith("["):
+            SENT_STARTS_WITH_QUOTE +=1
+            print("Sentence starts with a citation.")
+        
 
     return corrected
 
@@ -163,12 +164,15 @@ def drop_sentence(x: str) -> bool:
     if x[0].isalpha() and not x[0].isupper():
         return True
 
-    if not bool(re.search(r'[.!?"\'”;:]$' , x)):
+    if not bool(re.search(rf'[{QUOTES}.!?;:]$' , x)):
         return True
 
     # cleaning issues
     if x.count("(") != x.count(")"):
         return True # parantheses do not match
+
+    if x.count("[") != x.count("]"):
+        return True # brackets do not match
     return False
 
 def proc_article(article: dict, lang: str, nlp: Pipeline):
@@ -178,32 +182,39 @@ def proc_article(article: dict, lang: str, nlp: Pipeline):
             continue
         for paragraph in section['paragraphs']:
             # cleaning -> order important!!
+            print("\n\n+++++++++++++++\n\n", paragraph)
             paragraph = clean(paragraph) # general cleaning
             paragraph = clean_citation(paragraph) # citations
-            
-            print(f"\n\n{paragraph}")
+            print("\n\n\CLEAN+++++++++++++++\n\n", paragraph)
+            # print(f"\n\n{paragraph}")
             # paragraph citation indicators
             p_ends_with_citation = ends_with_citation(paragraph)
             p_any_citation = has_citation(paragraph)
             
             # get sentences
             extracted_sents = split_sentences2(paragraph, lang, nlp)
+            
+            prev_sentence = None
             for s in extracted_sents:
                 print(f"<START>{s}<END>")
                 sents.append({'title': article['title'],
                               'section': section['header'],
                               'source': article['source'],
+                              'context':  prev_sentence,
                               'p_ends_with_citation': p_ends_with_citation,
                               'p_any_citation': p_any_citation,
                               'sentence': s})
+                prev_sentence = s
     return sents
 
 
 def proc_sentence(item):
     sentence = item['sentence'].strip()
+    context = item['context']
     citation = has_citation(sentence) # has_citation(sentence)
 
     sentence_clean = remove_citations(sentence)
+    context_clean = remove_citations(context)
 
     if drop_sentence(sentence_clean):
         return None
@@ -223,6 +234,7 @@ def proc_sentence(item):
     #     label = 99
 
     item.update({"has_citation": citation,
+                 "context": context_clean,
                  "claim": sentence_clean,
                  'label': label,
                  'label_conservative': label_conservative})
@@ -230,18 +242,18 @@ def proc_sentence(item):
 
 def main():
     languages  = [
-        # "en",  # English
-        # "nl",  # Dutch
-        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        # "it",  # Italian
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
         "pt",  # Portuguese
-        # "ro",  # Romanian
-        # "ru",  # Russian
-        # "uk",  # Ukrainian
-        # "bg",  # Bulgarian
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
         # # "zh",  # Chinese
-        # # "ar",  # Arabic
-        #  "id"   # Indonesian
+        # "ar",  # Arabic
+         "id"   # Indonesian
     ]
     for lang in languages:
         print("="*10)
@@ -254,9 +266,12 @@ def main():
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
             data = [json.loads(line) for line in f]
             # data = [x for x in data if x['source'] not in "views"]
-        data = [x for x in data if x['title'] == "1.º Esquadrão de Aviões de Interceptação e Ataque"]
+        # data = [x for x in data if x['title'] == "1964 Illinois House of Representatives election"]
         print(data)
-        # data = data[:50]
+        # data = [data[10]]
+        # print(data)
+        data = data[:100]
+        # print(data)
 
         # define parser
         nlp = stanza.Pipeline(lang=LANG_MAP[lang], processors="tokenize", tokenize_pretokenized=False, use_gpu=torch.cuda.is_available())
@@ -273,6 +288,8 @@ def main():
 
         with open(OUTPUT_FILE, "w", encoding="utf-8") as out_f:
             json.dump(out_sents, out_f, ensure_ascii=False, indent=2)
+
+        print("Sentence dropped bc of failed splitting", SENT_STARTS_WITH_QUOTE)
 
     
 if __name__ == "__main__":

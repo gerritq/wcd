@@ -40,11 +40,12 @@ def get_generation_tag(tokenizer):
 
     return assistant_tag, assistant_tag_ids
 
-def check_completion_mask(tokenizer, tokenised_item):
+def check_labels(tokenizer, tokenised_item):
     token_ids = np.array(tokenised_item['input_ids'])
-    completion_mask = np.array(tokenised_item['completion_mask']).astype(bool)
+    labels = np.array(tokenised_item['labels'])
+    mask = labels != -100
 
-    print(tokenizer.decode(token_ids[completion_mask]))
+    print(tokenizer.decode(token_ids[mask]))
 
 def tokenize(example: dict, tokenizer, assistant_tag_ids: List[int]):
 
@@ -73,11 +74,11 @@ def tokenize(example: dict, tokenizer, assistant_tag_ids: List[int]):
     # generate completion mask
     # no need to shift lables, done by the model internally:
     # https://discuss.huggingface.co/t/where-does-the-transformers-do-the-target-text-shifting-in-causal-lm/32408
-    labels = [100]*len(text_input_ids)
+    labels = [-100]*len(text_input_ids)
     start = assistant_tag_index + len(assistant_tag_ids)
-    labels[start:] = text_input_ids[:start]
+    labels[start:] = text_input_ids[start:]
 
-    assert len(labels) == len(text_input_ids), "Completion mask length is incorrect."
+    assert len(labels) == len(text_input_ids), "Labels length is incorrect."
 
     text_tok['labels'] =  labels
     return text_tok
@@ -105,7 +106,7 @@ def main():
     print(tokenized_ds['messages'][0])
     print(tokenized_ds[0])
 
-    check_completion_mask(tokenizer, tokenized_ds[0])
+    check_labels(tokenizer, tokenized_ds[0])
 
 if __name__ == "__main__":
     main()

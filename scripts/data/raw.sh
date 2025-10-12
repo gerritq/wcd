@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=en-ro
+#SBATCH --job-name=ru-id
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=14:00:00

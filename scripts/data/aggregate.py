@@ -6,7 +6,7 @@ from collections import defaultdict
 BASE_DIR = os.getenv("BASE_WCD")
 INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
 OUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
-INFO_FILE = os.path.join(BASE_DIR, "data/info/aggregation.jsonl")
+INFO_FILE = os.path.join(BASE_DIR, "data/info/aggregate_drop.jsonl")
 
 MAIN_PAGES = {
     "en": "Main_Page",                  # English
@@ -21,8 +21,20 @@ MAIN_PAGES = {
     "zh": "Wikipedia:首页",              # Chinese
     "ar": "الصفحة_الرئيسية",            # Arabic
     "id": "Halaman_Utama"               # Indonesian
-}
+    }
 
+# For ID, lots of FA/good article pages are discussion (Pembicaraan) pages
+REMOVE_PREFIX = ["Pembicaraan:"]
+
+# bg: Потребител = user
+# bg: Категория = Category
+# uk: Категорія = Category
+# bg: Уикипедия = Wikipedia
+# ru,bg,uk: Шаблон = template
+
+DROP_PAGES = ["Wikipedia", "Templat", "Template", "Kategori", "Category", "Categorie:Wikipedia", 
+              "Categoria", "Categorie", "Категория", "Категорія", "Уикипедия", "Шаблон", 
+              "Потребител"]
 def main():
     
     languages  = [
@@ -35,8 +47,8 @@ def main():
         "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
-        "zh",  # Chinese
-        "ar",  # Arabic
+        # "zh",  # Chinese
+        # "ar",  # Arabic
         "id"   # Indonesian
     ]
 
@@ -68,21 +80,31 @@ def main():
 
             for i, item in enumerate(data):
                 title = item['title']
-                main_page = [MAIN_PAGES[lang].lower(), MAIN_PAGES[lang].replace("_", " ").lower()]
+
+                # drop if main page
+                main_page = [MAIN_PAGES[lang].lower(), MAIN_PAGES[lang].replace("_", " ").lower()] # drop if main page
                 if title in main_page:
                     skip_titles[lang].append(title)
                     continue
+
+                # chinese talk page case
                 if lang == "zh":
                     if title.startswith("Talk:"): # zh cases
                         title = title.replace("Talk:", "")
-                else:
-                    if ":" in title:
-                        skip_titles[lang].append(title)
-                        continue
+                
+                # drop if in predefined list
+                if any(title.lower().startswith(p.lower()) for p in DROP_PAGES):
+                    skip_titles[lang].append(title)
+                    continue
+
+                # for id, rm prefi
+                for p in REMOVE_PREFIX:
+                    if title.lower().startswith(p.lower()):
+                        title = title[len(p):].strip()
                     
-                if item['title'] not in unique_titles:
-                    all_titles.append({"title": item["title"], "source": source})
-                    unique_titles.add(item['title'])
+                if title not in unique_titles:
+                    all_titles.append({"title": title, "source": source})
+                    unique_titles.add(title)
             
         OUTPUT_FILE = os.path.join(OUT_PATH, f"{lang}_all.jsonl")
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:

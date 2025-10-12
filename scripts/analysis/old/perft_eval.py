@@ -1,10 +1,13 @@
 
 # need to get messages
 # do eval by lang
-
-
-import os, json, re, time, random
-import torch, evaluate
+import os
+import json
+import re
+import time
+import random
+import torch
+import evaluate
 from datasets import Dataset, DatasetDict, load_from_disk
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
 from peft import AutoPeftModelForCausalLM
@@ -15,16 +18,24 @@ acc_metric = evaluate.load("accuracy")
 f1_metric = evaluate.load("f1")
 
 BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
-FT_DIR   = os.path.join(BASE_DIR, "data/ft")
-OUT_DIR  = os.path.join(BASE_DIR, "data/scores")
+MODEL_DIR   = os.path.join(BASE_DIR, "data/models")
+OUT_DIR  = os.path.join(BASE_DIR, "data/scores/metrics")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-MAX_LENGTH = 128
-SEED = 42
+MAX_LENGTH = 256*4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {DEVICE}")
 
 set_seed(SEED)
 random.seed(SEED)
+
+# TOKENISER
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
+tokenizer.truncation_side = "left"
+
+
 
 def save_jsonl(records, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)

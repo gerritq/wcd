@@ -8,7 +8,7 @@ INPUT_DIR = os.path.join(BASE_DIR, f"data/sents")
 
 def main():
     
-    lang='en'
+    lang='it'
     n=20
 
     print("="*10)
@@ -19,11 +19,13 @@ def main():
 
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         data = json.load(f) 
-    random.shuffle(data)
-    for i, item in enumerate(data[:n]):
+        random.shuffle(data)
+        pos = [x for x in data if x['label'] == 1][:n//2]
+        neg = [x for x in data if x['label'] == 0][:n//2]
+        checks = pos + neg
+    for i, item in enumerate(checks):
         print(f"\nItem {i}")
-        for key, value in item.items():
-            print(key, ":", value)
+        print(item)
 
 if __name__ == "__main__":
     main()

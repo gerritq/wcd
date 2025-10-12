@@ -9,4 +9,4 @@
 
 nvidia-smi
 
-uv run eval.py
+uv run peft_eval.py

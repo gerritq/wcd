@@ -2,7 +2,7 @@ import os
 import json
 import random
 from typing import List, Dict, Any
-from datasets import Dataset, DatasetDict, Features, ClassLabel, Value
+from datasets import Dataset, DatasetDict, load_from_disk
 from collections import defaultdict
 
 SEED = 42
@@ -12,144 +12,148 @@ BASE_DIR = os.getenv("BASE_WCD", ".")
 IN_DIR = os.path.join(BASE_DIR, "data/sents")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets")
 
-def load_data(lang: str, n: int) -> list:
-    target_per_label = n // 2  
+def prepare_data(lang: str, total_n: int) -> list:
+    
+    def load_data(lang: str) -> list:
+        path = os.path.join(IN_DIR, f"{lang}_sents.json")
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except Exception:
+                data = []
+        return data
 
     # load data
-    path = os.path.join(IN_DIR, f"{lang}_sents.json")
-    with open(path, "r", encoding="utf-8") as f:
-        try:
-            data = json.load(f)
-        except Exception:
-            data = []
+    data = load_data(lang)
 
-    # bucket by source and label
-    data_by_source_label = defaultdict(list)
-    for item in data:
-        key = f"{item['source']}_{item['label']}"
-        data_by_source_label[key].append(item)
+    # balance data by label, picking high-quality subsets first
+    n_per_label = total_n // 2  
 
-    data_out = []
-    for label in [0, 1]:
-        collected = []
-        remaining = target_per_label
-        for source in ["fa", "good", "views"]:  # high to low quality
-            key = f"{source}_{label}"
-            if key not in data_by_source_label:
-                continue
-            random.shuffle(data_by_source_label[key])
-            take = min(remaining, len(data_by_source_label[key]))
-            collected.extend(data_by_source_label[key][:take])
-            remaining -= take
-            if remaining == 0:
-                break
-        data_out.extend(collected)
+    sorted_pos = []
+    sorted_neg = []
+    for subset in ['fa', 'good', "views"]:
+        temp = [x for x in data if x['source'] == subset]
+        
+        temp_pos = [x for x in temp if x['label'] == 1]
+        temp_neg = [x for x in temp if x['label'] == 0]
+        
+        sorted_pos.extend(temp_pos)
+        sorted_neg.extend(temp_neg)
 
-    random.shuffle(data_out)
-    label_dist = defaultdict(int)
+    final_data = sorted_pos[:n_per_label] + sorted_neg[:n_per_label]
+
+    assert len(final_data) == total_n, "Data error."
+
     source_label_dist = defaultdict(lambda: defaultdict(int))
-    for x in data_out:
-        label_dist[x["label"]] += 1
+    for x in final_data:
         source_label_dist[x["source"]][x["label"]] += 1
-
-    print(f"Len total data {len(data_out)}")
-    print(f"Label distribution: {dict(label_dist)}")
     print("Source × Label distribution:")
     for src, lbls in source_label_dist.items():
-        print(f"  {src}: {dict(lbls)}")
-    return data_out
+        print(f"\t{src}: {dict(lbls)}")
 
-def build_monolingual_dataset(lang: str, n: int) -> DatasetDict:
-    data = load_data(lang, n)
-    random.shuffle(data)
-    assert len(data) == n, "Data length error."
+    return final_data
 
-    k = n // 2
-    pos = [x for x in data if x["label"] == 1][:k]
-    neg = [x for x in data if x["label"] == 0][:k]
-    assert len(pos) == k, "Positive data does not meet min length."
-    assert len(neg) == k, "Negative data does not meet min length."
-    data = pos + neg
-    random.shuffle(data)
-
-    items = []
+def build_monolingual_dataset(lang: str, total_n: int, out_dir: str) -> None:
+    # load and select data
+    data = load_data(lang, total_n)
+    items=[]
     for x in data:
         # change label_conservative here to test
         items.append({"claim": x['claim'], 
                       "label": int(x["label"])})
-    ds = Dataset.from_list(items)
-    ds = ds.cast_column("label", ClassLabel(num_classes=2, names=["0", "1"])) # needed to use stratify below
-    split = ds.train_test_split(test_size=0.1, seed=SEED, stratify_by_column="label")
+
+    # split data
+    split_1 = int(0.8 * len(items))
+    split_2 = int(0.9 * len(items))
+    split_1_half = split_1 // 2
+    split_2_half = split_2 // 2
     
-    label_dist = defaultdict(int)
-    for x in split['test']:
-        label_dist[x["label"]] += 1
-    print(f"Test set label balance {dict(label_dist)}")
-    return DatasetDict({"train": split["train"], "test": split["test"]})
+    pos = random.shuffle([x for x in items if x["label"] == 1])
+    neg = random.shuffle([x for x in items if x["label"] == 0])
 
-def build_multilingual_dataset(langs: List[str], n: int, test_share: float = .1) -> DatasetDict:
-    # is here the full training data
-    n_langs = len(langs)
+    train = pos[:split_1_half] + neg[:split_1_half]
+    dev = pos[split_1_half:split_2_half] + neg[split_1_half:split_2_half]
+    test = pos[split_2_half:] + neg[split_2_half:]
 
-    per_lang_total = n // n_langs
-    per_lang_train = int(round(per_lang_total * (1 - test_share)))
-    per_lang_test  = int(round(n * test_share))
-    
-    train = []
-    test = []
-    for lang in langs:
-        data = load_data(lang)
-        random.shuffle(data)
+    # small check
+    for set_, name in zip([train, dev, test], ['train', 'dev', 'test']):
+        label_dist = defaultdict(int)
+        for x in set_:
+            label_dist[x["label"]] += 1
+        print(f"Distribuion set {name}: {dict(label_dist)}")
 
-        pos = []
-        neg = []
-        for x in data:
-            item = {'lang': lang, 'claim': x['claim'], 'label': x['label']}
-            if x['label'] == 1:
-                pos.append(item)
-            else:
-                neg.append(item)
-
-        tr_pos_n = min(len(pos), per_lang_train // 2)
-        tr_neg_n = min(len(neg), per_lang_train - tr_pos_n)
-
-        te_pos_n = min(len(pos) - tr_pos_n, per_lang_test // 2)
-        te_neg_n = min(len(neg) - tr_neg_n, per_lang_test - te_pos_n)
-
-        train.extend(pos[:tr_pos_n] + neg[:tr_neg_n])
-        test.extend(pos[tr_pos_n:tr_pos_n + te_pos_n] + neg[tr_neg_n:tr_neg_n + te_neg_n])
-
-    random.shuffle(train)
-    random.shuffle(test)
-
-    # check 
-    def counts(items):
-        d = defaultdict(lambda: defaultdict(int))
-        for x in items:
-            d[x["lang"]][x["label"]] += 1
-        return {k: dict(v) for k, v in d.items()}
-
-    print("Training counts:", counts(train))
-    print("Test counts:", counts(test))
-
-    return DatasetDict({
+    ds = DatasetDict({
         "train": Dataset.from_list(train),
-        "test": Dataset.from_list(test)
+        "dev": Dataset.from_list(dev),
+        "test": Dataset.from_list(test),
     })
+    ds.save_to_disk(out_dir)
 
-def save_dataset(ds: DatasetDict, out_dir: str) -> None:
-    os.makedirs(out_dir, exist_ok=True)
+def build_multilingual_training_data(languages: List[str], total_n: int, out_dir: str) -> None:
+    """Takes data from the monolingual datasets"""
+    training_n = int(.8 * total_n)
+    val_n = int(.1 * total_n)
+    n_languages = len(languages)
+    
+    # train split
+    train_n_per_language = training_n // n_languages
+    train_n_per_language_per_label = train_n_per_language // 2
+
+    # dev split
+    val_n_per_language = val_n // n_languages
+    val_n_per_language_per_label = val_n_per_language // 2
+
+    train = []
+    dev = []
+    for lang in languages: 
+        # load data 
+        in_dir = os.path.join(OUT_DIR, lang)
+        temp = load_from_disk(in_dir)
+        
+        # train
+        pos = [x for x in temp['train'] if x['label'] == 1]
+        neg = [x for x in temp['train'] if x['label'] == 0]
+
+        train.extend(pos[:train_n_per_language_per_label])
+        train.extend(neg[:train_n_per_language_per_label])
+
+        # dev
+        pos = [x for x in temp['dev'] if x['label'] == 1]
+        neg = [x for x in temp['dev'] if x['label'] == 0]
+
+        dev.extend(pos[:val_n_per_language_per_label])
+        dev.extend(neg[:val_n_per_language_per_label])
+
+        # add language labels
+        for x in train:
+            x['lang'] = lang
+        for x in dev:
+            x['lang'] = lang
+
+    # small check
+    for set_, name in zip([train, dev], ['train', 'dev']):
+        label_dist = defaultdict(lambda: defaultdict(int))
+        for x in set_:
+            label_dist[x["lang"]][x['label']] += 1
+
+        label_dist = {k: dict(v) for k, v in label_dist.items()}
+        print(f"Distribuion set {name}: {dict(label_dist)}")
+
+    ds = DatasetDict({
+        "train": Dataset.from_list(train),
+        "dev": Dataset.from_list(val),
+        })
     ds.save_to_disk(out_dir)
 
 def main():
 
     languages  = [
-        # "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        #  "en",  # English
+        # "nl",  # Dutch
+        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
         # "it",  # Italian
         # "pt",  # Portuguese
-        "ro",  # Romanian
+        # "ro",  # Romanian
         # "ru",  # Russian
         # "uk",  # Ukrainian
         # "bg",  # Bulgarian
@@ -158,19 +162,19 @@ def main():
         # "id"   # Indonesian
     ]
     
-    n = 5000
+    # set n
+    training_n = 5000
+    total_n = 5000 / .8 # assuming .1 dev and test
 
     for lang in languages:
         print(f"\nRUNNING {lang} ...", flush=True)
         # mono
-        ds = build_monolingual_dataset(lang, n)
         out_dir = os.path.join(OUT_DIR, f"{lang}")
-        save_dataset(ds, out_dir)
+        ds = build_monolingual_dataset(lang, total_n, out_dir)
 
     # multilingual
-    # ds = build_multilingual_dataset(langs, n)
-    # out_dir = os.path.join(OUT_DIR, f"multi_{n}")
-    # save_dataset(ds, out_dir)
+    out_dir = os.path.join(OUT_DIR, f"multi")
+    build_multilingual_training_data(languages, total_n, out_dir)
 
 if __name__ == "__main__":
     main()

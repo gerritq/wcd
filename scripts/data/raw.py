@@ -46,18 +46,18 @@ def get_html(lang: str, title: str):
 
 def main():
     languages  = [
-        "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
-        "ro",  # Romanian
-        # "ru",  # Russian
-        # "uk",  # Ukrainian
-        # "bg",  # Bulgarian
+        # "en",  # English
+        # "nl",  # Dutch
+        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        # "it",  # Italian
+        # "pt",  # Portuguese
+        # "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
         # "zh",  # Chinese
         # "ar",  # Arabic
-        # "id"   # Indonesian
+        "id"   # Indonesian
     ]
 
     for lang in languages:
