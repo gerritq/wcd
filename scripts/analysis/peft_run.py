@@ -5,29 +5,32 @@ import argparse
 import random
 import torch
 import time
-from utils import MODEL_MAPPING
-from prompts import PROMPTS
+from utils import (
+                    MODEL_MAPPING, 
+                    append_meta_file, 
+                    get_model_number
+)
+from prompts import SYSTEM_PROMPTS_SLM
 from datasets import load_from_disk
 from typing import List, Dict
 
 from datasets import Dataset
 from trl import SFTTrainer, SFTConfig
 from peft import LoraConfig, get_peft_model
-from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
+from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed, BitsAndBytesConfig
+from datetime import datetime
 
-"""
-1. what is add_generation_prompt doing?
+# HF recommends nf4
+# 
+# bfloat speeds up training
+# load in 4bit reducses storage size
+# HF recommends nf4
+nf4_config = BitsAndBytesConfig(
+   load_in_4bit=True,
+   bnb_4bit_quant_type="nf4",
+   bnb_4bit_compute_dtype=torch.bfloat16
+)
 
-2. How to do assistant only loss?
-- https://huggingface.co/docs/trl/en/sft_trainer
-- https://www.reddit.com/r/LocalLLaMA/comments/1f1ygd7/masking_loss_for_input_tokens_when_finetuning/
-- https://github.com/tloen/alpaca-lora/blob/main/finetune.py
-- https://gist.github.com/Blaizzy/40de0f6b4340490e3920db9e182e6455
-- for data collators: https://huggingface.co/docs/trl/v0.9.6/en/sft_trainer
-- Data collator example used to build the below: https://gist.github.com/Blaizzy/40de0f6b4340490e3920db9e182e6455
-
-3. Try doing the -100 by our own
-"""
 
 # ARGPARSE
 parser = argparse.ArgumentParser()
@@ -39,10 +42,8 @@ parser.add_argument("--plw", type=int, default=1)
 parser.add_argument("--system", type=int, required=True)
 parser.add_argument("--notes", type=str)
 args = parser.parse_args()
-args.plw = bool(args.plw) # make plw bool
-args.system = bool(args.system) # make plw bool
-
-print(f"Running plw {args.plw}")
+args.plw = bool(args.plw)
+args.system = bool(args.system) 
 
 # DIRs
 BASE_DIR = os.getenv("BASE_WCD")
@@ -51,14 +52,8 @@ MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm")
 
 # VARs
 MODEL_ID = MODEL_MAPPING[args.model]
-MAX_LENGTH = 256*4
-PROMPT_KEY = args.lang
-if args.system:
-    PROMPT_KEY = PROMPT_KEY + "_system"
-PROMPT = PROMPTS[PROMPT_KEY]
 
 set_seed(42)
-random.seed(42)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
@@ -69,45 +64,30 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
 tokenizer.truncation_side = "left"
 
-def append_meta_file(meta: dict, model_dir: str):
-    meta_path = os.path.join(model_dir, "meta_overview.jsonl")
-    with open(meta_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(meta, ensure_ascii=False) + "\n")
+MAX_LENGTH = tokenizer.model_max_length
+print("Max context length:", MAX_LENGTH)
 
-def get_model_number(model_dir: str) -> int:
-    model_names = [d for d in os.listdir(model_dir) if d.startswith("model_") and os.path.isdir(os.path.join(model_dir, d))]
-    
-    numbers = []
-    for name in model_names:
-        
-        num = int(name.split("_")[1])
-        numbers.append(num)
-        
-    next_number = max(numbers) + 1 if numbers else 1
-    return next_number
+def build_messages(dataset: Dataset, system: bool) -> Dataset:
 
-def build_messages(dataset: Dataset, PROMPT: str, system: bool) -> Dataset:
-    
     def preprocess_function(example):
+        if args.system:
+            PROMPT = SYSTEM_PROMPTS_SLM[example['lang']]
+        else:
+            # to do
+            pass
         
         if system:
             x = {
             "messages": [
-                {"role": "system", "content": PROMPT},
-                {"role": "user", "content": f"Claim: {example['claim']}"},
-                {"role": "assistant", "content": json.dumps({"label": int(example["label"])})}
+                {"role": "system", "content": PROMPT['system']},
+                {"role": "user", "content": PROMPT['user'].format(claim=example['claim'])},
+                {"role": "assistant", "content": PROMPT['assistant'].format(label=example['label'])}
             ]
         }
 
         else:
-            x = {
-                "messages": [
-                    {"role": "system", "content": "You are a seasoned Wikipedia fact-checker."},
-                    {"role": "user", "content": PROMPT.replace("{{claim}}", example["claim"])},
-                    {"role": "assistant", "content": json.dumps({"label": int(example["label"])})}
-                ]
-            }
-
+            # to do
+            pass
         return x
     
     data = list(dataset) 
@@ -179,13 +159,19 @@ def main():
     ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
     # train_msgs_ds = build_messages(ds["train"].select(range(10)))
     # train_msgs_ds = build_messages(ds["train"])
-    train_msgs_ds = build_messages(ds["train"], PROMPT, args.system)
+    train_msgs_ds = build_messages(ds["train"], args.system)
+    dev_msgs_ds = build_messages(ds["dev"], args.system)
     
-    print("Example msg" ,train_msgs_ds[0],"\n\n")
+    print("Example message for training\n\t", train_msgs_ds[0],"\n\n")
 
     assistant_tag, assistant_tag_ids = get_generation_tag(tokenizer)
         
     train_tok = train_msgs_ds.map(custom_tokenize,
+                                fn_kwargs={"tokenizer": tokenizer,
+                                           "assistant_tag_ids": assistant_tag_ids,
+                                           "pwt": args.plw}
+                                )
+    dev_tok = dev_msgs_ds.map(custom_tokenize,
                                 fn_kwargs={"tokenizer": tokenizer,
                                            "assistant_tag_ids": assistant_tag_ids,
                                            "pwt": args.plw}
@@ -195,8 +181,8 @@ def main():
     base_model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID,
         # device_map="auto", # let sft handle this
-        torch_dtype="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        quantization_config=nf4_config
     )
 
     if hasattr(base_model, "enable_input_require_grads"):
@@ -225,16 +211,13 @@ def main():
                         f"all params: {all_param:,d} || "
                         f"trainable%: {100 * trainable_params / all_param:.4f}"
                         )
-    
-    print(f"Memory allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
-    print(f"Max memory allocated: {torch.cuda.max_memory_allocated() / 1024**2:.2f} MB")
-
 
     training_args = SFTConfig(
         output_dir=None,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         num_train_epochs=args.epochs,
+        learning_rate=1e-4, # higher learning rate as only adapters are trained
         save_strategy="no",
         save_total_limit=1,
         logging_strategy="epoch",
@@ -242,24 +225,32 @@ def main():
         fp16=torch.cuda.is_available(),
         gradient_checkpointing=True,
         do_eval=False,
-        # chat_template_path="HuggingFaceTB/SmolLM3-3B",
-        # assistant_only_loss=True # important so that loss is only computed on the assistant tokens
+        packing=False,
+        max_length=MAX_LENGTH
+        # assistant_only_loss=True # does not work, hence our own implmentation
     )
 
+    print(f"Memory allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+    print(f"Max memory allocated: {torch.cuda.max_memory_allocated() / 1024**2:.2f} MB")
+    
     trainer = SFTTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_tok
+        train_dataset=train_tok,
+        eval_dataset=dev_tok,
     )
 
     trainer.train()
 
-    print(trainer.state.log_history)
-
+    # collect losses
     train_losses = []
+    eval_losses = []
+    
     for log in trainer.state.log_history:
         if "loss" in log:
             train_losses.append({"epoch": log.get("epoch"), "loss": log["loss"]})
+        if "eval_loss" in log:
+            eval_losses.append({"epoch": log.get("epoch"), "eval_loss": log["eval_loss"]})
 
     end = time.time()
 
@@ -268,16 +259,18 @@ def main():
 
     meta = {
         "model_number": model_number,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data": args.lang,
         "model": MODEL_ID,
         "plw": args.plw,
         "system": args.system,
         "train_n": len(ds['train']),
-        "test_n": len(ds['test']),
+        "dev_n": len(ds['dev']),
         "epochs": args.epochs,
         "batch_size": training_args.per_device_train_batch_size,
         "learning_rate": training_args.learning_rate,
         "train_losses": train_losses,
+        "eval_losses": eval_losses,
         "lora": {"r": lora_cfg.r, "alpha": lora_cfg.lora_alpha, "dropout": lora_cfg.lora_dropout},
         "trainable_parameters": trainable_params_str,
         "time_min": (end - start) / 60.0,

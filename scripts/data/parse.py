@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 from tqdm import tqdm
 from skip_sections import DROP_SECTIONS
 
-
 BASE_DIR = os.getenv("BASE_WCD")
 INPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
 OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/parsed")
@@ -52,7 +51,7 @@ def parse_html(html: str, DROP_SECTIONS_LANG: list, CITATION_NEEDED_LANG: str):
                 continue
 
             # get txt
-            text = tag.get_text(" ", strip=True)  
+            text = tag.get_text()  
             if text:
                 current_section["paragraphs"].append(text)
 
@@ -88,13 +87,13 @@ def main():
                         }
 
     languages  = [
-        # "en",  # English
-        # "nl",  # Dutch
-        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        # "it",  # Italian
-        # "pt",  # Portuguese
-        # "ro",  # Romanian
-        # "ru",  # Russian
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
         # "zh",  # Chinese

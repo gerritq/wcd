@@ -1,6 +1,7 @@
 import os
 import json
 from collections import defaultdict
+from datasets import Dataset, DatasetDict, load_from_disk
 
 """
 Notes
@@ -11,6 +12,7 @@ Notes
 BASE_DIR = os.getenv("BASE_WCD")
 INPUT_DIR = os.path.join(BASE_DIR, "data/raw/api")
 SENTS_DIR = os.path.join(BASE_DIR, "data/sents")
+SETS_DIR = os.path.join(BASE_DIR, "data/sets")
 
 def count_sents(lang: str):
     count = defaultdict(int)
@@ -20,7 +22,7 @@ def count_sents(lang: str):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         
-        print("N sentences", len(data))
+        print("\tTotal N sentences", len(data))
         for item in data:
             label = item['label']
             source = item['source']
@@ -30,15 +32,20 @@ def count_sents(lang: str):
         print(f"Issue counting sents {e}")
     
     sorted_count = dict(sorted(count.items()))
-    print("Labels:", sorted_count, "\n")
+    print("\t Total N labels:", sorted_count, "\n")
 
     sorted_count_source = {
         source: dict(sorted(label_counts.items()))
         for source, label_counts in count_source.items()
     }
-    print("Labels by source:", sorted_count_source, "\n")
+    print("\tLabels by source:", sorted_count_source, "\n")
 
-def count_items(source: str, lang: str):
+def count_final_ds(lang: str):
+    ds = load_from_disk(SETS_DIR, lang)
+    for _set in ds:
+        print()
+
+def count_articles(source: str, lang: str):
     try:
         path = os.path.join(INPUT_DIR, f"{lang}_{source}.jsonl")
         n = 0
@@ -60,8 +67,8 @@ def main():
         "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
-        "zh",  # Chinese
-        "ar",  # Arabic
+        # "zh",  # Chinese
+        # "ar",  # Arabic
         "id"   # Indonesian
     ]
 
@@ -78,13 +85,16 @@ def main():
                 #     count_colon+=1
         
         for x in ['views', 'good', 'fa']:
-            count[f'{x}_og'] = count_items(x, lang)
+            count[f'{x}_og'] = count_articles(x, lang)
         # print("Colon in title:", count_colon)
         
         sorted_count = dict(sorted(count.items()))
         print(f"========== {lang} ==========")
         print("Distribution of articles")
         print(sorted_count, "\n")
+
+        print("Distribution of sentences")
+        count_final_ds(lang)
 
         print("Distribution of sentences")
         count_sents(lang)

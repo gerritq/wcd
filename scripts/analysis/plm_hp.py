@@ -20,6 +20,7 @@ from utils import (
                     tokenise_data
 )
 import time
+from datetime import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lang", type=str, required=True)
@@ -86,7 +87,7 @@ def main():
 
     training_args = TrainingArguments(
         output_dir=None,
-        eva_strategy="epoch",
+        eval_strategy="epoch",
         logging_strategy="epoch",
         metric_for_best_model="accuracy",
         greater_is_better=True,
@@ -104,7 +105,7 @@ def main():
     # define hp space as in https://huggingface.co/docs/transformers/en/hpo_train
     def hp_space(trial):
         return {
-            "learning_rate": trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True),
+            "learning_rate": trial.suggest_float("learning_rate", 5e-5, 5e-4, log=True),
             "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [8, 16, 32]),
             "num_train_epochs": trial.suggest_int("num_train_epochs", 2, 8),
             }
@@ -135,12 +136,13 @@ def main():
     best_model_dev_metrics = trainer.evaluate(eval_dataset=dev_tok)
     # best_model_test_metrics = trainer.evaluate(eval_dataset=test_tok)
 
+    end = time.time()
+
     # Save best mmodel
     model_number = get_model_number(MODEL_DIR)
     out_dir = os.path.join(MODEL_DIR, f"model_{model_number}")
     trainer.save_model(out_dir)
 
-    end = time.time()
 
     train_losses, eval_losses = [], []
     for log in trainer.state.log_history:
@@ -151,6 +153,8 @@ def main():
 
     meta = {
         "model_number": model_number,
+        "hp_search": True,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data": args.lang,
         "context": args.context,
         "model": MODEL_ID,
@@ -171,9 +175,11 @@ def main():
         "all_hp_trials": collect_trials 
     }
 
-    # save meta
+    # save and append meta
     with open(os.path.join(out_dir, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
+
+    append_meta_file(meta, MODEL_DIR)
 
 if __name__ == "__main__":
     main()

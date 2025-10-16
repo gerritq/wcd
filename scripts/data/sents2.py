@@ -242,12 +242,12 @@ def proc_sentence(item):
 
 def main():
     languages  = [
-        "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
-        "ro",  # Romanian
+        # "en",  # English
+        # "nl",  # Dutch
+        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        # "it",  # Italian
+        # "pt",  # Portuguese
+        # "ro",  # Romanian
         "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
@@ -270,7 +270,7 @@ def main():
         print(data)
         # data = [data[10]]
         # print(data)
-        data = data[:100]
+        # data = data[:100]
         # print(data)
 
         # define parser

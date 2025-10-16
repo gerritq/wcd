@@ -1,19 +1,24 @@
 #!/bin/bash
-#SBATCH --job-name=plm
+#SBATCH --job-name=plm-md-l
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 
 nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id"
-LANGUAGES=("nl" "no" "ro")
-MODELS=("xlm-r" "mBert") # "xlm-r" "mBert"
+LANGUAGES=("multi")
+MODELS=("mDeberta-l") # "xlm-r-b" "mBert" "mBert"
+CONTEXT=0
+
+# HP
+EPOCH=5
+LEARNING_RATE=5e-05
 
 for LANGUAGE in "${LANGUAGES[@]}"; do
   for MODEL in "${MODELS[@]}"; do
@@ -22,10 +27,13 @@ for LANGUAGE in "${LANGUAGES[@]}"; do
 
     uv run plm.py \
       --lang "$LANGUAGE" \
-      --model "$MODEL"
+      --model "$MODEL" \
+      --context $CONTEXT \
+      --epochs $EPOCH \
+      --learning_rate "$LEARNING_RATE"
 
     end=$(date +%s)
     runtime=$((end - start))
-    echo "Time taken for LANGUAGE=$LANGUAGE, MODEL=$MODEL: ${runtime}s"
+    echo "Time taken for LANGUAGE=$LANGUAGE, MODEL=$MODEL: $((runtime / 60))m"
   done
 done

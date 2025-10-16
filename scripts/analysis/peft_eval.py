@@ -5,15 +5,17 @@ import time
 import random
 import torch
 import evaluate
-import sys
 from datasets import Dataset, DatasetDict, load_from_disk
-from transformers import AutoTokenizer, set_seed
+from transformers import AutoTokenizer, set_seed, logging
 from peft import AutoPeftModelForCausalLM
 from collections import defaultdict
-from prompts import PROMPTS
+from prompts import SYSTEM_PROMPTS_SLM
 from typing import List
 from utils import MODEL_MAPPING
-from tqdm import tqdm
+import argparse
+
+# Ignore "The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details."
+logging.set_verbosity_error()
 
 acc_metric = evaluate.load("accuracy")
 f1_metric = evaluate.load("f1")
@@ -26,12 +28,17 @@ METRICS_DIR = os.path.join(BASE_DIR, "data/metrics/slm")
 SEED=42
 MAX_LENGTH = 256*4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-REVERSE_MODEL_MAPPING = {v: k for k, v in MODEL_MAPPING.items()}
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_number", type=str, required=True)
+parser.add_argument("--languages", nargs="+", required=True)
+parser.add_argument("--mode", type=str, required=True)
+args = parser.parse_args()
+
 
 print(f"Using device: {DEVICE}")
 
 set_seed(SEED)
-random.seed(SEED)
 
 def load_test_sets(sets_dir: str):
     test_data = []
@@ -47,30 +54,53 @@ def load_test_sets(sets_dir: str):
                 raise KeyError("Key test does not exist.")
     return test_data
 
-def build_messages_labels(test_ds: Dataset, PROMPT: str, system: bool) -> Dataset:
+# def build_messages(dataset: Dataset, system: bool) -> Dataset:
+
+#     def preprocess_function(example):
+#         if args.system:
+#             PROMPT = SYSTEM_PROMPTS_SLM[example['lang']]
+#         else:
+#             # to do
+#             pass
+        
+#         if system:
+#             x = {
+#             "messages": [
+#                 {"role": "system", "content": PROMPT['system']},
+#                 {"role": "user", "content": PROMPT['user'].format(claim=example['claim'])}
+#             ]
+#         }
+
+#         else:
+#             # to do
+#             pass
+#         return x
+    
+#     data = list(dataset) 
+#     random.shuffle(data)
+
+#     dataset = dataset.map(preprocess_function, remove_columns=["claim", "label"])
+#     return dataset
+
+def build_messages_labels(test_ds: Dataset, system: bool) -> Dataset:
     claims = test_ds["claim"]
     labels = test_ds["label"]
-    langs = test_ds["lang"] if "lang" in test_ds.column_names else ["all"] * len(labels)
+    langs = test_ds["lang"]
     
     msgs = []
-    for c in claims:
+    for i in range(len(claims)):
 
             if system:
                 msg = {
                         "messages": [
-                            {"role": "system", "content": PROMPT},
-                            {"role": "user", "content": f"Claim: {c}"},
+                                {"role": "system", "content": SYSTEM_PROMPTS_SLM[langs[i]]['system']},
+                                {"role": "user", "content": SYSTEM_PROMPTS_SLM[langs[i]]['user'].format(claim=claims[i])},
                         ]
                     }
                 msgs.append(msg)
             else:
-                msg = {
-                        "messages": [
-                            {"role": "system", "content": "You are a seasoned Wikipedia fact-checker."},
-                            {"role": "user", "content": PROMPT.replace("{{claim}}", c)},
-                        ]
-                    }
-                msgs.append(msg)
+                # to do
+                pass
 
     return msgs, labels, langs
 
@@ -93,6 +123,7 @@ def predict(model, tokenizer, messages, batch_size, is_llama=False):
                 enable_thinking=False
             )
             chat_texts.append(chat)
+            # print(chat)
 
         enc = tokenizer(
             chat_texts,
@@ -107,7 +138,7 @@ def predict(model, tokenizer, messages, batch_size, is_llama=False):
         with torch.no_grad():
             out = model.generate(
                 **enc,
-                max_new_tokens=64,
+                max_new_tokens=20,
                 do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
                 eos_token_id=terminators,
@@ -119,45 +150,39 @@ def predict(model, tokenizer, messages, batch_size, is_llama=False):
                 idx = len(output_ids) - output_ids[::-1].index(151668)  # </think> for Qwen
             except ValueError:
                 idx = 0
-            content = tokenizer.decode(output_ids[idx:], skip_special_tokens=True).strip()
+            response = tokenizer.decode(output_ids[idx:], skip_special_tokens=True).strip()
 
-            lab = None
-            try:
-                obj = json.loads(content)
-                lab = int(obj.get("label", None))
-            except Exception:
-                m = re.search(r'"label"\s*:\s*(\d)', content)
-                if m:
-                    lab = int(m.group(1))
-            if lab not in (0, 1):
-                lab = None
-            preds.append(lab)
+            # print("answer", j, response)
+            
+            label = None
+            match = re.search(r"<label>\s*([01])\s*</label>", response, re.DOTALL | re.IGNORECASE)
+            if match:
+                label = int(match.group(1))
+            preds.append(label)
     return preds
 
-def eval(model_path: str,
-         model_hf_name: str, 
-         train_data_name: str,
-         test_data_name: str, 
-         test_data: Dataset,
-         PROMPT: str,
-         system: bool,
-         batch_size: int = 8):
+def evaluation(model_path: str,
+         meta: dict,
+         test_data_name: str,
+         batch_size: int = 16):
 
-    # tokeniser
-    tokenizer = AutoTokenizer.from_pretrained(model_hf_name, trust_remote_code=True)
+    # Load tokeniser and model
+    tokenizer = AutoTokenizer.from_pretrained(meta['model'], trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     tokenizer.truncation_side = "left"
 
-    # load the model
     model = AutoPeftModelForCausalLM.from_pretrained(
         model_path, device_map="auto", torch_dtype="auto", trust_remote_code=True
         )
     model.eval()
 
-    # gen data
-    messages, labels, langs = build_messages_labels(test_data, PROMPT, system)
-    is_llama = True if "llama" in model_hf_name.lower() else False
+    # Get and prep data
+    test = load_from_disk(os.path.join(SETS_DIR, test_data_name))['test']
+    # PROMPT = SYSTEM_PROMPTS_SLM[meta['data']]
+
+    messages, labels, langs = build_messages_labels(test, meta['system'])
+    is_llama = True if "llama" in meta['model'].lower() else False
 
     # Run predictions
     start = time.time()
@@ -188,81 +213,60 @@ def eval(model_path: str,
             
     end = time.time()
 
-    res = {
-        "model_path": model_path,
-        "train_data_name": train_data_name,
-        "test_data_name": test_data_name,
-        "n_total": len(labels),
-        "n_scored": len(valid),
-        "time_min": (end - start) / 60.0,
-        "accuracy": overall["accuracy"],
-        "f1": overall["f1"],
-        "by_lang": by_lang
+    meta['eval'][test_data_name] = {
+                "test_data_name": test_data_name,
+                "n_total": len(labels),
+                "n_scored": len(valid),
+                "time_min": (end - start) / 60.0,
+                "accuracy": overall["accuracy"],
+                "f1": overall["f1"],
+                "by_lang": by_lang
     }
 
-    return res
+    return meta
 
 def main():
-    # Get test data
-    test_data = load_test_sets(SETS_DIR)
+    start = time.time()
+
+    model_path = os.path.join(MODEL_DIR, args.model_number) 
     
-    # Get SLM dirs only
-    model_paths = [os.path.join(MODEL_DIR, d) for d in os.listdir(MODEL_DIR) if any(x in d for x in ["model"])]
-    for model_path in sorted(model_paths):
+    # Load meta
+    with open(os.path.join(model_path, "meta.json"), "r", encoding="utf-8") as f:
+        meta = json.load(f)
 
-        model_number = os.path.basename(model_path)
-        # load model meta file
-        meta_path = os.path.join(model_path, "meta.json")
-        if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
+    if not os.path.exists(model_path):
+        print(f"Model dir does not exit {model_dir}. Skipping.")
+        sys.exit(0)
 
+    print(f"EVALUATION {args.model_number} - Model {meta['model']} - Train {meta['data']}")    
+    
+    if args.mode == "all":
+        test_langs = args.languages
+    elif args.mode == "self":
+        test_langs = [meta['data']]
+    elif args.mode == "ool":
+        ool_langs = args.languages[:]
+        ool_langs.remove(meta['data'])
+        test_langs = ool_langs
+    else:
+        raise Exception(f"Incorrect mode: {args.mode}")
+    
+    print(f"\tEvaluation languages: {test_langs}")
 
-        model_hf_name = meta['model']
-        model_name = REVERSE_MODEL_MAPPING[meta['model']]
-        train_data_name = meta['data']
-        system = meta['system']
+    meta['eval'] = {}
+
+    for lang in test_langs:
         
-        # cases for the ct_english. TO DO; this does not work bc english is the lang not en; change the data prep
-        # if len(train_data_name.split("_") )> 1:
-        #     train_data_name = train_data_name.split("_")[0]
-
-        prompt_key = train_data_name
-        if system:
-            prompt_key = prompt_key + "_system"
-        PROMPT = PROMPTS[prompt_key]
+        print(f"\tEvaluating {lang}")
+        # adds results to meta eval
+        evaluation(model_path, meta, lang)
         
-        # select specific models
-        # if model_number not in ['model_1']:
-        #     continue
-
-        print(f"Running for model {model_number}: MODEL={model_name}, LANGUAGE+{train_data_name}")
-        for test_data_name, test_ds in test_data:
-            
-            # select specific models
-            # if test_data_name != "ct_english":
-            #     continue
-            if "en" != test_data_name:
-                continue
-                
-            print(f"\tEval on {test_data_name}...")
-            
-            res = eval(model_path, 
-                       model_hf_name, 
-                       train_data_name,
-                       test_data_name,
-                       test_ds,
-                       PROMPT,
-                       system,
-                       batch_size=8)
-
-            # ssave
-            metrics_path = os.path.join(METRICS_DIR, f"{train_data_name}_2_{test_data_name}_{model_number}.json")
-            meta["eval_results"] = res
-            with open(metrics_path, "w", encoding="utf-8") as f:
-                json.dump(meta, f, indent=2, ensure_ascii=False)
-
-            print(meta)
+        
+    # out_path = os.path.join(METRICS_DIR, f"{meta['data']}_2_{lang}_model{meta['model_number']}.json")
+    out_path = os.path.join(METRICS_DIR, f"model_{meta['model_number']}.json")
+    with open(out_path, "w") as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)    
+    
             
 if __name__ == "__main__":
     main()

@@ -3,145 +3,185 @@ import json
 import re
 import random
 import argparse
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from datasets import load_from_disk
 from openai import OpenAI
-from prompts import PROMPTS
+from prompts import SYSTEM_PROMPTS_LLM
 from sklearn.metrics import accuracy_score, f1_score
+from datetime import datetime
+from utils import (
+                    MODEL_MAPPING, 
+                    append_meta_file
+)
 
-class LLM:
-    def __init__(self, 
-                 args, 
-                 max_workers: int = 4):
-        self.lang = args.lang
-        self.model = args.model
-        self.notes = args.notes
-        self.client = OpenAI(
+BASE_DIR = os.getenv("BASE_WCD")
+DATA_DIR = os.path.join(BASE_DIR, "data/sets")
+METRICS_DIR = os.path.join(BASE_DIR, "data/metrics/llm")
+SHOTS_DIR = os.path.join(BASE_DIR, "data/sents/shots")
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--lang", type=str, required=True)
+parser.add_argument("--model", type=str, required=True)
+parser.add_argument("--shots", type=int, required=True)
+parser.add_argument("--system", type=int, required=True)
+parser.add_argument("--notes", type=str)
+args = parser.parse_args()
+args.shots = bool(args.shots)
+args.system = bool(args.system)
+
+def get_model_number(model_dir: str) -> int:
+    '''Function is differnt than in utils, as we are not chekcing for dir but files'''
+    model_names = [d for d in os.listdir(model_dir) if d.startswith("model_")] # and os.path.isdir(os.path.join(model_dir, d)
+    
+    numbers = []
+    for name in model_names:
+        
+        num = int(name.split("_")[1].replace(".json",""))
+        numbers.append(num)
+        
+    next_number = max(numbers) + 1 if numbers else 1
+    return next_number
+
+
+def format_messages(ds, args: dict) -> List[dict]:
+
+    if args.shots:
+        def format_few_shot(example: dict, shots: List[Dict]):
+                shots = [
+                        f"Claim: {s['claim']}\nAnswer: {s['label']}" for s in shots
+                        ]
+                system_message = SYSTEM_PROMPTS_LLM[example['lang']]['system'] + "\n\nExamples:\n\n".join(shots)
+                return {"messages": [
+                                    {"role": "system", "content": system_message},
+                                    {"role": "user", "content": SYSTEM_PROMPTS_LLM[example['lang']]['user'].format(claim=example['claim'])}
+                                ],
+                        "label": int(example["label"]),
+                        "claim": example["claim"]
+                        }
+
+        # load data and create messages
+        shots_path = os.path.join(SHOTS_DIR, f"shots.json")
+        with open(shots_path, "r", encoding="utf-8") as f:
+            shots = json.load(f)
+            shots = shots[args.lang]
+        rows = [format_few_shot(ex, shots) for ex in ds]
+    else:
+        def format_zero_shot(example: dict):
+            return {"messages": [
+                                {"role": "system", "content": SYSTEM_PROMPTS_LLM[example['lang']]['system']},
+                                {"role": "user", "content": SYSTEM_PROMPTS_LLM[example['lang']]['user'].format(claim=example['claim'])},
+                                ],
+                    "label": int(example["label"]),
+                    "claim": example["claim"],
+                    "lang": example["lang"]
+                    }
+            # load data and create messages
+        rows = [format_zero_shot(ex) for ex in ds]
+    
+    # out
+    random.shuffle(rows)
+    return rows
+    
+def find_response(response: str) -> int:
+    match = re.search(r"<label>\s*([01])\s*</label>", response, re.DOTALL | re.IGNORECASE)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            print("Could not convert label to int.")
+            return None
+    else:
+        print("No <label>...</label> block found in response.")
+        return None
+
+
+def query(client, model: str, messages: List[Dict]) -> int:
+        completion = client.chat.completions.create(
+            model=model,
+            temperature=0.0,
+            messages=messages,
+        )
+        content = completion.choices[0].message.content
+        return find_response(content)
+
+def eval(results: List[Dict], 
+         model_number: str,
+         test_n: int,
+         args) -> None:
+
+    # get valids, ys, and preds
+    valid = [r for r in results if r["pred"] is not None]
+    y_true = [int(r["label"]) for r in valid]
+    y_pred = [int(r["pred"]) for r in valid]
+
+    # get scores
+    acc = accuracy_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+
+    res = {'model_number': model_number, 
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'model': args.model, 
+            'lang': args.lang,
+            'shots': args.shots,
+            'system': args.system, 
+            'test_n': test_n,
+            'valid_n': len(valid),
+            'notes': args.notes,
+            'accuracy': acc, 
+            'f1': f1}
+    metrics_path = os.path.join(METRICS_DIR, f"model_{model_number}.json")
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump(res, f, indent=2, ensure_ascii=False)
+
+def main() -> None:
+    
+    # load data and get model number
+    # ds = load_from_disk(os.path.join(DATA_DIR, args.lang))["test"].select(range(10))
+    ds = load_from_disk(os.path.join(DATA_DIR, args.lang))["test"]
+    model_number = get_model_number(METRICS_DIR)
+
+    test_data = format_messages(ds, args)
+
+    print(test_data[:2])
+
+    # initialise client
+    client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=os.environ["OPENROUTER_API_KEY"]
-        )
-        self.max_workers = max_workers
-        self.PROMPT = PROMPTS[self.lang]
-        self.base_dir = os.getenv("BASE_WCD")
-        self.data_dir = os.path.join(self.base_dir, "data/sets")
-        self.metrics_dir = os.path.join(self.base_dir, "data/metrics/llm")
-
-    def _get_model_number(self) -> int:
-        model_files = [f for f in os.listdir(self.metrics_dir) if f.endswith(".json")]
-
-        numbers = []
-        for name in model_files:
-            match = re.search(rf"(\d+)\.json$", name)
-            if match:
-                numbers.append(int(match.group(1)))
-
-        next_number = max(numbers) + 1 if numbers else 1
-        return next_number
-
-    def _prepare_test_data(self) -> List[Dict]:
-        ds = load_from_disk(os.path.join(self.data_dir, self.lang))["test"]
-        def to_messages(example):
-            return {
-                "messages": [
-                    {"role": "system", "content": "You are a seasoned Wikipedia fact-checker."},
-                    {"role": "user", "content": self.PROMPT.replace("{{claim}}", example["claim"])},
-                ],
-                "label": int(example["label"]),
-                "claim": example["claim"],
-            }
-        rows = [to_messages(ex) for ex in ds][:10]
-        random.shuffle(rows)
-        self.test_n = len(rows)
-        return rows
-
-    def _format_response(self, response: str) -> int:
-        match = re.search(r"\s*(\{.*?\})\s*", response, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-            try:
-                data = json.loads(json_str)
-                return int(data["label"])
-            except json.JSONDecodeError:
-                raise ValueError("Failed to decode JSON.")
-        else:
-            raise ValueError("No JSON block found in response.")
-
-    def _query(self, messages: List[Dict]) -> int:
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                temperature=0.0,
-                messages=messages,
             )
-            content = completion.choices[0].message.content
-            return self._format_response(content)
 
-    def _eval(self, results: List[Dict]) -> None:
-        valid = [r for r in results if r["pred"] is not None]
+    print(f"\nRUNNING MODEL={args.model} - LANGUAGE={args.lang}")
+    def worker(example: Dict) -> Dict:
+        try:
+            pred = query(client, args.model, example["messages"])
+            return {
+                "claim": example["claim"],
+                "label": example["label"],
+                "pred": pred,
+            }
+        except Exception as e:
+            print(e)
+            return {
+                "claim": example["claim"],
+                "label": example["label"],
+                "pred": None,
+                "error": str(e),
+            }
 
-        self.valid_n = len(valid)
+    results = []
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futures = [ex.submit(worker, exm) for exm in test_data]
+        for fut in as_completed(futures):
+            results.append(fut.result())
 
-        y_true = [int(r["label"]) for r in valid]
-        y_pred = [int(r["pred"]) for r in valid]
-
-        acc = accuracy_score(y_true, y_pred)
-        f1 = f1_score(y_true, y_pred)
-
-        res = {'model_number': self.model_number, 
-                'model': self.model, 
-               'lang': self.lang,
-               'test_n': self.test_n,
-               'valid_n': self.valid_n,
-               'notes': self.notes,
-               'accuracy': acc, 
-               'f1': f1}
-        metrics_path = os.path.join(self.metrics_dir, f"{self.lang}_model_{self.model_number}.json")
-        with open(metrics_path, "w", encoding="utf-8") as f:
-            json.dump(res, f, indent=2, ensure_ascii=False)
-
-
-    def run(self) -> None:
-        
-        # load data and get model number
-        data = self._prepare_test_data()
-        self.model_number = self._get_model_number()
-
-        def worker(example: Dict) -> Dict:
-            try:
-                pred = self._query(example["messages"])
-                return {
-                    "claim": example["claim"],
-                    "label": example["label"],
-                    "pred": pred,
-                }
-            except Exception as e:
-                print(e)
-                return {
-                    "claim": example["claim"],
-                    "label": example["label"],
-                    "pred": None,
-                    "error": str(e),
-                }
-
-        results = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as ex:
-            futures = [ex.submit(worker, exm) for exm in data]
-            for fut in as_completed(futures):
-                results.append(fut.result())
-
-        # eval
-        self._eval(results)
-
+    # eval
+    eval(results, model_number, len(test_data), args)
 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--lang", type=str, required=True)
-    parser.add_argument("--model", type=str, required=True)
-    parser.add_argument("--notes", type=str)
-    args = parser.parse_args()
 
-    llm = LLM(args)
-    llm.run()
+
+    main()

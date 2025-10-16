@@ -6,4 +6,4 @@
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=20GB
 
-uv run parse.py pl
+uv run parse.py
