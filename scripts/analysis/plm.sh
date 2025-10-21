@@ -1,24 +1,24 @@
 #!/bin/bash
-#SBATCH --job-name=plm-md-l
+#SBATCH --job-name=plm-c1
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 
 nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id"
-LANGUAGES=("multi")
-MODELS=("mDeberta-l") # "xlm-r-b" "mBert" "mBert"
-CONTEXT=0
+# "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg"
+LANGUAGES=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg")
+MODELS=("mBert") # "xlm-r-b" "mBert" "mBert"
+CONTEXT=1
 
 # HP
-EPOCH=5
-LEARNING_RATE=5e-05
+EPOCH=3
+LEARNING_RATE=1e-05
 
 for LANGUAGE in "${LANGUAGES[@]}"; do
   for MODEL in "${MODELS[@]}"; do

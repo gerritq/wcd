@@ -25,6 +25,7 @@ def load_tsv(path):
     return data
 
 def main():
+    mapping = {'english': 'en', 'bulgarian': 'bg', 'dutch': 'nl'}
     languages = ["bulgarian", "english", "dutch"]
     split_map = {"train": "train", "dev": "validation", "dev_test": "test"}
 
@@ -36,7 +37,10 @@ def main():
                 print(f"[WARN] Missing file: {tsv_path} — skipping this split")
                 continue
             rows = load_tsv(tsv_path)
-            split_data[hf_split] = Dataset.from_list(rows)
+            # how to add lang here with mapping
+            dataset = Dataset.from_list(rows)
+            dataset = dataset.add_column("lang", [mapping[language]] * len(dataset))
+            split_data[hf_split] = dataset
             print(f"[{language}] {hf_split}: {len(rows)} examples")
 
         if not split_data:

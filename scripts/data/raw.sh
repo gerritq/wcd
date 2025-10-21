@@ -1,9 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=ru-id
+#SBATCH --job-name=r-id-tr
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=14:00:00
+#SBATCH --time=05:00:00
 #SBATCH --mem=40GB
 #SBATCH --partition=cpu,nmes_cpu
 
-uv run raw.py
+# "en" "nl" "no" "it"
+# "pt" "ro" "ru" "uk" "bg"
+# "id" "vi" "tr"
+LANGUAGES=("id" "vi" "tr") # 
+
+uv run raw.py --languages "${LANGUAGES[@]}"

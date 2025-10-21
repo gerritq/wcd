@@ -14,13 +14,13 @@ MAIN_PAGES = {
     "no": "Forside",                    # Norwegian (Bokmål default)
     "it": "Pagina_principale",          # Italian
     "pt": "Página_principal",           # Portuguese
-    "ro": "Pagina_principală",          # Romanian
+    "ro": "Pagina_principală",          # Rsomanian
     "ru": "Заглавная_страница",         # Russian
     "uk": "Головна_сторінка",           # Ukrainian
     "bg": "Начална_страница",           # Bulgarian
-    "zh": "Wikipedia:首页",              # Chinese
-    "ar": "الصفحة_الرئيسية",            # Arabic
-    "id": "Halaman_Utama"               # Indonesian
+    "id": "Halaman_Utama",           # Indonesian
+    "vi": "Trang_Chính",           # Vietnamese
+    "tr": "Anasayfa",           # Turkish
     }
 
 # For ID, lots of FA/good article pages are discussion (Pembicaraan) pages
@@ -32,32 +32,37 @@ REMOVE_PREFIX = ["Pembicaraan:"]
 # bg: Уикипедия = Wikipedia
 # ru,bg,uk: Шаблон = template
 
+PREFIX = ["Pembicaraan:"]
 DROP_PAGES = ["Wikipedia", "Templat", "Template", "Kategori", "Category", "Categorie:Wikipedia", 
               "Categoria", "Categorie", "Категория", "Категорія", "Уикипедия", "Шаблон", 
-              "Потребител"]
+              "Потребител", "Thể_loại"]
+
+
 def main():
     
     languages  = [
-        "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
-        "ro",  # Romanian
-        "ru",  # Russian
-        "uk",  # Ukrainian
-        "bg",  # Bulgarian
-        # "zh",  # Chinese
-        # "ar",  # Arabic
-        "id"   # Indonesian
+        # "en",  # English
+        # "nl",  # Dutch
+        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        # "it",  # Italian
+        # "pt",  # Portuguese
+        # "ro",  # Romanian
+        # "ru",  # Russian
+        # "uk",  # Ukrainian
+        # "bg",  # Bulgarian
+        "id",
+        "vi",
+        "tr"
     ]
 
     skip_titles = defaultdict(list)
 
     for lang in languages:
-        all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_views*")) \
-          + glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
-            + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*"))
+        all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
+            + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
+        #   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
+        #     + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*")) \
+                # + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
         print(all_files)
 
         all_titles = []
@@ -66,15 +71,17 @@ def main():
             with open(file, "r", encoding="utf-8") as f:
                 data = [json.loads(line) for line in f]
 
-            filename = os.path.basename(file)
+            filename = os.path.splitext(os.path.basename(file))[0]
             print(filename)
 
-            if "_views" in filename:
+            if filename.endswith("views"):
                 source = "views"
-            elif "_fa" in filename:
+            elif filename.endswith("fa"):
                 source = "fa"
-            elif "_good" in filename:
+            elif filename.endswith("good"):
                 source = "good"
+            elif filename.endswith("random"):
+                source = "random"
             else:
                 raise ValueError(f"Unknown source type in filename: {filename}")
 
@@ -83,21 +90,21 @@ def main():
 
                 # drop if main page
                 main_page = [MAIN_PAGES[lang].lower(), MAIN_PAGES[lang].replace("_", " ").lower()] # drop if main page
-                if title in main_page:
+                if title.lower() in main_page:
                     skip_titles[lang].append(title)
                     continue
 
                 # chinese talk page case
-                if lang == "zh":
-                    if title.startswith("Talk:"): # zh cases
-                        title = title.replace("Talk:", "")
+                # if lang == "zh":
+                #     if title.startswith("Talk:"): # zh cases
+                #         title = title.replace("Talk:", "")
                 
                 # drop if in predefined list
                 if any(title.lower().startswith(p.lower()) for p in DROP_PAGES):
                     skip_titles[lang].append(title)
                     continue
 
-                # for id, rm prefi
+                # for id
                 for p in REMOVE_PREFIX:
                     if title.lower().startswith(p.lower()):
                         title = title[len(p):].strip()

@@ -3,6 +3,12 @@ import requests
 import json
 from tqdm import tqdm
 import sys
+import time
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--languages", nargs="+", required=True)
+args = parser.parse_args()
 
 BASE_DIR = os.getenv("BASE_WCD")
 INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
@@ -13,19 +19,24 @@ headers = {
 }
 
 
-def get_wikitext(lang: str, title: str):
-    URL = f"https://{lang}.wikipedia.org/w/api.php"
-    params = {
-        "action": "query",
-        "format": "json",
-        "prop": "revisions",
-        "rvprop": "content",
-        "rvslots": "main",
-        "titles": title
-    }
-    r = requests.get(URL, params=params, headers=headers).json()
-    page = next(iter(r["query"]["pages"].values()))
-    return page["revisions"][0]["slots"]["main"]["*"]
+def get_topic(article: str, lang: str):
+    inference_url = 'https://api.wikimedia.org/service/lw/inference/v1/models/outlink-topic-model:predict'
+    
+    data = {'page_title': article, "lang": lang}
+    try:
+        response = requests.post(inference_url, headers=headers, data=json.dumps(data))
+    except Exception as e:
+        print(f"API Error for article {article} in language {lang}: {e}")
+        return None
+    
+    try:
+        r = response.json()
+        sorted_results = sorted(r['prediction']['results'], key=lambda x: x['score'], reverse=True)
+        topic = sorted_results[0]['topic']
+        return topic
+    except Exception as e:
+        print(f"Parsing Error for article {article} in language {lang}: {e}")
+        return None
 
 def get_html(lang: str, title: str):
     url = f"https://{lang}.wikipedia.org/w/api.php"
@@ -45,23 +56,10 @@ def get_html(lang: str, title: str):
         return None
 
 def main():
-    languages  = [
-        # "en",  # English
-        # "nl",  # Dutch
-        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        # "it",  # Italian
-        # "pt",  # Portuguese
-        # "ro",  # Romanian
-        "ru",  # Russian
-        "uk",  # Ukrainian
-        "bg",  # Bulgarian
-        # "zh",  # Chinese
-        # "ar",  # Arabic
-        "id"   # Indonesian
-    ]
 
-    for lang in languages:
-        print(f"Running {lang} ...", flush=True)
+    print(f"All languages: {args.languages} ...", flush=True)
+    for lang in args.languages:
+        print(f"\tRunning {lang} ...", flush=True)
 
         INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_all.jsonl")
         OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_htmls.jsonl")
@@ -70,17 +68,7 @@ def main():
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
             data = [json.loads(line) for line in f]
 
-        # can restrict here
-        if lang == "en":
-            data = [x for x in data if x['source'] == 'fa']
-            print(f'Len data {len(data)}')
-
-        if lang in ["zh", "ru", "pt"]:
-            data = [x for x in data if x['source'] != 'views']
-            print(f'Len data {len(data)}')
-
-        # data = data[:1000]
-
+        # Collect already downloaded titles
         processed_titles = set()
         if os.path.exists(OUTPUT_FILE):
             with open(OUTPUT_FILE, "r", encoding="utf-8") as out_f:
@@ -93,16 +81,23 @@ def main():
             print(f"Skipping {len(processed_titles)} already processed articles")
 
         with open(OUTPUT_FILE, "a", encoding="utf-8") as out_f:
-            for item in tqdm(data):
-                if item['title'] in processed_titles:
+            for i, item in enumerate(tqdm(data)):
+                if i % 500 == 0 and i !=0:
+                    time.sleep(60)
+                title = item['title']
+                
+                if title in processed_titles:
                     continue
-                raw = get_html(lang, item['title'])
+
+                # get html
+                raw = get_html(lang, title)
                 if not raw:
                     continue
-                item.update({"raw": raw})
+                
+                # get topic
+                topic = get_topic(title, lang)
+                item.update({"topic": topic, "raw": raw})
                 out_f.write(json.dumps(item, ensure_ascii=False) + "\n")
-
-        print(f"Saved {len(data)} articles to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
     main()

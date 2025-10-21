@@ -25,12 +25,13 @@ from datetime import datetime
 # bfloat speeds up training
 # load in 4bit reducses storage size
 # HF recommends nf4
-nf4_config = BitsAndBytesConfig(
+# Use Qlora effectively as in https://ai.google.dev/gemma/docs/core/huggingface_text_finetune_qlora
+bnb_config = BitsAndBytesConfig(
    load_in_4bit=True,
+   bnb_4bit_use_double_quant=True,
    bnb_4bit_quant_type="nf4",
    bnb_4bit_compute_dtype=torch.bfloat16
 )
-
 
 # ARGPARSE
 parser = argparse.ArgumentParser()
@@ -40,15 +41,18 @@ parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--epochs", type=int, default=5)
 parser.add_argument("--plw", type=int, default=1)
 parser.add_argument("--system", type=int, required=True)
+parser.add_argument("--shots", type=int, required=True)
 parser.add_argument("--notes", type=str)
 args = parser.parse_args()
 args.plw = bool(args.plw)
+args.shots = bool(args.shots)
 args.system = bool(args.system) 
 
 # DIRs
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets")
 MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm")
+SHOTS_DIR = os.path.join(BASE_DIR, "data/sents/shots")
 
 # VARs
 MODEL_ID = MODEL_MAPPING[args.model]
@@ -70,24 +74,29 @@ print("Max context length:", MAX_LENGTH)
 def build_messages(dataset: Dataset, system: bool) -> Dataset:
 
     def preprocess_function(example):
-        if args.system:
-            PROMPT = SYSTEM_PROMPTS_SLM[example['lang']]
-        else:
-            # to do
-            pass
         
-        if system:
+        if args.shots:
+            shots_path = os.path.join(SHOTS_DIR, f"shots.json")
+            with open(shots_path, "r", encoding="utf-8") as f:
+                shots = json.load(f)
+                shots = shots[example['lang']]
+            system_message = PROMPT[example['lang']]['system'] + "\n\nExamples:\n" + "\n\n".join(shots)
+            
             x = {
             "messages": [
-                {"role": "system", "content": PROMPT['system']},
-                {"role": "user", "content": PROMPT['user'].format(claim=example['claim'])},
-                {"role": "assistant", "content": PROMPT['assistant'].format(label=example['label'])}
-            ]
-        }
-
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": SYSTEM_PROMPTS_SLM[example['lang']]['user'].format(claim=example['claim'])},
+                {"role": "assistant", "content": SYSTEM_PROMPTS_SLM[example['lang']]['assistant'].format(label=example['label'])}
+                ]
+            }
         else:
-            # to do
-            pass
+            x = {
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPTS_SLM[example['lang']]['system']},
+                {"role": "user", "content": SYSTEM_PROMPTS_SLM[example['lang']]['user'].format(claim=example['claim'])},
+                {"role": "assistant", "content": SYSTEM_PROMPTS_SLM[example['lang']]['assistant'].format(label=example['label'])}
+                ]
+            }
         return x
     
     data = list(dataset) 
@@ -182,7 +191,7 @@ def main():
         MODEL_ID,
         # device_map="auto", # let sft handle this
         trust_remote_code=True,
-        quantization_config=nf4_config
+        quantization_config=bnb_config
     )
 
     if hasattr(base_model, "enable_input_require_grads"):
@@ -212,6 +221,8 @@ def main():
                         f"trainable%: {100 * trainable_params / all_param:.4f}"
                         )
 
+    use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+
     training_args = SFTConfig(
         output_dir=None,
         per_device_train_batch_size=args.batch_size,
@@ -222,9 +233,10 @@ def main():
         save_total_limit=1,
         logging_strategy="epoch",
         report_to="none",
-        fp16=torch.cuda.is_available(),
+        fp16=False,
+        bf16=use_bf16, 
         gradient_checkpointing=True,
-        do_eval=False,
+        eval_strategy="epoch", 
         packing=False,
         max_length=MAX_LENGTH
         # assistant_only_loss=True # does not work, hence our own implmentation

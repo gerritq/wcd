@@ -12,125 +12,126 @@ SYSTEM_PROMPTS_SLM = {
         "user": "Claim: {claim}",
         "user_context": "Topic: {topic} Context: {context} Claim: {claim}",
         "assistant": "<label>{label}</label>"
-    },
-
+    }
+}
+    
+    
+    ,
     "nl": {
         "system": (
-            "Je bent een ervaren Wikipedia-citatieclassificeerder. "
-            "Bepaal of de volgende bewering een bronvermelding nodig heeft. "
+            "Je bent een ervaren Wikipedia-bronverificatie-expert.\n"
+            "Bepaal of de volgende bewering een bronvermelding nodig heeft.\n"
+            "Antwoord met exact één label in het formaat <label>1</label> of <label>0</label>.\n"
             "Gebruik:\n"
-            " - 1 als de bewering een bronvermelding nodig heeft\n"
-            " - 0 als de bewering geen bronvermelding nodig heeft\n"
-            "Formatteer je output exact als: <label>0</label> of <label>1</label>. "
+            " - 1 als de bewering een bron nodig heeft\n"
+            " - 0 als de bewering geen bron nodig heeft\n"
             "Voeg geen extra tekst toe."
         ),
-        "user": "Bewering: {claim}",
-        "user_context": "Onderwerp: {topic} Context: {context} Bewering: {claim}",
+        "user": "Bewerking: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "no": {
         "system": (
-            "Du er en erfaren Wikipedia-siteringsklassifiserer. "
-            "Avgjør om følgende påstand krever en kildehenvisning. "
+            "Du er en erfaren Wikipedia-kildevurderer.\n"
+            "Avgjør om følgende påstand trenger en kildehenvisning.\n"
+            "Svar med nøyaktig én etikett i formatet <label>1</label> eller <label>0</label>.\n"
             "Bruk:\n"
-            " - 1 hvis påstanden trenger en kildehenvisning\n"
-            " - 0 hvis påstanden ikke trenger en kildehenvisning\n"
-            "Formater svaret ditt nøyaktig som: <label>0</label> eller <label>1</label>. "
-            "Ikke inkluder annen tekst."
+            " - 1 hvis påstanden trenger en kilde\n"
+            " - 0 hvis påstanden ikke trenger en kilde\n"
+            "Ikke inkluder ekstra tekst."
         ),
         "user": "Påstand: {claim}",
-        "user_context": "Emne: {topic} Kontekst: {context} Påstand: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "it": {
         "system": (
-            "Sei un esperto classificatore di citazioni di Wikipedia. "
-            "Decidi se la seguente affermazione richiede una citazione. "
+            "Sei un esperto classificatore di citazioni di Wikipedia.\n"
+            "Decidi se la seguente affermazione richiede una citazione.\n"
+            "Rispondi con un'unica etichetta nel formato <label>1</label> o <label>0</label>.\n"
             "Usa:\n"
-            " - 1 se l’affermazione richiede una citazione\n"
-            " - 0 se l’affermazione non richiede una citazione\n"
-            "Formatta l’output esattamente come: <label>0</label> o <label>1</label>. "
-            "Non includere alcun testo aggiuntivo."
+            " - 1 se l'affermazione necessita di una citazione\n"
+            " - 0 se l'affermazione non necessita di una citazione\n"
+            "Non aggiungere altro testo."
         ),
         "user": "Affermazione: {claim}",
-        "user_context": "Argomento: {topic} Contesto: {context} Affermazione: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "pt": {
         "system": (
-            "Você é um classificador experiente de citações da Wikipédia. "
-            "Decida se a seguinte afirmação precisa de uma citação. "
+            "Você é um verificador experiente de citações da Wikipedia.\n"
+            "Decida se a afirmação a seguir requer uma citação.\n"
+            "Responda com exatamente um rótulo no formato <label>1</label> ou <label>0</label>.\n"
             "Use:\n"
             " - 1 se a afirmação precisar de uma citação\n"
             " - 0 se a afirmação não precisar de uma citação\n"
-            "Formate sua resposta exatamente como: <label>0</label> ou <label>1</label>. "
-            "Não inclua nenhum texto adicional."
+            "Não inclua texto adicional."
         ),
         "user": "Afirmação: {claim}",
-        "user_context": "Tópico: {topic} Contexto: {context} Afirmação: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "ro": {
         "system": (
-            "Ești un clasificator experimentat de citări Wikipedia. "
-            "Decide dacă următoarea afirmație necesită o citare. "
+            "Ești un verificator experimentat de citate Wikipedia.\n"
+            "Decide dacă afirmația următoare necesită o citare.\n"
+            "Răspunde cu exact o etichetă în formatul <label>1</label> sau <label>0</label>.\n"
             "Folosește:\n"
             " - 1 dacă afirmația necesită o citare\n"
             " - 0 dacă afirmația nu necesită o citare\n"
-            "Formatează răspunsul exact așa: <label>0</label> sau <label>1</label>. "
             "Nu include text suplimentar."
         ),
         "user": "Afirmație: {claim}",
-        "user_context": "Subiect: {topic} Context: {context} Afirmație: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "ru": {
         "system": (
-            "Вы опытный классификатор цитат Википедии. "
-            "Определите, требует ли следующее утверждение ссылки на источник. "
+            "Вы опытный классификатор цитат Википедии.\n"
+            "Определите, требует ли следующее утверждение ссылки.\n"
+            "Ответьте строго одним тегом в формате <label>1</label> или <label>0</label>.\n"
             "Используйте:\n"
             " - 1 если утверждение требует ссылки\n"
             " - 0 если утверждение не требует ссылки\n"
-            "Отформатируйте ответ точно так: <label>0</label> или <label>1</label>. "
-            "Не добавляйте никакого дополнительного текста."
+            "Не добавляйте дополнительный текст."
         ),
         "user": "Утверждение: {claim}",
-        "user_context": "Тема: {topic} Контекст: {context} Утверждение: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "uk": {
         "system": (
-            "Ви досвідчений класифікатор цитувань Вікіпедії. "
-            "Визначте, чи потребує наступне твердження посилання на джерело. "
+            "Ви досвідчений класифікатор посилань у Вікіпедії.\n"
+            "Визначте, чи потребує наступне твердження посилання.\n"
+            "Відповідайте лише одним тегом у форматі <label>1</label> або <label>0</label>.\n"
             "Використовуйте:\n"
             " - 1 якщо твердження потребує посилання\n"
             " - 0 якщо твердження не потребує посилання\n"
-            "Відформатуйте відповідь точно так: <label>0</label> або <label>1</label>. "
-            "Не додавайте жодного додаткового тексту."
+            "Не додавайте додатковий текст."
         ),
         "user": "Твердження: {claim}",
-        "user_context": "Тема: {topic} Контекст: {context} Твердження: {claim}",
         "assistant": "<label>{label}</label>"
     },
-
     "bg": {
         "system": (
-            "Вие сте опитен класификатор на цитати в Уикипедия. "
-            "Решете дали следното твърдение изисква източник. "
+            "Вие сте опитен класификатор на цитати в Уикипедия.\n"
+            "Решете дали следното твърдение изисква източник.\n"
+            "Отговорете с точно един етикет във формат <label>1</label> или <label>0</label>.\n"
             "Използвайте:\n"
-            " - 1 ако твърдението изисква източник\n"
-            " - 0 ако твърдението не изисква източник\n"
-            "Форматирайте отговора си точно така: <label>0</label> или <label>1</label>. "
-            "Не включвайте никакъв допълнителен текст."
+            " - 1 ако твърдението има нужда от източник\n"
+            " - 0 ако твърдението няма нужда от източник\n"
+            "Без допълнителен текст."
         ),
         "user": "Твърдение: {claim}",
-        "user_context": "Тема: {topic} Контекст: {context} Твърдение: {claim}",
+        "assistant": "<label>{label}</label>"
+    },
+    "id": {
+        "system": (
+            "Anda adalah pemeriksa kutipan Wikipedia yang berpengalaman.\n"
+            "Tentukan apakah klaim berikut memerlukan kutipan.\n"
+            "Jawab dengan satu label dalam format <label>1</label> atau <label>0</label>.\n"
+            "Gunakan:\n"
+            " - 1 jika klaim memerlukan kutipan\n"
+            " - 0 jika klaim tidak memerlukan kutipan\n"
+            "Jangan tambahkan teks tambahan."
+        ),
+        "user": "Pernyataan: {claim}",
         "assistant": "<label>{label}</label>"
     }
 }

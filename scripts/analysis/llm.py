@@ -8,13 +8,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from datasets import load_from_disk
 from openai import OpenAI
-from prompts import SYSTEM_PROMPTS_LLM
+from prompts import SYSTEM_PROMPTS_SLM, SYSTEM_PROMPTS_LLM
 from sklearn.metrics import accuracy_score, f1_score
 from datetime import datetime
+import time
 from utils import (
                     MODEL_MAPPING, 
                     append_meta_file
 )
+from utils import MODEL_MAPPING
 
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets")
@@ -26,10 +28,13 @@ parser.add_argument("--lang", type=str, required=True)
 parser.add_argument("--model", type=str, required=True)
 parser.add_argument("--shots", type=int, required=True)
 parser.add_argument("--system", type=int, required=True)
+parser.add_argument("--verbose", type=int, required=True)
 parser.add_argument("--notes", type=str)
 args = parser.parse_args()
 args.shots = bool(args.shots)
 args.system = bool(args.system)
+args.verbose = bool(args.verbose)
+args.model = MODEL_MAPPING[args.model]
 
 def get_model_number(model_dir: str) -> int:
     '''Function is differnt than in utils, as we are not chekcing for dir but files'''
@@ -47,15 +52,20 @@ def get_model_number(model_dir: str) -> int:
 
 def format_messages(ds, args: dict) -> List[dict]:
 
+    if args.verbose:
+        PROMPT = SYSTEM_PROMPTS_LLM
+    else:
+        PROMPT = SYSTEM_PROMPTS_SLM
+
     if args.shots:
         def format_few_shot(example: dict, shots: List[Dict]):
                 shots = [
-                        f"Claim: {s['claim']}\nAnswer: {s['label']}" for s in shots
+                        f"Claim: {s['claim']}\nAnswer: <label>{s['label']}</label>" for s in shots
                         ]
-                system_message = SYSTEM_PROMPTS_LLM[example['lang']]['system'] + "\n\nExamples:\n\n".join(shots)
+                system_message = PROMPT[example['lang']]['system'] + "\n\nExamples:\n" + "\n\n".join(shots)
                 return {"messages": [
                                     {"role": "system", "content": system_message},
-                                    {"role": "user", "content": SYSTEM_PROMPTS_LLM[example['lang']]['user'].format(claim=example['claim'])}
+                                    {"role": "user", "content": PROMPT[example['lang']]['user'].format(claim=example['claim'])}
                                 ],
                         "label": int(example["label"]),
                         "claim": example["claim"]
@@ -70,8 +80,8 @@ def format_messages(ds, args: dict) -> List[dict]:
     else:
         def format_zero_shot(example: dict):
             return {"messages": [
-                                {"role": "system", "content": SYSTEM_PROMPTS_LLM[example['lang']]['system']},
-                                {"role": "user", "content": SYSTEM_PROMPTS_LLM[example['lang']]['user'].format(claim=example['claim'])},
+                                {"role": "system", "content": PROMPT[example['lang']]['system']},
+                                {"role": "user", "content": PROMPT[example['lang']]['user'].format(claim=example['claim'])},
                                 ],
                     "label": int(example["label"]),
                     "claim": example["claim"],
@@ -122,21 +132,25 @@ def eval(results: List[Dict],
 
     res = {'model_number': model_number, 
             "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'model': args.model, 
-            'lang': args.lang,
+            'time_mins': args.time_mins,
+            'model': args.model,
+            'data': args.lang,
             'shots': args.shots,
-            'system': args.system, 
+            'system': args.system,
+            'verbose': args.verbose,
             'test_n': test_n,
             'valid_n': len(valid),
             'notes': args.notes,
-            'accuracy': acc, 
-            'f1': f1}
+            "f1": f1,
+            'accuracy': acc
+            }
+
     metrics_path = os.path.join(METRICS_DIR, f"model_{model_number}.json")
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(res, f, indent=2, ensure_ascii=False)
 
 def main() -> None:
-    
+    start = time.time()
     # load data and get model number
     # ds = load_from_disk(os.path.join(DATA_DIR, args.lang))["test"].select(range(10))
     ds = load_from_disk(os.path.join(DATA_DIR, args.lang))["test"]
@@ -144,7 +158,8 @@ def main() -> None:
 
     test_data = format_messages(ds, args)
 
-    print(test_data[:2])
+    # test_data = test_data[:1]
+    # print(test_data[:2])
 
     # initialise client
     client = OpenAI(
@@ -155,6 +170,11 @@ def main() -> None:
     print(f"\nRUNNING MODEL={args.model} - LANGUAGE={args.lang}")
     def worker(example: Dict) -> Dict:
         try:
+            # print("\n\n--- PROMPT ---")
+            # for msg in example["messages"]:
+            #     print(f"{msg['role'].upper()}: {msg['content']}")
+            # print("--- END PROMPT ---\n")
+
             pred = query(client, args.model, example["messages"])
             return {
                 "claim": example["claim"],
@@ -176,6 +196,9 @@ def main() -> None:
         for fut in as_completed(futures):
             results.append(fut.result())
 
+    end = time.time()
+    time_mins = (end - start) / 60.0
+    args.time_mins = time_mins
     # eval
     eval(results, model_number, len(test_data), args)
 

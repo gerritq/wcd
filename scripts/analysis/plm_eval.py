@@ -55,7 +55,6 @@ def main():
     # Load tokeniser
     tokenizer = AutoTokenizer.from_pretrained(meta['model'])
 
-
     if args.mode == "all":
         test_langs = args.languages
     elif args.mode == "self":
@@ -69,6 +68,8 @@ def main():
     
     print(f"\tEvaluation languages: {test_langs}")
 
+    if "context" not in meta.keys():
+        meta['context'] = False
     meta['eval'] = {}
 
     for lang in test_langs:

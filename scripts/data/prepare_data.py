@@ -12,35 +12,38 @@ BASE_DIR = os.getenv("BASE_WCD", ".")
 IN_DIR = os.path.join(BASE_DIR, "data/sents")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets")
 
+def load_data(lang: str) -> list:
+    path = os.path.join(IN_DIR, f"{lang}_sents.json")
+    with open(path, "r", encoding="utf-8") as f:
+        try:
+            data = json.load(f)
+        except Exception:
+            data = []
+    return data
+
 def prepare_data(lang: str, total_n: int) -> list:
     
-    def load_data(lang: str) -> list:
-        path = os.path.join(IN_DIR, f"{lang}_sents.json")
-        with open(path, "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-            except Exception:
-                data = []
-        return data
-
     # load data
     data = load_data(lang)
 
     # balance data by label, picking high-quality subsets first
     n_per_label = int(total_n // 2 ) 
 
-    sorted_pos = []
-    sorted_neg = []
-    for subset in ['fa', 'good', "views"]:
+    pos = []
+    neg = []
+    for subset in ['fa']: #  'good', "views"
         temp = [x for x in data if x['source'] == subset]
         
         temp_pos = [x for x in temp if x['label'] == 1]
         temp_neg = [x for x in temp if x['label'] == 0]
         
-        sorted_pos.extend(temp_pos)
-        sorted_neg.extend(temp_neg)
+        pos.extend(temp_pos)
+        neg.extend(temp_neg)
 
-    final_data = sorted_pos[:n_per_label] + sorted_neg[:n_per_label]
+    random.shuffle(pos)
+    random.shuffle(neg)
+
+    final_data = pos[:n_per_label] + neg[:n_per_label]
 
     assert len(final_data) == total_n, "Data error."
 
@@ -53,7 +56,7 @@ def prepare_data(lang: str, total_n: int) -> list:
     print(" ")
     return final_data
 
-def build_monolingual_dataset(lang: str, total_n: int, out_dir: str) -> None:
+def build_monolingual_dataset(lang: str, total_n: int) -> None:
     # load and select data
     all_data = prepare_data(lang, total_n)
     data=[]
@@ -81,6 +84,10 @@ def build_monolingual_dataset(lang: str, total_n: int, out_dir: str) -> None:
     dev = pos[split_1_half:split_2_half] + neg[split_1_half:split_2_half]
     test = pos[split_2_half:] + neg[split_2_half:]
 
+    random.shuffle(train)
+    random.shuffle(dev)
+    random.shuffle(test)
+
     # small check
     print("\tFinal distribution")
     for set_, name in zip([train, dev, test], ['train', 'dev', 'test']):
@@ -94,6 +101,8 @@ def build_monolingual_dataset(lang: str, total_n: int, out_dir: str) -> None:
         "dev": Dataset.from_list(dev),
         "test": Dataset.from_list(test),
     })
+
+    out_dir = os.path.join(OUT_DIR, f"{lang}")
     ds.save_to_disk(out_dir)
 
 def build_multilingual_training_data(languages: List[str], total_n: int, out_dir: str) -> None:
@@ -157,6 +166,39 @@ def build_multilingual_training_data(languages: List[str], total_n: int, out_dir
         })
     ds.save_to_disk(out_dir)
 
+def build_random_test_set(lang: str, total_n: int):
+    data = load_data(lang)
+    data = [x for x in data if x['source'] == "random"]
+
+    n_per_label = int(total_n // 2 ) 
+
+    pos = [x for x in temp if x['label'] == 1]
+    neg = [x for x in temp if x['label'] == 0]
+    random.shuffle(pos)
+    random.shuffle(neg)
+
+    assert len(pos) > n_per_label and len(neg) > n_per_label,  f"Too few data for {lang}"
+
+    final_data = pos[:n_per_label] + neg[:n_per_label]
+
+    assert len(final_data) == total_n, "Data error."
+
+    source_label_dist = defaultdict(lambda: defaultdict(int))
+    for x in final_data:
+        source_label_dist[x["source"]][x["label"]] += 1
+    print("\tSource × Label distribution:")
+    for src, lbls in source_label_dist.items():
+        print(f"\t\t{src}: {dict(lbls)}")
+    print(" ")
+
+    ds = DatasetDict({
+        "test": Dataset.from_list(test)
+        })
+
+    out_dir = os.path.join(OUT_DIR, "random", f"{lang}_random")
+    ds.save_to_disk(out_dir)
+
+
 def main():
 
     languages  = [
@@ -180,13 +222,17 @@ def main():
 
     for lang in languages:
         print(f"\nRUNNING {lang} ...", flush=True)
-        # mono
-        out_dir = os.path.join(OUT_DIR, f"{lang}")
-        ds = build_monolingual_dataset(lang, total_n, out_dir)
+
+        
+        # mono main set
+        build_monolingual_dataset(lang, total_n)
+        build_random_test_set(lang, total_n)
+
+
 
     # multilingual
-    out_dir = os.path.join(OUT_DIR, f"multi")
-    build_multilingual_training_data(languages, total_n, out_dir)
+    # out_dir = os.path.join(OUT_DIR, f"multi")
+    # build_multilingual_training_data(languages, total_n, out_dir)
 
 if __name__ == "__main__":
     main()

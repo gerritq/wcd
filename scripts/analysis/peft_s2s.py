@@ -27,10 +27,11 @@ from transformers import (
 )
 
 # 4-bit NF4 quantization
-nf4_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16,
+bnb_config = BitsAndBytesConfig(
+   load_in_4bit=True,
+   bnb_4bit_use_double_quant=True,
+   bnb_4bit_quant_type="nf4",
+   bnb_4bit_compute_dtype=torch.bfloat16
 )
 
 # ARGPARSE
@@ -65,15 +66,11 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
 tokenizer.truncation_side = "left"
 
-MAX_SOURCE_LEN = tokenizer.model_max_length
+MAX_SOURCE_LEN = 1024
 MAX_TARGET_LEN = 32
 
 def format_example(example: dict) -> Dict[str, str]:
-    """
-    Build source (encoder input) and target (decoder labels) from the example.
-    Uses language-specific prompts if args.system is True.
-    Expects example to have: claim (str), label (int), and optionally lang.
-    """
+
     lang = example["lang"]
     prompt = SYSTEM_PROMPTS_SLM[lang]
     
@@ -82,20 +79,19 @@ def format_example(example: dict) -> Dict[str, str]:
     return {"source": source, "target": target}
 
 def tokenise_seq2seq(dataset: Dataset) -> Dataset:
-    def _tok(batch):
-        formatted = [format_example(ex) for ex in batch]
-        sources = [x["source"] for x in formatted]
-        targets = [x["target"] for x in formatted]
+    def _tok(example):
+        source = f"Decide whether this claim needs a citation or not: {example['claim']}" 
+        target = SYSTEM_PROMPTS_SLM[example['lang']]["assistant"].format(label=example["label"])
 
         model_inputs = tokenizer(
-            sources,
+            source,
             max_length=MAX_SOURCE_LEN,
             truncation=True,
             padding=False,
         )
         with tokenizer.as_target_tokenizer():
             labels = tokenizer(
-                targets,
+                target,
                 max_length=MAX_TARGET_LEN,
                 truncation=True,
                 padding=False,
@@ -103,8 +99,7 @@ def tokenise_seq2seq(dataset: Dataset) -> Dataset:
         model_inputs["labels"] = labels["input_ids"]
         return model_inputs
 
-    cols_to_remove = [c for c in dataset.column_names if c not in ("claim", "label", "lang")]
-    return dataset.map(_tok, batched=True, remove_columns=cols_to_remove)
+    return dataset.map(_tok)
 
 def main():
     start = time.time()
@@ -122,7 +117,7 @@ def main():
     base_model = AutoModelForSeq2SeqLM.from_pretrained(
         MODEL_ID,
         trust_remote_code=True,
-        quantization_config=nf4_config,
+        quantization_config=bnb_config,
     )
     base_model.config.use_cache = False
 
@@ -133,7 +128,7 @@ def main():
         lora_dropout=0.05,
         bias="none",
         task_type="SEQ_2_SEQ_LM",
-        target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],  # adjust if needed per model
+        target_modules=["k","q","v","o"],
     )
     model = get_peft_model(base_model, lora_cfg)
 

@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=l1-all
+#SBATCH --job-name=cl-l8
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=08:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
@@ -23,12 +23,13 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
 # "qwen3_32b": "Qwen/Qwen3-32B"
 
-LANGUAGES=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id" "multi")
-# LANGUAGES=("nl" "no")
+# LANGUAGES=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id" "multi")
+# LANGUAGES=("nl" "no" "bg")
+# LANGUAGES=("en")
 
-# LANGUAGES=("multi")
+LANGUAGES=("multi")
 MODELS=(
-  "llama3_1b"
+  "llama3_8b"
 )
 
   # "qwen3_8b"
@@ -36,20 +37,14 @@ MODELS=(
 
 BATCH=16
 EPOCHS=5
-PLW=0
-SYSTEM=1
-NOTES=""
 
 for LANGUAGE in "${LANGUAGES[@]}"; do
   for MODEL in "${MODELS[@]}"; do
     echo "Running with MODEL=$MODEL, LANGUAGES=$LANGUAGE"
-    uv run peft_run.py \
+    uv run classy.py \
       --lang "$LANGUAGE" \
       --model "$MODEL" \
       --batch_size $BATCH \
-      --epochs $EPOCHS \
-      --plw $PLW \
-      --system "$SYSTEM" \
-      --notes "$NOTES"
+      --epochs $EPOCHS
   done
 done

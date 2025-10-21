@@ -40,11 +40,6 @@ def count_sents(lang: str):
     }
     print("\tLabels by source:", sorted_count_source, "\n")
 
-def count_final_ds(lang: str):
-    ds = load_from_disk(SETS_DIR, lang)
-    for _set in ds:
-        print()
-
 def count_articles(source: str, lang: str):
     try:
         path = os.path.join(INPUT_DIR, f"{lang}_{source}.jsonl")
@@ -67,13 +62,11 @@ def main():
         "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
-        # "zh",  # Chinese
-        # "ar",  # Arabic
-        "id"   # Indonesian
     ]
 
     for lang in languages:
         count = defaultdict(int)
+        all_count = defaultdict(int)
         count_colon = 0
         file_path = os.path.join(INPUT_DIR, f"{lang}_all.jsonl")
 
@@ -84,17 +77,19 @@ def main():
                 # if ":" in item['title']:
                 #     count_colon+=1
         
-        for x in ['views', 'good', 'fa']:
-            count[f'{x}_og'] = count_articles(x, lang)
+        # this adds the oriingal counts of the sources
+        # for x in ['views', 'good', 'fa']:
+        #     count[f'{x}_og'] = count_articles(x, lang)
+
         # print("Colon in title:", count_colon)
         
         sorted_count = dict(sorted(count.items()))
         print(f"========== {lang} ==========")
-        print("Distribution of articles")
+        print("Final distribution of articles")
         print(sorted_count, "\n")
 
-        print("Distribution of sentences")
-        count_final_ds(lang)
+        # print("Distribution of sentences")
+        # count_final_ds(lang)
 
         print("Distribution of sentences")
         count_sents(lang)

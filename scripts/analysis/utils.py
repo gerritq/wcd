@@ -10,6 +10,7 @@ accuracy_metric = evaluate.load("accuracy")
 f1_metric = evaluate.load("f1")
 roc_auc_metric = evaluate.load("roc_auc")
 
+
 MODEL_MAPPING =  {
     "mBert": "google-bert/bert-base-multilingual-uncased",
     "xlm-r-b": "FacebookAI/xlm-roberta-base",
@@ -26,7 +27,8 @@ MODEL_MAPPING =  {
     "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
     "qwen3_32b": "Qwen/Qwen3-32B",
     "aya": "CohereLabs/aya-101",
-    "gpt-4o-mini": "openai/gpt-4o-mini"
+    "gpt-4o-mini": "openai/gpt-4o-mini",
+    "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite"
     }
 
 def compute_metrics(eval_pred):
@@ -67,12 +69,14 @@ def tokenise_data(ds, tokenizer, context_bool: bool):
         # concat input
         claim = example["claim"].strip()
         if context_bool:
-            section = example['section'].strip()
-            context = example['context'].strip()
+            section = example['section']
+            context = example['context']
             
             # only use non-empty parts
-            parts = [p for p in [section, context, claim] if p]
-            return f" {sep_token} ".join(parts)
+            parts = [p.strip() for p in [section, context, claim] if p]
+            out = f" {sep_token} ".join(parts)
+            print(out)
+            return out
         # claim only, no context
         else:
             return claim

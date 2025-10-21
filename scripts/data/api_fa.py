@@ -22,10 +22,10 @@ FA_NAMES = {
     "ru": "Википедия:Избранные_статьи_по_алфавиту", # (2072) https://ru.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D0%B8%D1%8F:%D0%92%D0%B8%D0%BA%D0%B8%D0%BF%D0%B5%D0%B4%D0%B8%D1%8F:%D0%98%D0%B7%D0%B1%D1%80%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5_%D1%81%D1%82%D0%B0%D1%82%D1%8C%D0%B8_%D0%BF%D0%BE_%D0%B0%D0%BB%D1%84%D0%B0%D0%B2%D0%B8%D1%82%D1%83
     "uk": "Вікіпедія:Вибрані_статті", # (246) https://uk.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D1%96%D1%8F:%D0%92%D1%96%D0%BA%D1%96%D0%BF%D0%B5%D0%B4%D1%96%D1%8F:%D0%92%D0%B8%D0%B1%D1%80%D0%B0%D0%BD%D1%96_%D1%81%D1%82%D0%B0%D1%82%D1%82%D1%96
     "bg": "Избрани_статии_на_български", # (153) https://bg.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D0%B8%D1%8F:%D0%98%D0%B7%D0%B1%D1%80%D0%B0%D0%BD%D0%B8_%D1%81%D1%82%D0%B0%D1%82%D0%B8%D0%B8_%D0%BD%D0%B0_%D0%B1%D1%8A%D0%BB%D0%B3%D0%B0%D1%80%D1%81%D0%BA%D0%B8
-    "zh": "典范条目",
-    "ar": "مقالات_مختارة",
-    "id": "Artikel_pilihan" # (421) https://id.wikipedia.org/wiki/Kategori:Artikel_bagus
-}
+    "id": "Artikel_pilihan", # (421) https://id.wikipedia.org/wiki/Kategori:Artikel_bagus
+    "vi": "Bài_viết_chọn_lọc", # (479) https://vi.wikipedia.org/wiki/Th%E1%BB%83_lo%E1%BA%A1i:B%C3%A0i_vi%E1%BA%BFt_ch%E1%BB%8Dn_l%E1%BB%8Dc
+    "tr": "Seçkin_maddeler" # (228) https://tr.wikipedia.org/wiki/Kategori:Se%C3%A7kin_maddeler
+}   
 
 
 # missing for: nl,
@@ -38,9 +38,9 @@ GOOD_NAMES = {
     "ru": "Википедия:Хорошие_статьи_по_алфавиту", # (5002) https://ru.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D0%B8%D1%8F:%D0%92%D0%B8%D0%BA%D0%B8%D0%BF%D0%B5%D0%B4%D0%B8%D1%8F:%D0%A5%D0%BE%D1%80%D0%BE%D1%88%D0%B8%D0%B5_%D1%81%D1%82%D0%B0%D1%82%D1%8C%D0%B8_%D0%BF%D0%BE_%D0%B0%D0%BB%D1%84%D0%B0%D0%B2%D0%B8%D1%82%D1%83
     "uk": "Вікіпедія:Добрі_статті", # (1077) https://uk.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D1%96%D1%8F:%D0%92%D1%96%D0%BA%D1%96%D0%BF%D0%B5%D0%B4%D1%96%D1%8F:%D0%94%D0%BE%D0%B1%D1%80%D1%96_%D1%81%D1%82%D0%B0%D1%82%D1%82%D1%96
     "bg": "Добри_статии", # (59) https://bg.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D0%B8%D1%8F:%D0%94%D0%BE%D0%B1%D1%80%D0%B8_%D1%81%D1%82%D0%B0%D1%82%D0%B8%D0%B8
-    "zh": "优良条目讨论",
-    "ar": "مقالات_جيدة",
-    "id": "Artikel_bagus" # (431) https://id.wikipedia.org/wiki/Kategori:Artikel_bagus
+    "id": "Artikel_bagus", # (431) https://id.wikipedia.org/wiki/Kategori:Artikel_bagus
+    "vi": "Bài_viết_chất_lượng_tốt", # (566) https://vi.wikipedia.org/wiki/Th%E1%BB%83_lo%E1%BA%A1i:B%C3%A0i_vi%E1%BA%BFt_ch%E1%BA%A5t_l%C6%B0%E1%BB%A3ng_t%E1%BB%91t
+    "tr": "Kaliteli_maddeler" # (344) https://tr.wikipedia.org/wiki/Kategori:Se%C3%A7kin_maddeler
 }
 
 # Categorie:Wikipedia:Etalage-artikelen
@@ -57,7 +57,9 @@ CATEGORY_NAMES = {
     "bg": "Категория",
     "zh": "Category",
     "ar": "تصنيف",
-    "id": "Kategori"
+    "id": "Kategori",
+    "vi": "Thể_loại",
+    "tr": "Kategori"
 }
 
 def query_high_quality_articles(lang: str, QUALITY_NAMES: dict):
@@ -101,18 +103,18 @@ def query_high_quality_articles(lang: str, QUALITY_NAMES: dict):
 
 def main():
     languages  = [
-    "en",  # English
-    "nl",  # Dutch
-    "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-    "it",  # Italian
-     "pt",  # Portuguese
-      "ro",  # Romanian
-      "ru",  # Russian
-      "uk",  # Ukrainian
-      "bg",  # Bulgarian
-     "zh",  # Chinese
-     "ar",  # Arabic
-      "id"   # Indonesian
+    # "en",  # English
+    # "nl",  # Dutch
+    # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+    # "it",  # Italian
+    # "pt",  # Portuguese
+    # "ro",  # Romanian
+    # "ru",  # Russian
+    # "uk",  # Ukrainian
+    # "bg",  # Bulgarian
+    "id",  # Indonesian
+    "vi",  # Vietnamese
+    "tr"  # Turkish
     ]
     for lang in languages:
         print(f"Running FA {lang} ...")

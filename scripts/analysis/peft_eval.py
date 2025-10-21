@@ -152,7 +152,7 @@ def predict(model, tokenizer, messages, batch_size, is_llama=False):
                 idx = 0
             response = tokenizer.decode(output_ids[idx:], skip_special_tokens=True).strip()
 
-            # print("answer", j, response)
+            print("answer", j, response)
             
             label = None
             match = re.search(r"<label>\s*([01])\s*</label>", response, re.DOTALL | re.IGNORECASE)
@@ -263,7 +263,7 @@ def main():
         
         
     # out_path = os.path.join(METRICS_DIR, f"{meta['data']}_2_{lang}_model{meta['model_number']}.json")
-    out_path = os.path.join(METRICS_DIR, f"model_{meta['model_number']}.json")
+    out_path = os.path.join(METRICS_DIR, f"model_{meta['model_number']}_2.json")
     with open(out_path, "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)    
     

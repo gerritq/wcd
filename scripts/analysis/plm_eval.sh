@@ -11,8 +11,8 @@ nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-MODELS=("model_26")
-# MODELS=($(seq -f "model_%g" 1 21))
+# MODELS=("model_26")
+MODELS=($(seq -f "model_%g" 27 48))
 MODE="all" # all "ool"
 LANGUAGES=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id")
 

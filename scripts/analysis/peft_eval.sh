@@ -2,7 +2,7 @@
 #SBATCH --job-name=eval
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --partition=gpu,nmes_gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
@@ -13,10 +13,10 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # MODELS=("model_11")
 # MODELS=($(seq -f "model_%g" 2 18))
-# MODELS=("model_1")
-MODELS=("model_18")
+MODELS=("model_4")
+# MODELS=($(seq -f "model_%g" 19 31))
 MODE="all" # all "ool"
-LANGUAGES=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id")
+LANGUAGES=("en" "ct_english")
 
 for MODEL in "${MODELS[@]}"; do
   start=$(date +%s)

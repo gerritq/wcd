@@ -1,5 +1,6 @@
 import os
 import json
+import argparse
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from skip_sections import DROP_SECTIONS
@@ -8,6 +9,10 @@ BASE_DIR = os.getenv("BASE_WCD")
 INPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
 OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/parsed")
 INFO_PATH = os.path.join(BASE_DIR, "data/info/parsing_stats.json")
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--languages", nargs="+", required=True)
+args = parser.parse_args()
 
 def clean_paragraphs(paragraphs):
     
@@ -83,27 +88,13 @@ def main():
                         "ru": "[источник?]",
                         "uk": None,
                         "bg": None,
-                        "id": None,
+                        "id": "[butuh rujukan]",
+                        "vi": "[cần dẫn nguồn]",
+                        "tr": "[kaynak belirtilmeli]",
                         }
-
-    languages  = [
-        "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
-        "ro",  # Romanian
-        "ru",  # Russian
-        "uk",  # Ukrainian
-        "bg",  # Bulgarian
-        # "zh",  # Chinese
-        # "ar",  # Arabic
-        "id"   # Indonesian
-    ]
-
     stats = {}
 
-    for lang in languages:
+    for lang in args.languages:
         print(f"Running {lang} ...", flush=True)
 
         INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_htmls.jsonl")

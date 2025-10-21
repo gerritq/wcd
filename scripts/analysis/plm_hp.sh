@@ -12,9 +12,9 @@ nvidia-smi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id"
-LANGUAGES=("multi")
-MODELS=("xlm-r-b") # "xlm-r" "mBert"
-TRIALS=5
+LANGUAGES=("en")
+MODELS=("mBert") # "xlm-r" "mBert"
+TRIALS=2
 CONTEXT=0
 
 for LANGUAGE in "${LANGUAGES[@]}"; do

@@ -6,4 +6,4 @@
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=20GB
 
-uv run prepare_data.py
+uv run prepare_data.py 
