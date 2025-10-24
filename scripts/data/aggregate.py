@@ -41,15 +41,15 @@ DROP_PAGES = ["Wikipedia", "Templat", "Template", "Kategori", "Category", "Categ
 def main():
     
     languages  = [
-        # "en",  # English
-        # "nl",  # Dutch
-        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        # "it",  # Italian
-        # "pt",  # Portuguese
-        # "ro",  # Romanian
-        # "ru",  # Russian
-        # "uk",  # Ukrainian
-        # "bg",  # Bulgarian
+        "en",  # English
+        "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
         "id",
         "vi",
         "tr"

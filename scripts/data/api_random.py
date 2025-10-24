@@ -40,7 +40,7 @@ def query_random_articles(lang: str, n: int):
         print(f"[{lang}] Fetched {fetched}/{n}")
 
     OUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_random.jsonl")
-    with open(OUT_FILE, "w", encoding="utf-8") as f:
+    with open(OUT_FILE, "a", encoding="utf-8") as f:
         for item in titles:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
     return titles
@@ -48,15 +48,15 @@ def query_random_articles(lang: str, n: int):
 
 def main():
     languages  = [
-    # "en",  # English
-    # "nl",  # Dutch
-    # "no",  # Norwegian 
-    # "it",  # Italian
-    # "pt",  # Portuguese
-    # "ro",  # Romanian
-    # "ru",  # Russian
-    # "uk",  # Ukrainian
-    # "bg",  # Bulgarian
+    "en",  # English
+    "nl",  # Dutch
+    "no",  # Norwegian 
+    "it",  # Italian
+    "pt",  # Portuguese
+    "ro",  # Romanian
+    "ru",  # Russian
+    "uk",  # Ukrainian
+    "bg",  # Bulgarian
     "id",
     "vi",
     "tr",

@@ -1,3 +1,6 @@
+# https://api.wikimedia.org/wiki/Lift_Wing_API/Reference/Article_Topic_Outlink_scores_object
+# https://api.wikimedia.org/wiki/Lift_Wing_API/Reference/Get_articletopic_outlink_prediction
+# last word of the full topic is the most precise
 import os
 import requests
 import json

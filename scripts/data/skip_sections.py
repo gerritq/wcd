@@ -561,6 +561,7 @@ DROP_SECTIONS = {
         "lectură suplimentară",
         "bibliografie",
         "legături externe",
+        "referințe"
     ],
     "ru": [
         "примечания",

@@ -4,6 +4,7 @@ import argparse
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from skip_sections import DROP_SECTIONS
+import unicodedata
 
 BASE_DIR = os.getenv("BASE_WCD")
 INPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
@@ -14,10 +15,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--languages", nargs="+", required=True)
 args = parser.parse_args()
 
-def clean_paragraphs(paragraphs):
+
+def clean_txt(paragraphs):
     
     out = []
     for x in paragraphs:
+        x = unicodedata.normalize("NFKC", x)
         x = x.strip()
         x = x.replace("\n", "")
         if not x:
@@ -54,6 +57,10 @@ def parse_html(html: str, DROP_SECTIONS_LANG: list, CITATION_NEEDED_LANG: str):
             # drop if small
             if any(child.name == "small" for child in tag.children if child.name):
                 continue
+            # this drops latex math notation
+            for ann in tag.find_all("annotation"):
+                if "\\displaystyle" in ann.get_text():
+                    ann.decompose()
 
             # get txt
             text = tag.get_text()  
@@ -65,11 +72,15 @@ def parse_html(html: str, DROP_SECTIONS_LANG: list, CITATION_NEEDED_LANG: str):
 
     sections_out = []
     for s in sections:
+        # clean header
+        s['header'] = unicodedata.normalize("NFKC", s['header'])
         if s['header'].lower().strip() in DROP_SECTIONS_LANG:
             continue
-        s['paragraphs'] = clean_paragraphs(s['paragraphs'])
-        if (CITATION_NEEDED_LANG and CITATION_NEEDED_LANG in " ".join(s['paragraphs'])):
-            return None
+        s['paragraphs'] = clean_txt(s['paragraphs'])
+
+        # We drop paragraphs in which there is a [citation needed] statement
+        if (CITATION_NEEDED_LANG and CITATION_NEEDED_LANG.lower() in " ".join(s['paragraphs']).lower()):
+            continue
 
         sections_out.append(s)
 
@@ -98,7 +109,7 @@ def main():
         print(f"Running {lang} ...", flush=True)
 
         INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_htmls.jsonl")
-        OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_parsed.jsonl")
+        OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_parsed_2.jsonl")
         
         DROP_SECTIONS_LANG = DROP_SECTIONS[lang]
         CITATION_NEEDED_LANG = CITATION_NEEDED[lang]
@@ -106,6 +117,7 @@ def main():
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
             data = [json.loads(line) for line in f]
             # data = data[:100]
+            data = [x for x in data if x['title'] == "Teoria relativității generale"]
 
         dropped = 0
         parsed = 0

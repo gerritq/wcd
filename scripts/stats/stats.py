@@ -62,6 +62,9 @@ def main():
         "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
+        "id",
+        "vi",
+        "tr"
     ]
 
     for lang in languages:
