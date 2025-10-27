@@ -8,7 +8,8 @@ import time
 from utils import (
                     MODEL_MAPPING, 
                     append_meta_file, 
-                    get_model_number
+                    get_model_number,
+                    plot_loss_curves
 )
 from prompts import SYSTEM_PROMPTS_SLM
 from datasets import load_from_disk
@@ -37,20 +38,18 @@ bnb_config = BitsAndBytesConfig(
 parser = argparse.ArgumentParser()
 parser.add_argument("--lang", type=str, required=True)
 parser.add_argument("--model", type=str, required=True)
-parser.add_argument("--batch_size", type=int, default=16)
-parser.add_argument("--epochs", type=int, default=5)
-parser.add_argument("--plw", type=int, default=1)
-parser.add_argument("--system", type=int, required=True)
-parser.add_argument("--shots", type=int, required=True)
-parser.add_argument("--notes", type=str)
+parser.add_argument("--learning_rate", type=float, required=True)
+parser.add_argument("--batch_size", type=int, required=True)
+parser.add_argument("--epochs", type=int, required=True)
+parser.add_argument("--plw", type=int, default=0)
+parser.add_argument("--shots", type=int, default=0)
 args = parser.parse_args()
 args.plw = bool(args.plw)
 args.shots = bool(args.shots)
-args.system = bool(args.system) 
 
 # DIRs
 BASE_DIR = os.getenv("BASE_WCD")
-DATA_DIR = os.path.join(BASE_DIR, "data/sets")
+DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
 MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm")
 SHOTS_DIR = os.path.join(BASE_DIR, "data/sents/shots")
 
@@ -63,7 +62,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {DEVICE}")
 
 # TOKENISER
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, token=os.getenv("HF_TOKEN"))
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
 tokenizer.truncation_side = "left"
@@ -71,7 +70,7 @@ tokenizer.truncation_side = "left"
 MAX_LENGTH = tokenizer.model_max_length
 print("Max context length:", MAX_LENGTH)
 
-def build_messages(dataset: Dataset, system: bool) -> Dataset:
+def build_messages(dataset: Dataset) -> Dataset:
 
     def preprocess_function(example):
         
@@ -107,6 +106,8 @@ def build_messages(dataset: Dataset, system: bool) -> Dataset:
 
 
 def get_generation_tag(tokenizer):
+    """Used to identify the assistant tag and ids. Can be used to define an assistant loss (rather than a loss
+    over the full prompt)"""
     messages = ([{"role": "user","content":"test"}])
     no_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
     with_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -121,7 +122,7 @@ def get_generation_tag(tokenizer):
     return assistant_tag, assistant_tag_ids
 
 def custom_tokenize(example: dict, tokenizer, assistant_tag_ids: List[int], pwt=False):
-    """Allows to apply pwt."""
+    """Enables to apply pwt."""
 
     def find_sublist_reverse(sub, lst):
         for i in range(len(lst) - len(sub), -1, -1):  # start from the back
@@ -129,16 +130,17 @@ def custom_tokenize(example: dict, tokenizer, assistant_tag_ids: List[int], pwt=
                 return i
         return -1
 
-    text = tokenizer.apply_chat_template(
-                                            example["messages"],
-                                            tokenize=False,
-                                            add_generation_prompt=False,
-                                            enable_thinking=False
+    # applies the chat template, crucial to turn add generation prompt off
+    text = tokenizer.apply_chat_template(example["messages"],
+                                         tokenize=False,
+                                         add_generation_prompt=False,
+                                        enable_thinking=False
                                         )
-    # print(text)
-    # text tokens
+    print(text)
+    # tokenise
     text_tok = tokenizer(text, truncation=True, max_length=MAX_LENGTH)
     
+    # this is the pwt loss, else just return the lables and thats it
     if pwt:
         text_input_ids = text_tok['input_ids']
 
@@ -166,10 +168,9 @@ def main():
 
     # load data
     ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
-    # train_msgs_ds = build_messages(ds["train"].select(range(10)))
+    train_msgs_ds = build_messages(ds["train"].select(range(10)))
     # train_msgs_ds = build_messages(ds["train"])
-    train_msgs_ds = build_messages(ds["train"], args.system)
-    dev_msgs_ds = build_messages(ds["dev"], args.system)
+    dev_msgs_ds = build_messages(ds["dev"])
     
     print("Example message for training\n\t", train_msgs_ds[0],"\n\n")
 
@@ -191,7 +192,8 @@ def main():
         MODEL_ID,
         # device_map="auto", # let sft handle this
         trust_remote_code=True,
-        quantization_config=bnb_config
+        quantization_config=bnb_config,
+        token=os.getenv("HF_TOKEN")
     )
 
     if hasattr(base_model, "enable_input_require_grads"):
@@ -211,7 +213,7 @@ def main():
         bias="none",
         task_type="CAUSAL_LM",
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"]
-    )
+        )
     
     model = get_peft_model(base_model, lora_cfg)
 
@@ -228,9 +230,8 @@ def main():
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         num_train_epochs=args.epochs,
-        learning_rate=1e-4, # higher learning rate as only adapters are trained
+        learning_rate=args.learning_rate, # rec 1e-4 
         save_strategy="no",
-        save_total_limit=1,
         logging_strategy="epoch",
         report_to="none",
         fp16=False,
@@ -239,12 +240,8 @@ def main():
         eval_strategy="epoch", 
         packing=False,
         max_length=MAX_LENGTH
-        # assistant_only_loss=True # does not work, hence our own implmentation
     )
 
-    print(f"Memory allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
-    print(f"Max memory allocated: {torch.cuda.max_memory_allocated() / 1024**2:.2f} MB")
-    
     trainer = SFTTrainer(
         model=model,
         args=training_args,
@@ -252,12 +249,17 @@ def main():
         eval_dataset=dev_tok,
     )
 
+
+    print(f"Memory allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+    print(f"Max memory allocated: {torch.cuda.max_memory_allocated() / 1024**2:.2f} MB")
+    
     trainer.train()
 
     # collect losses
     train_losses = []
     eval_losses = []
     
+    print(trainer.state.log_history)
     for log in trainer.state.log_history:
         if "loss" in log:
             train_losses.append({"epoch": log.get("epoch"), "loss": log["loss"]})
@@ -275,7 +277,6 @@ def main():
         "data": args.lang,
         "model": MODEL_ID,
         "plw": args.plw,
-        "system": args.system,
         "train_n": len(ds['train']),
         "dev_n": len(ds['dev']),
         "epochs": args.epochs,
@@ -286,8 +287,7 @@ def main():
         "lora": {"r": lora_cfg.r, "alpha": lora_cfg.lora_alpha, "dropout": lora_cfg.lora_dropout},
         "trainable_parameters": trainable_params_str,
         "time_min": (end - start) / 60.0,
-        "cuda_max_memory_allocation": torch.cuda.max_memory_allocated() / 1024**2,
-        "notes": args.notes
+        "cuda_max_memory_allocation": torch.cuda.max_memory_allocated() / 1024**2
     }
 
     out_dir = os.path.join(MODEL_DIR, f"model_{model_number}")
@@ -297,6 +297,10 @@ def main():
 
     with open(os.path.join(out_dir, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
+
+    # save loss plot in the dir
+    if train_losses and eval_losses:
+        plot_loss_curves(train_losses, eval_losses, out_dir)
 
 if __name__ == "__main__":
     main()

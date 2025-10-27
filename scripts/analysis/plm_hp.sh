@@ -1,9 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=plm-hp
+#SBATCH --job-name=ph-en
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=nmes_gpu,gpu,interruptible_gpu
+# SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
 
@@ -11,11 +12,11 @@ nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id"
+# VARs
+# "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id" "vi" "tr"
 LANGUAGES=("en")
-MODELS=("mBert") # "xlm-r" "mBert"
-TRIALS=2
-CONTEXT=0
+MODELS=("mBert") # "mBert"
+TRIALS=5
 
 for LANGUAGE in "${LANGUAGES[@]}"; do
   for MODEL in "${MODELS[@]}"; do
@@ -25,8 +26,7 @@ for LANGUAGE in "${LANGUAGES[@]}"; do
     uv run plm_hp.py \
       --lang "$LANGUAGE" \
       --model "$MODEL" \
-      --trials $TRIALS \
-      --context $CONTEXT
+      --trials $TRIALS 
 
     end=$(date +%s)
     runtime=$((end - start))

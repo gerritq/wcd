@@ -58,11 +58,17 @@ def main():
     skip_titles = defaultdict(list)
 
     for lang in languages:
-        all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
-            + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
-        #   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
-        #     + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*")) \
-                # + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
+        if lang not in ['tr', 'id']:
+            all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
+                + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
+            #   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
+            #     + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*")) \
+                    # + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
+        else:
+            all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
+                + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*")) \
+                   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*"))
+            
         print(all_files)
 
         all_titles = []

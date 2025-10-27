@@ -27,13 +27,24 @@ LANG_MAP = {
     "zh": "zh-hans", 
     "ar": "ar", 
     "id": "id",
+    "tr": "tr",
+    "vi": "vi"
 }
 
 
 def load_data(lang: str):
     path = os.path.join(IN_DIR, f"{lang}_sents.json")
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+
+    # we do a small adjustment by coutning good articesl as fa articles
+    # this is only for id and tr, and we will put an asteriks in the table to indicate that
+    for x in data:
+        if x['source'] == "good":
+            x['source'] = "fa"
+
+    return data
+        
 
 def js_distance_fa_random(data):
     """gets the js distance between fa and random topics

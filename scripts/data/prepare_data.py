@@ -31,7 +31,7 @@ def prepare_data(lang: str, total_n: int) -> list:
 
     pos = []
     neg = []
-    for subset in ['fa']: #  'good', "views"
+    for subset in ['fa', 'good']: #  'good', "views"
         temp = [x for x in data if x['source'] == subset]
         
         temp_pos = [x for x in temp if x['label'] == 1]
@@ -67,6 +67,7 @@ def build_monolingual_dataset(lang: str, total_n: int) -> None:
                      "title": x['title'],
                      "section": x['section'],
                      "context": x['context'],
+                     "source": x['source'],
                      "lang": lang })
 
     # split data
@@ -102,69 +103,69 @@ def build_monolingual_dataset(lang: str, total_n: int) -> None:
         "test": Dataset.from_list(test),
     })
 
-    out_dir = os.path.join(OUT_DIR, f"{lang}")
+    out_dir = os.path.join(OUT_DIR, "main", f"{lang}")
     ds.save_to_disk(out_dir)
 
-def build_multilingual_training_data(languages: List[str], total_n: int, out_dir: str) -> None:
-    """Takes data from the monolingual datasets"""
-    training_n = int(.8 * total_n)
-    dev_n = int(.1 * total_n)
-    n_languages = len(languages)
+# def build_multilingual_training_data(languages: List[str], total_n: int, out_dir: str) -> None:
+#     """Takes data from the monolingual datasets"""
+#     training_n = int(.8 * total_n)
+#     dev_n = int(.1 * total_n)
+#     n_languages = len(languages)
     
-    # train split
-    train_n_per_language = training_n // n_languages
-    train_n_per_language_per_label = train_n_per_language // 2
+#     # train split
+#     train_n_per_language = training_n // n_languages
+#     train_n_per_language_per_label = train_n_per_language // 2
 
-    # dev split
-    dev_n_per_language = dev_n // n_languages
-    dev_n_per_language_per_label = dev_n_per_language // 2
+#     # dev split
+#     dev_n_per_language = dev_n // n_languages
+#     dev_n_per_language_per_label = dev_n_per_language // 2
 
-    train = []
-    dev = []
-    for lang in languages: 
-        # load data 
-        in_dir = os.path.join(OUT_DIR, lang)
-        temp = load_from_disk(in_dir)
+#     train = []
+#     dev = []
+#     for lang in languages: 
+#         # load data 
+#         in_dir = os.path.join(OUT_DIR, lang)
+#         temp = load_from_disk(in_dir)
         
-        # for x in temp['train']:
-        #     x['lang'] = lang
-        # for x in temp['dev']:
-        #     x['lang'] = lang
+#         # for x in temp['train']:
+#         #     x['lang'] = lang
+#         # for x in temp['dev']:
+#         #     x['lang'] = lang
 
-        # train
-        pos = [x for x in temp['train'] if x['label'] == 1]
-        neg = [x for x in temp['train'] if x['label'] == 0]
+#         # train
+#         pos = [x for x in temp['train'] if x['label'] == 1]
+#         neg = [x for x in temp['train'] if x['label'] == 0]
 
-        train.extend(pos[:train_n_per_language_per_label])
-        train.extend(neg[:train_n_per_language_per_label])
+#         train.extend(pos[:train_n_per_language_per_label])
+#         train.extend(neg[:train_n_per_language_per_label])
 
-        # dev
-        pos = [x for x in temp['dev'] if x['label'] == 1]
-        neg = [x for x in temp['dev'] if x['label'] == 0]
+#         # dev
+#         pos = [x for x in temp['dev'] if x['label'] == 1]
+#         neg = [x for x in temp['dev'] if x['label'] == 0]
 
-        dev.extend(pos[:dev_n_per_language_per_label])
-        dev.extend(neg[:dev_n_per_language_per_label])
+#         dev.extend(pos[:dev_n_per_language_per_label])
+#         dev.extend(neg[:dev_n_per_language_per_label])
 
-        # # add language labels
-        # for x in train:
-        #     x['lang'] = lang
-        # for x in dev:
-        #     x['lang'] = lang
+#         # # add language labels
+#         # for x in train:
+#         #     x['lang'] = lang
+#         # for x in dev:
+#         #     x['lang'] = lang
 
-    # small check
-    for set_, name in zip([train, dev], ['train', 'dev']):
-        label_dist = defaultdict(lambda: defaultdict(int))
-        for x in set_:
-            label_dist[x["lang"]][x['label']] += 1
+#     # small check
+#     for set_, name in zip([train, dev], ['train', 'dev']):
+#         label_dist = defaultdict(lambda: defaultdict(int))
+#         for x in set_:
+#             label_dist[x["lang"]][x['label']] += 1
 
-        label_dist = {k: dict(v) for k, v in label_dist.items()}
-        print(f"Distribuion set {name}: {dict(label_dist)}")
+#         label_dist = {k: dict(v) for k, v in label_dist.items()}
+#         print(f"Distribuion set {name}: {dict(label_dist)}")
 
-    ds = DatasetDict({
-        "train": Dataset.from_list(train),
-        "dev": Dataset.from_list(dev),
-        })
-    ds.save_to_disk(out_dir)
+#     ds = DatasetDict({
+#         "train": Dataset.from_list(train),
+#         "dev": Dataset.from_list(dev),
+#         })
+#     ds.save_to_disk(out_dir)
 
 def build_random_test_set(lang: str, total_n: int):
     data = load_data(lang)
@@ -172,8 +173,8 @@ def build_random_test_set(lang: str, total_n: int):
 
     n_per_label = int(total_n // 2 ) 
 
-    pos = [x for x in temp if x['label'] == 1]
-    neg = [x for x in temp if x['label'] == 0]
+    pos = [x for x in data if x['label'] == 1]
+    neg = [x for x in data if x['label'] == 0]
     random.shuffle(pos)
     random.shuffle(neg)
 
@@ -181,7 +182,8 @@ def build_random_test_set(lang: str, total_n: int):
 
     final_data = pos[:n_per_label] + neg[:n_per_label]
 
-    assert len(final_data) == total_n, "Data error."
+    # if we do 625 we get 624 which is ok
+    # assert len(final_data) == total_n, f"Data error. Len data{len(final_data)}"
 
     source_label_dist = defaultdict(lambda: defaultdict(int))
     for x in final_data:
@@ -192,10 +194,10 @@ def build_random_test_set(lang: str, total_n: int):
     print(" ")
 
     ds = DatasetDict({
-        "test": Dataset.from_list(test)
+        "test": Dataset.from_list(final_data)
         })
 
-    out_dir = os.path.join(OUT_DIR, "random", f"{lang}_random")
+    out_dir = os.path.join(OUT_DIR, "random", f"{lang}")
     ds.save_to_disk(out_dir)
 
 
@@ -211,14 +213,16 @@ def main():
         "ru",  # Russian
         "uk",  # Ukrainian
         "bg",  # Bulgarian
-        # "zh",  # Chinese
-        # "ar",  # Arabic
-        "id"   # Indonesian
+        "id",   # Indonesian
+        "vi",
+        "tr"
+
     ]
     
     # set n
     training_n = 5000
     total_n = 5000 / .8 # assuming .1 dev and test
+    random_n = (5000 / .8) * .1
 
     for lang in languages:
         print(f"\nRUNNING {lang} ...", flush=True)
@@ -226,7 +230,7 @@ def main():
         
         # mono main set
         build_monolingual_dataset(lang, total_n)
-        build_random_test_set(lang, total_n)
+        build_random_test_set(lang, random_n)
 
 
 

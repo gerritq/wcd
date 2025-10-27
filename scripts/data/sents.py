@@ -55,11 +55,14 @@ def clean_paragraph(x: str) -> str:
     x = re.sub( rf"([?.!])\s*([{QUOTES}])", r"\1\2", x)
 
     # no space between word and punct
-    x = re.sub( rf"(\w)\s+([{END_PUNCT}{QUOTES};:,\)])", r"\1\2", x)
+    x = re.sub( rf"(\w)\s+([{END_PUNCT};:,\)])", r"\1\2", x)
 
     # add a space between a punctuation and word
     # x = re.sub(rf"([{END_PUNCT}{QUOTES};:,\)])(\w{4,})", r"\1 \2", x)
-    x = re.sub(rf"(\.)(\w{4,}?)", r"\1 \2", x)
+    x = re.sub(rf"(?<!\d)(\.)(\w{4,}?)", r"\1 \2", x)
+
+    # add space between parentheses
+    x = re.sub(r"(\))(\()", r"\1 \2", x)
 
     # rm templates. There should be none but we found rare instances
     # Eg Romanian article "Doggerbank "
@@ -98,7 +101,7 @@ def clean_citation(x: str) -> str:
 def final_clean(x):
 
     # no space between word and punct
-    x = re.sub( rf"(\w)\s+([{END_PUNCT}{QUOTES};:,\)])", r"\1\2", x)
+    x = re.sub( rf"(\w)\s+([{END_PUNCT};:,\)])", r"\1\2", x)
 
     # rm multiple dots at the end
     x = re.sub(r"\.{2,}$", r".", x)
@@ -233,8 +236,8 @@ def drop_sentence(x: str) -> bool:
     # if x.count("\"") % 2 != 0:
     #     return True
 
-    if x.count("„") != x.count("“"):
-        return True
+    # if x.count("„") != x.count("“"):
+    #     return True
 
     return False
 

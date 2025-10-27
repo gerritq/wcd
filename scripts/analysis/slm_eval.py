@@ -13,6 +13,7 @@ from prompts import SYSTEM_PROMPTS_SLM
 from typing import List
 from utils import MODEL_MAPPING
 import argparse
+from sklearn.metrics import confusion_matrix
 
 # Ignore "The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details."
 logging.set_verbosity_error()
@@ -22,7 +23,7 @@ f1_metric = evaluate.load("f1")
 
 BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
 MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm")
-SETS_DIR = os.path.join(BASE_DIR, "data/sets")
+SETS_DIR = os.path.join(BASE_DIR, "data/sets/main")
 METRICS_DIR = os.path.join(BASE_DIR, "data/metrics/slm")
 
 SEED=42
@@ -82,33 +83,38 @@ def load_test_sets(sets_dir: str):
 #     dataset = dataset.map(preprocess_function, remove_columns=["claim", "label"])
 #     return dataset
 
-def build_messages_labels(test_ds: Dataset, system: bool) -> Dataset:
+def build_messages_labels(test_ds: Dataset) -> Dataset:
     claims = test_ds["claim"]
     labels = test_ds["label"]
     langs = test_ds["lang"]
     
     msgs = []
     for i in range(len(claims)):
-
-            if system:
-                msg = {
-                        "messages": [
-                                {"role": "system", "content": SYSTEM_PROMPTS_SLM[langs[i]]['system']},
-                                {"role": "user", "content": SYSTEM_PROMPTS_SLM[langs[i]]['user'].format(claim=claims[i])},
-                        ]
-                    }
-                msgs.append(msg)
-            else:
-                # to do
-                pass
+        msg = {
+                "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPTS_SLM[langs[i]]['system']},
+                        {"role": "user", "content": SYSTEM_PROMPTS_SLM[langs[i]]['user'].format(claim=claims[i])},
+                ]
+            }
+        msgs.append(msg)
 
     return msgs, labels, langs
 
 def compute_metrics(preds, refs):
+    
     acc = acc_metric.compute(predictions=preds, references=refs)["accuracy"]
     f1  = f1_metric.compute(predictions=preds, references=refs, average="binary")["f1"]
-    return {"accuracy": acc, "f1": f1}
 
+    tn, fp, fn, tp = confusion_matrix(refs, preds).ravel()
+
+    return {
+        "accuracy": acc,
+        "f1": f1,
+        "true_positives": int(tp),
+        "false_positives": int(fp),
+        "true_negatives": int(tn),
+        "false_negatives": int(fn)
+    }
 
 def predict(model, tokenizer, messages, batch_size, is_llama=False):
     preds = []
@@ -152,7 +158,7 @@ def predict(model, tokenizer, messages, batch_size, is_llama=False):
                 idx = 0
             response = tokenizer.decode(output_ids[idx:], skip_special_tokens=True).strip()
 
-            print("answer", j, response)
+            # print("answer", j, response)
             
             label = None
             match = re.search(r"<label>\s*([01])\s*</label>", response, re.DOTALL | re.IGNORECASE)
@@ -181,7 +187,7 @@ def evaluation(model_path: str,
     test = load_from_disk(os.path.join(SETS_DIR, test_data_name))['test']
     # PROMPT = SYSTEM_PROMPTS_SLM[meta['data']]
 
-    messages, labels, langs = build_messages_labels(test, meta['system'])
+    messages, labels, langs = build_messages_labels(test)
     is_llama = True if "llama" in meta['model'].lower() else False
 
     # Run predictions

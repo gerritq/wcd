@@ -18,13 +18,6 @@ languages  = [
     "tr"  # Turkish
 ]
 
-# check textacy
-# import textacy.preprocessing as tprep
-
-# x = "Situl„Pădurea Orléans” se întinde din nord-estul aglomerației orléaneze până la porțile orașului Gien, urmând un arc de cerc de aproximativ 60 de kilometri lungime și având o lățime variabilă între aproximativ 2 și 15 km."
-# x = tprep.normalize_quotation_marks(x)
-# print(x)
-
 print('works')
 
 

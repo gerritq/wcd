@@ -55,8 +55,8 @@ def parse_html(html: str, DROP_SECTIONS_LANG: list, CITATION_NEEDED_LANG: str):
             if tag.find_parent("div", class_="quote"): # for real?
                 continue
             # drop if small
-            if any(child.name == "small" for child in tag.children if child.name):
-                continue
+            for small in tag.find_all("small"):
+                small.decompose()
             # this drops latex math notation
             for ann in tag.find_all("annotation"):
                 if "\\displaystyle" in ann.get_text():
@@ -109,7 +109,7 @@ def main():
         print(f"Running {lang} ...", flush=True)
 
         INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_htmls.jsonl")
-        OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_parsed_2.jsonl")
+        OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_parsed.jsonl")
         
         DROP_SECTIONS_LANG = DROP_SECTIONS[lang]
         CITATION_NEEDED_LANG = CITATION_NEEDED[lang]
@@ -117,7 +117,7 @@ def main():
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
             data = [json.loads(line) for line in f]
             # data = data[:100]
-            data = [x for x in data if x['title'] == "Teoria relativității generale"]
+            # data = [x for x in data if x['title'] == "Teoria relativității generale"]
 
         dropped = 0
         parsed = 0
