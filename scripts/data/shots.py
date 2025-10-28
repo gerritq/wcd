@@ -3,8 +3,8 @@ import json
 from datasets import load_from_disk
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
-IN_DIR = os.path.join(BASE_DIR, "data/sets")
-OUT_DIR = os.path.join(BASE_DIR, "data/sents/shots")
+IN_DIR = os.path.join(BASE_DIR, "data/sets/main")
+OUT_DIR = os.path.join(BASE_DIR, "data/sets/shots")
 
 def main():
 
@@ -18,9 +18,9 @@ def main():
     "ru",  # Russian
     "uk",  # Ukrainian
     "bg",  # Bulgarian
-    # "zh",  # Chinese
-    # "ar",  # Arabic
-    "id"   # Indonesian
+    "id",   # Indonesian
+    "vi",
+    "tr"
     ]   
 
     all_shots = {}

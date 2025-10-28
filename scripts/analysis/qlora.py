@@ -21,6 +21,7 @@ from peft import LoraConfig, get_peft_model
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed, BitsAndBytesConfig
 from datetime import datetime
 
+from datasets import load_dataset
 # HF recommends nf4
 # 
 # bfloat speeds up training
@@ -28,10 +29,10 @@ from datetime import datetime
 # HF recommends nf4
 # Use Qlora effectively as in https://ai.google.dev/gemma/docs/core/huggingface_text_finetune_qlora
 bnb_config = BitsAndBytesConfig(
-   load_in_4bit=True,
-   bnb_4bit_use_double_quant=True,
-   bnb_4bit_quant_type="nf4",
-   bnb_4bit_compute_dtype=torch.bfloat16
+#    load_in_4bit=True,
+#    bnb_4bit_use_double_quant=True,
+#    bnb_4bit_quant_type="nf4",
+#    bnb_4bit_compute_dtype=torch.bfloat16
 )
 
 # ARGPARSE
@@ -50,7 +51,7 @@ args.shots = bool(args.shots)
 # DIRs
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm")
+MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
 SHOTS_DIR = os.path.join(BASE_DIR, "data/sents/shots")
 
 # VARs
@@ -67,7 +68,7 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
 tokenizer.truncation_side = "left"
 
-MAX_LENGTH = tokenizer.model_max_length
+MAX_LENGTH = 512*8
 print("Max context length:", MAX_LENGTH)
 
 def build_messages(dataset: Dataset) -> Dataset:
@@ -136,7 +137,7 @@ def custom_tokenize(example: dict, tokenizer, assistant_tag_ids: List[int], pwt=
                                          add_generation_prompt=False,
                                         enable_thinking=False
                                         )
-    print(text)
+    # print(text)
     # tokenise
     text_tok = tokenizer(text, truncation=True, max_length=MAX_LENGTH)
     
@@ -167,25 +168,29 @@ def main():
     start = time.time()
 
     # load data
-    ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
-    train_msgs_ds = build_messages(ds["train"].select(range(10)))
-    # train_msgs_ds = build_messages(ds["train"])
-    dev_msgs_ds = build_messages(ds["dev"])
-    
-    print("Example message for training\n\t", train_msgs_ds[0],"\n\n")
+    # ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
+    # train_msgs_ds = build_messages(ds["train"].select(range(128)))
+    # # train_msgs_ds = build_messages(ds["train"])
+    # dev_msgs_ds = build_messages(ds["dev"].select(range(128)))
 
-    assistant_tag, assistant_tag_ids = get_generation_tag(tokenizer)
+    # print("data len",len(train_msgs_ds))
+    
+    # print("Example message for training\n\t", train_msgs_ds[0],"\n\n")
+
+    # assistant_tag, assistant_tag_ids = get_generation_tag(tokenizer)
         
-    train_tok = train_msgs_ds.map(custom_tokenize,
-                                fn_kwargs={"tokenizer": tokenizer,
-                                           "assistant_tag_ids": assistant_tag_ids,
-                                           "pwt": args.plw}
-                                )
-    dev_tok = dev_msgs_ds.map(custom_tokenize,
-                                fn_kwargs={"tokenizer": tokenizer,
-                                           "assistant_tag_ids": assistant_tag_ids,
-                                           "pwt": args.plw}
-                                )
+    # train_tok = train_msgs_ds.map(custom_tokenize,
+    #                             fn_kwargs={"tokenizer": tokenizer,
+    #                                        "assistant_tag_ids": assistant_tag_ids,
+    #                                        "pwt": args.plw},
+    #                             remove_columns=["messages"]
+    #                             )
+    # dev_tok = dev_msgs_ds.map(custom_tokenize,
+    #                             fn_kwargs={"tokenizer": tokenizer,
+    #                                        "assistant_tag_ids": assistant_tag_ids,
+    #                                        "pwt": args.plw},
+    #                             remove_columns=["messages"]
+    #                             )
 
     # Load model
     base_model = AutoModelForCausalLM.from_pretrained(
@@ -223,30 +228,40 @@ def main():
                         f"trainable%: {100 * trainable_params / all_param:.4f}"
                         )
 
-    use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    # use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
 
     training_args = SFTConfig(
         output_dir=None,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         num_train_epochs=args.epochs,
-        learning_rate=args.learning_rate, # rec 1e-4 
+        learning_rate=1e-2 , # rec 1e-4 
         save_strategy="no",
         logging_strategy="epoch",
         report_to="none",
-        fp16=False,
-        bf16=use_bf16, 
+        # fp16=False,
+        # bf16=use_bf16, 
         gradient_checkpointing=True,
         eval_strategy="epoch", 
         packing=False,
         max_length=MAX_LENGTH
     )
 
+    ds = load_dataset("trl-lib/Capybara", split="train")
+    ds_small = ds.select(range(128))
+    del ds
+    ds = load_dataset("trl-lib/Capybara", split="test")
+    ds_test_small = ds.select(range(128))
+    del ds
+
+
     trainer = SFTTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_tok,
-        eval_dataset=dev_tok,
+        train_dataset=ds_small,
+        eval_dataset=ds_test_small,
+        # train_dataset=train_tok,
+        # eval_dataset=dev_tok,
     )
 
 

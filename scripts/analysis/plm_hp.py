@@ -36,7 +36,7 @@ args.context = bool(args.context)
 
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-MODEL_DIR = os.path.join(BASE_DIR, "data/models/plm")
+MODEL_DIR = os.path.join(BASE_DIR, "data/models/plm/hp")
 BASE_TEMP_ROOT = os.path.join(BASE_DIR, "scripts/analysis/.hp_trials")
 os.makedirs(BASE_TEMP_ROOT, exist_ok=True)
 TEMP_DIR = tempfile.mkdtemp(prefix="run_", dir=BASE_TEMP_ROOT)
@@ -71,12 +71,14 @@ def main():
 
     training_args = TrainingArguments(
         output_dir=TEMP_DIR,
-        eval_strategy="epoch",
         save_strategy="epoch",
-        logging_strategy="epoch",
         greater_is_better=True,
         report_to="none",
-        save_total_limit=1
+        save_total_limit=1,
+        logging_strategy="steps",
+        logging_steps=20,
+        eval_strategy="steps",
+        eval_steps=40,
         )
 
     trainer = Trainer(
@@ -91,7 +93,7 @@ def main():
     def hp_space(trial):
         return {
             "learning_rate": trial.suggest_float("learning_rate", 1e-6, 5e-5, log=False),
-            "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [8, 16, 32]),
+            "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [8, 16]),
             "num_train_epochs": trial.suggest_int("num_train_epochs", 1, 3),
             }
 
@@ -150,7 +152,6 @@ def main():
     model_number = get_model_number(MODEL_DIR)
     out_dir = os.path.join(MODEL_DIR, f"model_{model_number}")
     final_model.save_pretrained(out_dir)
-
 
 
     meta = {

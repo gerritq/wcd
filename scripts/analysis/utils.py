@@ -23,11 +23,12 @@ MODEL_MAPPING =  {
     "llama3_3b": "meta-llama/Llama-3.2-3B-Instruct",
     "llama3_8b": "meta-llama/Llama-3.1-8B-Instruct",
     "llama3_70b": "meta-llama/Llama-3.3-70B-Instruct",
-    "qwen_06b": "Qwen/Qwen3-0.6B",
+    "qwen3_06b": "Qwen/Qwen3-0.6B",
     "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
     "qwen3_8b": "Qwen/Qwen3-8B",
     "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
     "qwen3_32b": "Qwen/Qwen3-32B",
+    "gemma3_12b": "google/gemma-3-12b-it",
     "aya": "CohereLabs/aya-101",
     "gpt-4o-mini": "openai/gpt-4o-mini",
     "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite"
@@ -76,7 +77,7 @@ def append_meta_file(meta: dict, model_dir: str):
         f.write(json.dumps(meta, ensure_ascii=False) + "\n")
 
 def get_model_number(model_dir: str) -> int:
-    model_names = [d for d in os.listdir(model_dir) if d.startswith("model_") and os.path.isdir(os.path.join(model_dir, d))]
+    model_names = [os.path.splitext(d)[0] for d in os.listdir(model_dir) if d.startswith("model_")]
     
     numbers = []
     for name in model_names:
