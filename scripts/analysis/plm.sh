@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=plm-c1
+#SBATCH --job-name=plm-nl
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=03:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
@@ -12,7 +12,7 @@ nvidia-smi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # "en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg"
-LANGUAGES=("en")
+LANGUAGES=("en" "nl" "no")
 MODELS=("mBert") # "xlm-r-b" "mBert" "mBert"
 CONTEXT=1
 

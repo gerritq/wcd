@@ -1,16 +1,14 @@
-# https://colab.research.google.com/github/NielsRogge/Transformers-Tutorials/blob/master/Mistral/Supervised_fine_tuning_(SFT)_of_an_LLM_using_Hugging_Face_tooling.ipynb#scrollTo=VvIfUqjK6ntu
-# https://www.philschmid.de/fine-tune-google-gemma
-# https://github.com/unslothai/unsloth/issues/1264
-# https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide
-# https://cookbook.openai.com/articles/gpt-oss/fine-tune-transfomers
-# https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-Instruct.ipynb
-# https://docs.unsloth.ai/get-started/unsloth-notebooks
 import os
 import json
-import argparse
+import unsloth
+import torch
 import time
+import argparse
 from datetime import datetime
 from tqdm import tqdm
+import re
+from trl import SFTTrainer, SFTConfig
+from unsloth import FastLanguageModel
 from utils import (
                     MODEL_MAPPING, 
                     append_meta_file, 
@@ -19,24 +17,10 @@ from utils import (
 )
 from prompts import SYSTEM_PROMPTS_SLM
 
-import torch
 from datasets import load_from_disk
-from peft import LoraConfig, AutoPeftModelForCausalLM
-from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed, BitsAndBytesConfig
-from trl import SFTTrainer, SFTConfig
-# from transformers import TrainingArguments
-import evaluate
-from sklearn.metrics import confusion_matrix
-import re
-
-acc_metric = evaluate.load("accuracy")
-f1_metric = evaluate.load("f1")
-
-set_seed(42)
-
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
+MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/test")
 
 def preprocess_function(example, tokenizer):
     claim = example['claim']
@@ -106,86 +90,51 @@ def get_testset(args, tokenizer):
     
     return text, labels
 
-def collect_and_save_losses(history, model_dir):
-    train_losses, eval_losses = [], []
-    for log in history:
-        if "loss" in log:
-            train_losses.append({"epoch": log.get("epoch"), "loss": log["loss"]})
-        if "eval_loss" in log:
-            eval_losses.append({"epoch": log.get("epoch"), "eval_loss": log["eval_loss"]})
-
-    if train_losses and eval_losses:
-        plot_loss_curves(train_losses, eval_losses, model_dir)
-
-def get_config(args, tokenizer):
-    bnb_config = BitsAndBytesConfig(
-                                load_in_4bit=True, 
-                                # bnb_4bit_use_double_quant=True, 
-                                bnb_4bit_quant_type="nf4", 
-                                bnb_4bit_compute_dtype=torch.bfloat16
-                                )
-
-    # LoRA config based on QLoRA paper & Sebastian Raschka experiment
-    # https://www.philschmid.de/fine-tune-google-gemma
-    # We actuallu use those: https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide
-    lora_config = LoraConfig(
-            lora_alpha=16,
-            lora_dropout=.1,
-            r=16,
-            bias="none",
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-            task_type="CAUSAL_LM",
+def get_model():
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name = "unsloth/Qwen3-4B-unsloth-bnb-4bit",
+        max_seq_length = 2048*2,   # Context length - can be longer, but uses more memory
+        load_in_4bit = True,     # 4bit uses much less memory
+        load_in_8bit = False,    # A bit more accurate, uses 2x memory
+        full_finetuning = False, # We have full finetuning now!
+        # token = "hf_...",      # use one if using gated models
     )
-    # https://www.philschmid.de/fine-tune-google-gemma
-    training_args = SFTConfig(
-        output_dir=None,
-        num_train_epochs=args.epochs,                     # number of training epochs
-        per_device_train_batch_size=args.batch_size,          # batch size per device during training
-        gradient_accumulation_steps=4, #2 before          # number of steps before performing a backward/update pass
-        gradient_checkpointing=True,            # use gradient checkpointing to save memory
-        bf16=True,                              # use bfloat16 precision
-        learning_rate=args.learning_rate,                     # learning rate, based on QLoRA paper
-        # max_grad_norm=0.3,                      # max gradient norm based on QLoRA paper
-        # warmup_ratio=0.03,                      # warmup ratio based on QLoRA paper
-        lr_scheduler_type="linear", # cosine
-        dataset_text_field="text",
-        max_length=tokenizer.model_max_length,
-        report_to='none',
-        logging_strategy="steps",
-        logging_steps=20,
-        model_init_kwargs={"quantization_config": bnb_config},
-        eval_strategy="steps",
-        eval_steps=60,
-        per_device_eval_batch_size=16,
-        )
-    return training_args, bnb_config, lora_config
 
 
-def get_tokenizer(args, inference=False):
-    if inference:
-        tokenizer = AutoTokenizer.from_pretrained(args.model, padding_side='left')
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(args.model)
-    # if tokenizer has no padding token, then reuse the end of sequence token
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-    if tokenizer.model_max_length > 100_000:
-        tokenizer.model_max_length = 512*10 
-    if not tokenizer.chat_template:
-        raise Exception("Tokeniser has not cha template.")
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r = 32,           # Choose any number > 0! Suggested 8, 16, 32, 64, 128
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                        "gate_proj", "up_proj", "down_proj",],
+        lora_alpha = 32,  # Best to choose alpha = rank or rank*2
+        lora_dropout = 0, # Supports any, but = 0 is optimized
+        bias = "none",    # Supports any, but = "none" is optimized
+        # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
+        use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
+        random_state = 3407,
+        use_rslora = False,   # We support rank stabilized LoRA
+        loftq_config = None,  # And LoftQ
+    )
 
-    return tokenizer
+    return model, tokenizer
 
-def inference(test, model_dir, tokenizer, bnb_config, batch_size=8):
+def inference(args, model_dir, tokenizer, batch_size=8):
     """
     Need to set model eval and torch no grad: https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615
     """
-    model = AutoPeftModelForCausalLM.from_pretrained(model_dir, 
-                                                     device_map="auto", 
-                                                     torch_dtype="auto", 
-                                                     trust_remote_code=True,
-                                                     quantization_config=bnb_config)
+
+    model, _ = FastLanguageModel.from_pretrained(
+        model_name = model_dir,
+        max_seq_length = 2048,
+        load_in_4bit = True,
+    )
     model.eval()
+
+    # model = AutoModelForCausalLM.from_pretrained(model_dir, 
+    #                                              device_map="auto",
+    #                                              quantization_config=bnb_config)
+    # model.eval()
+    test, labels = get_testset(args, tokenizer)
 
     # batch inference
     predictions = []
@@ -246,42 +195,64 @@ def evaluation(predictions, labels):
             
     return metrics, len(labels), len(valid)
 
+def collect_and_save_losses(history, model_dir):
+    train_losses, eval_losses = [], []
+    for log in history:
+        if "loss" in log:
+            train_losses.append({"epoch": log.get("epoch"), "loss": log["loss"]})
+        if "eval_loss" in log:
+            eval_losses.append({"epoch": log.get("epoch"), "eval_loss": log["eval_loss"]})
+
+    if train_losses and eval_losses:
+        plot_loss_curves(train_losses, eval_losses, model_dir)
+
 def main():
     start = time.time()
 
     # ARGPARSE
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", type=str, required=True)
-    parser.add_argument("--model", type=str, required=True)
-    parser.add_argument("--learning_rate", type=float, required=True)
-    parser.add_argument("--batch_size", type=int, required=True)
-    parser.add_argument("--epochs", type=int, required=True)
-    parser.add_argument("--plw", type=int, default=0)
     args = parser.parse_args()
-    args.plw = bool(args.plw)
-    args.model = MODEL_MAPPING[args.model]
 
-    print("="*10, f"Running MODEL {args.model} - LANG {args.lang}","="*10)
+    print("="*10, f"Running LANG {args.lang}","="*10)
 
-    tokenizer = get_tokenizer(args)
+    model, tokenizer = get_model()
     train, dev = get_dataset(args, tokenizer)
-    print(train[0]['text'])
-
-    # configs
-    training_args, bnb_config, lora_config = get_config(args, tokenizer)
 
     trainer = SFTTrainer(
-        model=args.model,
-        args=training_args,
-        peft_config=lora_config,
-        train_dataset=train,
-        eval_dataset=dev,
-        processing_class=tokenizer,
-        )
-    
-    print(f"\tMax memory allocated: {torch.cuda.max_memory_allocated() / 1024**2:.2f} MB")
-    
-    train_result = trainer.train()
+        model = model,
+        tokenizer = tokenizer,
+        train_dataset = train,
+        eval_dataset = dev, # Can set up evaluation!
+        args = SFTConfig(
+            dataset_text_field = "text",
+            per_device_train_batch_size = 2,
+            gradient_accumulation_steps = 4, # Use GA to mimic batch size!
+            warmup_steps = 5,
+            num_train_epochs = 1, # Set this for 1 full training run.
+            # max_steps = 30,
+            learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
+            optim = "adamw_8bit",
+            weight_decay = 0.01,
+            lr_scheduler_type = "linear",
+            seed = 3407,
+            report_to = "none", # Use TrackIO/WandB etc
+            logging_strategy="steps",
+            logging_steps=20,
+            eval_strategy="steps",
+            eval_steps=40,
+            per_device_eval_batch_size=16,
+        ),
+    )
+
+    # @title Show current memory stats
+    gpu_stats = torch.cuda.get_device_properties(0)
+    start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+    max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+    print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
+    print(f"{start_gpu_memory} GB of memory reserved.")
+
+    trainer_stats = trainer.train()
 
     # Save model
     model_number = get_model_number(MODEL_DIR)
@@ -292,9 +263,9 @@ def main():
     collect_and_save_losses(trainer.state.log_history, model_dir)
 
     # EVAL
-    tokenizer = get_tokenizer(args, inference=True)
+    # tokenizer = get_tokenizer(args, inference=True)
     test, labels = get_testset(args, tokenizer)
-    predictions = inference(test, model_dir, tokenizer, bnb_config)
+    predictions = inference(args, model_dir, tokenizer)
     metrics = evaluation(predictions, labels)
 
     meta = {
@@ -314,13 +285,12 @@ def main():
         "n_test": metrics[1],
         "n_valid": metrics[2],
         "metrics": metrics[0],
+
     }
 
-    print(meta)
-
-    append_meta_file(meta, MODEL_DIR)
     with open(os.path.join(model_dir, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
+
 
 if __name__ == "__main__":
     main()

@@ -16,7 +16,7 @@ nvidia-smi
 # "it" "pt" "ro"
 # "ru" "uk" "bg"
 # "id" "vi" "tr"
-LANGUAGES=("id" "tr")
+LANGUAGES=("en")
 
 start=$(date +%s)
 

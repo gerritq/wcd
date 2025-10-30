@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, set_seed, logging, AutoModelForCausalLM
 from collections import defaultdict
 from prompts import SYSTEM_PROMPTS_SLM
 from typing import List
-from utils import MODEL_MAPPING, get_model_number
+from utils import MODEL_MAPPING, get_model_number, append_meta_file
 import argparse
 from sklearn.metrics import confusion_matrix
 from datetime import datetime
@@ -24,7 +24,7 @@ f1_metric = evaluate.load("f1")
 
 BASE_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd"
 SETS_DIR = os.path.join(BASE_DIR, "data/sets/main")
-METRICS_DIR = os.path.join(BASE_DIR, "data/metrics/slm/icl")
+MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/icl")
 SHOTS_DIR = os.path.join(BASE_DIR, "data/sets/shots")
 
 SEED=42
@@ -247,10 +247,11 @@ def main():
         model_name = MODEL_MAPPING[args.model]
         meta = evaluation(model_name, lang)
 
-        model_number = get_model_number(METRICS_DIR)
+        model_number = get_model_number(MODEL_DIR)
         meta.update({"model_number": model_number})
             
-        out_path = os.path.join(METRICS_DIR, f"model_{meta['model_number']}.json")
+        out_path = os.path.join(MODEL_DIR, f"model_{meta['model_number']}.json")
+        append_meta_file(meta, MODEL_DIR)
         with open(out_path, "w") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)    
     

@@ -29,6 +29,9 @@ MODEL_MAPPING =  {
     "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
     "qwen3_32b": "Qwen/Qwen3-32B",
     "gemma3_12b": "google/gemma-3-12b-it",
+    "gpt_oss": "openai/gpt-oss-20b",
+    "mistral_8b": "mistralai/Ministral-8B-Instruct-2410",
+    "ds_llama": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
     "aya": "CohereLabs/aya-101",
     "gpt-4o-mini": "openai/gpt-4o-mini",
     "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite"

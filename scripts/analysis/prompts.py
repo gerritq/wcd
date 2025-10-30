@@ -132,9 +132,53 @@ SYSTEM_PROMPTS_SLM = {
         "user": "Твърдение: {claim}",
         "user_context": "Тема: {topic} Контекст: {context} Твърдение: {claim}",
         "assistant": "<label>{label}</label>"
+    },
+
+    "id": {
+        "system": (
+            "Anda adalah pengklasifikasi kutipan Wikipedia yang berpengalaman. "
+            "Tentukan apakah pernyataan berikut memerlukan kutipan. "
+            "Gunakan:\n"
+            " - 1 jika pernyataan membutuhkan kutipan\n"
+            " - 0 jika pernyataan tidak membutuhkan kutipan\n"
+            "Format keluaran Anda tepat seperti ini: <label>0</label> atau <label>1</label>. "
+            "Jangan sertakan teks tambahan apa pun."
+        ),
+        "user": "Pernyataan: {claim}",
+        "user_context": "Topik: {topic} Konteks: {context} Pernyataan: {claim}",
+        "assistant": "<label>{label}</label>"
+    },
+
+    "vi": {
+        "system": (
+            "Bạn là một chuyên gia phân loại trích dẫn của Wikipedia. "
+            "Hãy xác định xem tuyên bố sau có cần trích dẫn hay không. "
+            "Sử dụng:\n"
+            " - 1 nếu tuyên bố cần trích dẫn\n"
+            " - 0 nếu tuyên bố không cần trích dẫn\n"
+            "Định dạng câu trả lời của bạn chính xác như sau: <label>0</label> hoặc <label>1</label>. "
+            "Không bao gồm bất kỳ văn bản bổ sung nào."
+        ),
+        "user": "Tuyên bố: {claim}",
+        "user_context": "Chủ đề: {topic} Ngữ cảnh: {context} Tuyên bố: {claim}",
+        "assistant": "<label>{label}</label>"
+    },
+
+    "tr": {
+        "system": (
+            "Sen deneyimli bir Wikipedia alıntı sınıflandırıcısısın. "
+            "Aşağıdaki iddianın bir kaynak gerektirip gerektirmediğine karar ver. "
+            "Kullan:\n"
+            " - 1 eğer iddia bir kaynak gerektiriyorsa\n"
+            " - 0 eğer iddia bir kaynak gerektirmiyorsa\n"
+            "Çıktını tam olarak şu şekilde biçimlendir: <label>0</label> veya <label>1</label>. "
+            "Ekstra hiçbir metin ekleme."
+        ),
+        "user": "İddia: {claim}",
+        "user_context": "Konu: {topic} Bağlam: {context} İddia: {claim}",
+        "assistant": "<label>{label}</label>"
     }
 }
-
 
 SYSTEM_PROMPTS_LLM = {
     "en": {

@@ -326,7 +326,7 @@ def main():
 
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
             data = [json.loads(line) for line in f]
-            # data = [x for x in data if x['title'] == "Hobbitul"]
+            # data = [x for x in data if x['title'] == "Meteorological history of Hurricane Wilma"]
 
         # Stanza parser -  run on gpu otherwise this takes years
         nlp = stanza.Pipeline(lang=LANG_MAP[lang], 
@@ -354,7 +354,7 @@ def main():
             json.dump(out_sents, out_f, ensure_ascii=False, indent=2)
 
         # save number of failed splits
-        with open(os.path.join(INFO_DIR, f"sent_{lang}_stats.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(INFO_DIR, f"sent_{lang}_stats_2.json"), "w", encoding="utf-8") as f:
             json.dump({"sent_starts_with_quote": SENT_STARTS_WITH_QUOTE}, f, ensure_ascii=False, indent=2)
 
     

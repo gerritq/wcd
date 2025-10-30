@@ -17,7 +17,7 @@ from utils import (
                     get_model_number,
                     plot_loss_curves
 )
-from prompts import SYSTEM_PROMPTS_SLM
+# from prompts import SYSTEM_PROMPTS_SLM
 
 import torch
 from datasets import load_from_disk
@@ -35,8 +35,29 @@ f1_metric = evaluate.load("f1")
 set_seed(42)
 
 BASE_DIR = os.getenv("BASE_WCD")
-DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
+DATA_DIR = os.path.join(BASE_DIR, "data/sets/old")
 MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
+
+SYSTEM_PROMPTS_SLM = {
+    "en": {
+        "system": (
+            "You are an expert Wikipedia editor. Your task is to classify whether a claim requires a citation or not. "
+            "Answer with \"YES\" if h"
+        ),
+        "user": "Claim: {claim}",
+        "user_context": "Section: {section} Context: {context} Claim: {claim}",
+        "assistant": "<label>{label}</label>"
+    },
+    "nl": {
+        "system": (
+            "You are a multilingual Wikipedia citation classifier. Read a Dutch claim and decide if it needs a citation. Output ONLY <label>1</label> if a citation is needed, otherwise <label>0</label>."
+        ),
+        "user": "Claim (Dutch): {claim}",
+        # "user": "Section: {section} Context: {context} Claim: {claim}",
+        "assistant": "<label>{label}</label>"
+    }
+}
+
 
 def preprocess_function(example, tokenizer):
     claim = example['claim']
@@ -44,8 +65,8 @@ def preprocess_function(example, tokenizer):
     lang = example['lang'][:2] # in case we test more data eg en_8k
 
     system = SYSTEM_PROMPTS_SLM[lang]['system']
-    user = SYSTEM_PROMPTS_SLM[lang]['user'].format(claim=claim)
-    assistant = SYSTEM_PROMPTS_SLM[lang]['assistant'].format(label=label)
+    user = SYSTEM_PROMPTS_SLM[lang]['user'].format(**example)
+    assistant = SYSTEM_PROMPTS_SLM[lang]['assistant'].format(**example)
     
     messages = {
     "messages": [
@@ -64,7 +85,7 @@ def preprocess_function_generation(example, tokenizer):
     lang = example['lang'][:2]
 
     system = SYSTEM_PROMPTS_SLM[lang]['system']
-    user = SYSTEM_PROMPTS_SLM[lang]['user'].format(claim=claim)
+    user = SYSTEM_PROMPTS_SLM[lang]['user'].format(**example)
     
     messages = {
     "messages": [
@@ -120,7 +141,7 @@ def collect_and_save_losses(history, model_dir):
 def get_config(args, tokenizer):
     bnb_config = BitsAndBytesConfig(
                                 load_in_4bit=True, 
-                                # bnb_4bit_use_double_quant=True, 
+                                bnb_4bit_use_double_quant=True, 
                                 bnb_4bit_quant_type="nf4", 
                                 bnb_4bit_compute_dtype=torch.bfloat16
                                 )
@@ -129,9 +150,9 @@ def get_config(args, tokenizer):
     # https://www.philschmid.de/fine-tune-google-gemma
     # We actuallu use those: https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide
     lora_config = LoraConfig(
-            lora_alpha=16,
+            lora_alpha=32,
             lora_dropout=.1,
-            r=16,
+            r=32,
             bias="none",
             target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
             task_type="CAUSAL_LM",
@@ -141,12 +162,12 @@ def get_config(args, tokenizer):
         output_dir=None,
         num_train_epochs=args.epochs,                     # number of training epochs
         per_device_train_batch_size=args.batch_size,          # batch size per device during training
-        gradient_accumulation_steps=4, #2 before          # number of steps before performing a backward/update pass
+        gradient_accumulation_steps=2, #2 before          # number of steps before performing a backward/update pass
         gradient_checkpointing=True,            # use gradient checkpointing to save memory
         bf16=True,                              # use bfloat16 precision
         learning_rate=args.learning_rate,                     # learning rate, based on QLoRA paper
         # max_grad_norm=0.3,                      # max gradient norm based on QLoRA paper
-        # warmup_ratio=0.03,                      # warmup ratio based on QLoRA paper
+        warmup_ratio=0.03,                      # warmup ratio based on QLoRA paper
         lr_scheduler_type="linear", # cosine
         dataset_text_field="text",
         max_length=tokenizer.model_max_length,
@@ -155,7 +176,7 @@ def get_config(args, tokenizer):
         logging_steps=20,
         model_init_kwargs={"quantization_config": bnb_config},
         eval_strategy="steps",
-        eval_steps=60,
+        eval_steps=40,
         per_device_eval_batch_size=16,
         )
     return training_args, bnb_config, lora_config
@@ -176,7 +197,7 @@ def get_tokenizer(args, inference=False):
 
     return tokenizer
 
-def inference(test, model_dir, tokenizer, bnb_config, batch_size=8):
+def inference(args, model_dir, tokenizer, bnb_config, batch_size=8):
     """
     Need to set model eval and torch no grad: https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615
     """
@@ -186,6 +207,8 @@ def inference(test, model_dir, tokenizer, bnb_config, batch_size=8):
                                                      trust_remote_code=True,
                                                      quantization_config=bnb_config)
     model.eval()
+
+    test, labels = get_testset(args, tokenizer)
 
     # batch inference
     predictions = []
@@ -294,7 +317,7 @@ def main():
     # EVAL
     tokenizer = get_tokenizer(args, inference=True)
     test, labels = get_testset(args, tokenizer)
-    predictions = inference(test, model_dir, tokenizer, bnb_config)
+    predictions = inference(args, model_dir, tokenizer, bnb_config)
     metrics = evaluation(predictions, labels)
 
     meta = {
@@ -314,6 +337,8 @@ def main():
         "n_test": metrics[1],
         "n_valid": metrics[2],
         "metrics": metrics[0],
+        "note": "test prompt"
+
     }
 
     print(meta)

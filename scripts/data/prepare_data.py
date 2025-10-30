@@ -103,7 +103,7 @@ def build_monolingual_dataset(lang: str, total_n: int) -> None:
         "test": Dataset.from_list(test),
     })
 
-    out_dir = os.path.join(OUT_DIR, "main", f"{lang}")
+    out_dir = os.path.join(OUT_DIR, "main", f"{lang}_8k")
     ds.save_to_disk(out_dir)
 
 # def build_multilingual_training_data(languages: List[str], total_n: int, out_dir: str) -> None:
@@ -205,24 +205,23 @@ def main():
 
     languages  = [
         "en",  # English
-        "nl",  # Dutch
-        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        "it",  # Italian
-        "pt",  # Portuguese
-        "ro",  # Romanian
-        "ru",  # Russian
-        "uk",  # Ukrainian
-        "bg",  # Bulgarian
-        "id",   # Indonesian
-        "vi",
-        "tr"
-
+        # "nl",  # Dutch
+        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        # "it",  # Italian
+        # "pt",  # Portuguese
+        # "ro",  # Romanian
+        # "ru",  # Russian
+        # "uk",  # Ukrainian
+        # "bg",  # Bulgarian
+        # "id",   # Indonesian
+        # "vi",
+        # "tr"
     ]
     
     # set n
-    training_n = 5000
-    total_n = 5000 / .8 # assuming .1 dev and test
-    random_n = (5000 / .8) * .1
+    training_n = 8000
+    total_n = training_n / .8 # assuming .1 dev and test
+    random_n = (training_n / .8) * .1
 
     for lang in languages:
         print(f"\nRUNNING {lang} ...", flush=True)
@@ -230,7 +229,7 @@ def main():
         
         # mono main set
         build_monolingual_dataset(lang, total_n)
-        build_random_test_set(lang, random_n)
+        # build_random_test_set(lang, random_n)
 
 
 
