@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=m-pt
+#SBATCH --job-name=c-l8-nl
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=08:00:00
+#SBATCH --time=02:30:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
@@ -12,16 +12,19 @@ nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-LANGUAGES=("pt") # "en" "nl" "pt"
-MODELS=("mistral_8b") # "qwen3_8b" "llama3_8b"
+# LANGUAGES=("no" "it" "ro" "ru" "uk" "bg" "id" "vi" "tr")
+# MODELS=("qwen3_4b")
+
+LANGUAGES=("nl")
+MODELS=("llama3_8b")
 
 # qwen 8b euns 1:20 hrs for 2 epochs
 
 BATCH=8
-EPOCHS=(1 3)
+EPOCHS=(5)
 GRAD_ACC=4 # unsloth says larger effective batch size leads to more stable training
 MAX_GRAD_NORM=0.3 #  0.3 in the qlora paper for smaller models; 0.03 for bigger ones; defualts to 1 in the TrainerArguments class
-LEARNING_RATES=(1e-4 1e-5) # qlora paper 2e-4
+LEARNING_RATES=(1e-4) # qlora paper 2e-4
 
 for LANGUAGE in "${LANGUAGES[@]}"; do
   for MODEL in "${MODELS[@]}"; do

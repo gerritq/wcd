@@ -8,6 +8,7 @@ BASE_DIR = os.getenv("BASE_WCD")
 PLM_DIR = os.path.join(BASE_DIR, "data/models/plm/hp")
 SLM_SFT_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
 SLM_ICL_DIR = os.path.join(BASE_DIR, "data/models/slm/icl")
+SLM_CLASSY_DIR = os.path.join(BASE_DIR, "data/models/slm/test")
 
 MODEL_MAPPING =  {
     "mBert": "google-bert/bert-base-multilingual-uncased",
@@ -62,7 +63,6 @@ def load_slms_sft():
     sft_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
 
 
-    print(sft_dir)
     rows = defaultdict(dict)
     for path in sft_dir:
         meta = load_metrics(path)
@@ -73,7 +73,11 @@ def load_slms_sft():
         if model_name not in rows:
             accs = {l: None for l in LANGS}
             rows[model_name] = accs
-        rows[model_name][lang] = test_accuracy
+
+        if not rows[model_name][lang]:
+            rows[model_name][lang] = test_accuracy
+        if rows[model_name][lang] and test_accuracy > rows[model_name][lang]:
+            rows[model_name][lang] = test_accuracy
     return rows
 
 def load_slms_icl():
@@ -92,6 +96,30 @@ def load_slms_icl():
             accs = {l: None for l in LANGS}
             rows[model_name] = accs
         rows[model_name][lang] = test_accuracy
+    return rows
+
+
+
+def load_slms_classy():
+    paths = glob.glob(os.path.join(SLM_CLASSY_DIR, "model_*"))
+    classy_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
+    
+    rows = defaultdict(dict)
+    for path in classy_dir:
+        with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        lang = meta['data'][:2]
+        model_number = meta['model_number'] 
+        model_name = meta['model'].split("/")[-1] + f" (ch)"
+        test_accuracy = meta['test_metrics']['eval_accuracy']
+        if model_name not in rows:
+            accs = {l: None for l in LANGS}
+            rows[model_name] = accs
+            
+        if not rows[model_name][lang]:
+            rows[model_name][lang] = test_accuracy
+        if rows[model_name][lang] and test_accuracy > rows[model_name][lang]:
+            rows[model_name][lang] = test_accuracy
     return rows
 
 def latex_table(rows):
@@ -149,11 +177,13 @@ def main():
     rows_plm = load_plms()
     rows_sft = load_slms_sft()
     rows_icl = load_slms_icl()
+    rows_classy = load_slms_classy()
 
     print(rows_sft)
     
     r = merge_defaultdicts(rows_plm, rows_icl)
     r = merge_defaultdicts(r, rows_sft)
+    r = merge_defaultdicts(r, rows_classy)
 
     latex_table(r)
 

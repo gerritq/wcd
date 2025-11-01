@@ -120,7 +120,7 @@ def collect_and_save_losses(history, model_dir):
 def get_config(args, tokenizer):
     bnb_config = BitsAndBytesConfig(
                                 load_in_4bit=True, 
-                                # bnb_4bit_use_double_quant=True, 
+                                bnb_4bit_use_double_quant=True, 
                                 bnb_4bit_quant_type="nf4", 
                                 bnb_4bit_compute_dtype=torch.bfloat16
                                 )
@@ -130,7 +130,7 @@ def get_config(args, tokenizer):
     # We actuallu use those: https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide
     lora_config = LoraConfig(
             lora_alpha=16,
-            lora_dropout=.1,
+            lora_dropout=.05,
             r=16,
             bias="none",
             target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
@@ -141,12 +141,13 @@ def get_config(args, tokenizer):
         output_dir=None,
         num_train_epochs=args.epochs,                     # number of training epochs
         per_device_train_batch_size=args.batch_size,          # batch size per device during training
-        gradient_accumulation_steps=4, #2 before          # number of steps before performing a backward/update pass
+        gradient_accumulation_steps=args.grad_acc, #2 before          # number of steps before performing a backward/update pass
         gradient_checkpointing=True,            # use gradient checkpointing to save memory
         bf16=True,                              # use bfloat16 precision
         learning_rate=args.learning_rate,                     # learning rate, based on QLoRA paper
-        # max_grad_norm=0.3,                      # max gradient norm based on QLoRA paper
-        # warmup_ratio=0.03,                      # warmup ratio based on QLoRA paper
+        max_grad_norm=args.max_grad_norm,                      # max gradient norm based on QLoRA paper
+        warmup_ratio=args.warmup_ratio,                      # warmup ratio based on QLoRA paper
+        weight_decay=args.weight_decay,
         lr_scheduler_type="linear", # cosine
         dataset_text_field="text",
         max_length=tokenizer.model_max_length,
@@ -159,8 +160,7 @@ def get_config(args, tokenizer):
         per_device_eval_batch_size=16,
         )
     return training_args, bnb_config, lora_config
-
-
+ 
 def get_tokenizer(args, inference=False):
     if inference:
         tokenizer = AutoTokenizer.from_pretrained(args.model, padding_side='left')
@@ -256,6 +256,10 @@ def main():
     parser.add_argument("--learning_rate", type=float, required=True)
     parser.add_argument("--batch_size", type=int, required=True)
     parser.add_argument("--epochs", type=int, required=True)
+    parser.add_argument("--grad_acc", type=int, required=True)
+    parser.add_argument("--max_grad_norm", type=float, required=True)
+    parser.add_argument("--weight_decay", type=float, required=True)
+    parser.add_argument("--warmup_ratio", type=float, required=True)
     parser.add_argument("--plw", type=int, default=0)
     args = parser.parse_args()
     args.plw = bool(args.plw)
