@@ -39,6 +39,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
 MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
 
 def preprocess_function(example, tokenizer):
+    """preprocess to obtain the prompt"""
     claim = example['claim']
     label = example['label']
     lang = example['lang'][:2] # in case we test more data eg en_8k
@@ -93,11 +94,11 @@ def get_dataset(args, tokenizer):
                   fn_kwargs={"tokenizer": tokenizer},)
 
     
-    return train, dev
+    return train.select(range(128)), dev.select(range(128))
 
 def get_testset(args, tokenizer):
     ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
-    test = ds['test']
+    test = ds['test'].select(range(128))
     test = test.map(preprocess_function_generation, 
                       fn_kwargs={"tokenizer": tokenizer})
 
