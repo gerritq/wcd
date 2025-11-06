@@ -26,13 +26,10 @@ dependencies = [
     "stanza>=1.11.0",
     "tiktoken>=0.11.0",
     "torch>=2.8.0",
-    "transformers>=4.55.4",
+    "transformers",
     "trl>=0.22.2",
-    "unsloth>=2025.10.11",
     "wandb>=0.21.1",
 ]
 
-[tool.uv.workspace]
-members = [
-    "venv",
-]
+[tool.uv.sources]
+transformers = { git = "https://github.com/huggingface/transformers.git", rev = "main" }

@@ -28,7 +28,8 @@ def load_slms_classy():
             wd = meta['training_args']['weight_decay']
             epochs = meta['training_args']['num_train_epochs']
             warmup_r = meta['training_args']['warmup_ratio']
-            hps = [epochs, batch, grad_acc, lr, wd, warmup_r]
+            max_grad_norm = meta['training_args']['max_grad_norm']
+            hps = [epochs, batch, grad_acc, lr, wd, warmup_r, max_grad_norm]
         except:
             hps = []
 
@@ -46,9 +47,9 @@ def main():
     rows_classy = load_slms_classy()
 
     for key, value in rows_classy.items():
-        print(key)
+        print("\n", key, f"[epochs, batch, grad_acc, lr, wd, warmup_r, max_grad_norm]")
         for model in value[:5]:
-            print(model)
+            print("\t", model)
 
 
 

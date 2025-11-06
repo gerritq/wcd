@@ -15,108 +15,23 @@ from utils import (
                     MODEL_MAPPING, 
                     append_meta_file, 
                     get_model_number,
-                    plot_loss_curves
+                    collect_and_save_losses,
+                    evaluation_non_tok,
+                    get_tokenizer,
+                    get_train_dev,
+                    get_test
 )
-from prompts import SYSTEM_PROMPTS_SLM
 
 import torch
-from datasets import load_from_disk
-from peft import LoraConfig, AutoPeftModelForCausalLM
-from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed, BitsAndBytesConfig
+from peft import LoraConfig
+from transformers import AutoModelForCausalLM, set_seed, BitsAndBytesConfig
 from trl import SFTTrainer, SFTConfig
-# from transformers import TrainingArguments
-import evaluate
-from sklearn.metrics import confusion_matrix
-import re
-
-acc_metric = evaluate.load("accuracy")
-f1_metric = evaluate.load("f1")
 
 set_seed(42)
 
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
 MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
-
-def preprocess_function(example, tokenizer):
-    """preprocess to obtain the prompt"""
-    claim = example['claim']
-    label = example['label']
-    lang = example['lang'][:2] # in case we test more data eg en_8k
-
-    system = SYSTEM_PROMPTS_SLM[lang]['system']
-    user = SYSTEM_PROMPTS_SLM[lang]['user'].format(claim=claim)
-    assistant = SYSTEM_PROMPTS_SLM[lang]['assistant'].format(label=label)
-    
-    messages = {
-    "messages": [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-        {"role": "assistant", "content": assistant}
-    ]
-    }
-
-    example["text"] = tokenizer.apply_chat_template(messages['messages'], tokenize=False)
-
-    return example
-
-def preprocess_function_generation(example, tokenizer):
-    claim = example['claim']
-    lang = example['lang'][:2]
-
-    system = SYSTEM_PROMPTS_SLM[lang]['system']
-    user = SYSTEM_PROMPTS_SLM[lang]['user'].format(claim=claim)
-    
-    messages = {
-    "messages": [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user}
-    ]
-    }
-
-    example["text"] = tokenizer.apply_chat_template(messages['messages'], 
-                                                    tokenize=False, 
-                                                    add_generation_prompt=True)
-
-    return example
-
-def get_dataset(args, tokenizer):
-    ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
-    train = ds['train']
-    dev = ds['dev']
-
-    remove_columns = [x for x in train.column_names if x != "text"]
-    train = train.map(preprocess_function, 
-                      remove_columns=remove_columns,
-                      fn_kwargs={"tokenizer": tokenizer},)
-    dev = dev.map(preprocess_function, 
-                  remove_columns=remove_columns,
-                  fn_kwargs={"tokenizer": tokenizer},)
-
-    
-    return train.select(range(128)), dev.select(range(128))
-
-def get_testset(args, tokenizer):
-    ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
-    test = ds['test'].select(range(128))
-    test = test.map(preprocess_function_generation, 
-                      fn_kwargs={"tokenizer": tokenizer})
-
-    text = list(test['text'])
-    labels = list(test['label'])
-    
-    return text, labels
-
-def collect_and_save_losses(history, model_dir):
-    train_losses, eval_losses = [], []
-    for log in history:
-        if "loss" in log:
-            train_losses.append({"epoch": log.get("epoch"), "loss": log["loss"]})
-        if "eval_loss" in log:
-            eval_losses.append({"epoch": log.get("epoch"), "eval_loss": log["eval_loss"]})
-
-    if train_losses and eval_losses:
-        plot_loss_curves(train_losses, eval_losses, model_dir)
 
 def get_config(args, tokenizer):
     bnb_config = BitsAndBytesConfig(
@@ -162,114 +77,11 @@ def get_config(args, tokenizer):
         )
     return training_args, bnb_config, lora_config
  
-def get_tokenizer(args, inference=False):
-    if inference:
-        tokenizer = AutoTokenizer.from_pretrained(args.model, padding_side='left')
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(args.model)
-    # if tokenizer has no padding token, then reuse the end of sequence token
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-    if tokenizer.model_max_length > 100_000:
-        tokenizer.model_max_length = 512*10 
-    if not tokenizer.chat_template:
-        raise Exception("Tokeniser has not cha template.")
-
-    return tokenizer
-
-def inference(test, model_dir, tokenizer, bnb_config, batch_size=8):
-    """
-    Need to set model eval and torch no grad: https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615
-    """
-    model = AutoPeftModelForCausalLM.from_pretrained(model_dir, 
-                                                     device_map="auto", 
-                                                     torch_dtype="auto", 
-                                                     trust_remote_code=True,
-                                                     quantization_config=bnb_config)
-    model.eval()
-
-    # batch inference
-    predictions = []
-    for i in tqdm(range(0, len(test), batch_size), desc="Running batch inference ..."):
-        batch = test[i:i+batch_size]
-        input_ids = tokenizer(batch,
-                              padding=True,
-                              truncation=True,
-                              return_tensors="pt").to(model.device)
-
-        with torch.no_grad():
-            out = model.generate(
-                **input_ids,
-                max_new_tokens=54, 
-                )
-
-        for j in range(len(batch)):
-            output_ids = out[j][len(input_ids["input_ids"][j]):].tolist()
-            try:
-                idx = len(output_ids) - output_ids[::-1].index(151668)  # </think> for Qwen
-            except ValueError:
-                idx = 0
-            response = tokenizer.decode(output_ids[idx:], skip_special_tokens=True).strip()
-
-            # identify labels            
-            label = None
-            match = re.search(r"<label>\s*([01])\s*</label>", response, re.DOTALL | re.IGNORECASE)
-            if match:
-                label = int(match.group(1))
-            predictions.append(label)
-    return predictions
-
-
-def compute_metrics(preds, labels):
-    
-    acc = acc_metric.compute(predictions=preds, references=labels)["accuracy"]
-    f1  = f1_metric.compute(predictions=preds, references=labels, average="binary")["f1"]
-
-    tn, fp, fn, tp = confusion_matrix(labels, preds).ravel()
-
-    return {
-        "accuracy": acc,
-        "f1": f1,
-        "true_positives": int(tp),
-        "false_positives": int(fp),
-        "true_negatives": int(tn),
-        "false_negatives": int(fn)
-    }
-
-def evaluation(predictions, labels):
-    
-    valid = [(p, y) for p, y in zip(predictions, labels) if p is not None]
-    if valid:
-        p_clean, y_clean = zip(*valid)
-        metrics = compute_metrics(list(p_clean), list(y_clean))
-    else:
-        raise ValueError("No valid predictions.")
-            
-    return metrics, len(labels), len(valid)
-
-def main():
+def run(args):
     start = time.time()
-
-    # ARGPARSE
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--lang", type=str, required=True)
-    parser.add_argument("--model", type=str, required=True)
-    parser.add_argument("--learning_rate", type=float, required=True)
-    parser.add_argument("--batch_size", type=int, required=True)
-    parser.add_argument("--epochs", type=int, required=True)
-    parser.add_argument("--grad_acc", type=int, required=True)
-    parser.add_argument("--max_grad_norm", type=float, required=True)
-    parser.add_argument("--weight_decay", type=float, required=True)
-    parser.add_argument("--warmup_ratio", type=float, required=True)
-    parser.add_argument("--plw", type=int, default=0)
-    args = parser.parse_args()
-    args.plw = bool(args.plw)
-    args.model = MODEL_MAPPING[args.model]
-
-    print("="*10, f"Running MODEL {args.model} - LANG {args.lang}","="*10)
-
     tokenizer = get_tokenizer(args)
-    train, dev = get_dataset(args, tokenizer)
+    train, dev = get_train_dev(args, tokenizer)
+    test = get_test(args, tokenizer)
     print(train[0]['text'])
 
     # configs
@@ -288,19 +100,18 @@ def main():
     
     train_result = trainer.train()
 
+
     # Save model
     model_number = get_model_number(MODEL_DIR)
     model_dir = os.path.join(MODEL_DIR, f"model_{model_number}")
     trainer.save_model(model_dir)
-    
+
     # collect_and_save_losses
     collect_and_save_losses(trainer.state.log_history, model_dir)
 
     # EVAL
     tokenizer = get_tokenizer(args, inference=True)
-    test, labels = get_testset(args, tokenizer)
-    predictions = inference(test, model_dir, tokenizer, bnb_config)
-    metrics = evaluation(predictions, labels)
+    metrics = evaluation_non_tok(test, model_dir, tokenizer, bnb_config)
 
     meta = {
         "model_number": model_number,
@@ -316,9 +127,7 @@ def main():
         "lora": {"r": lora_config.r, "alpha": lora_config.lora_alpha, "dropout": lora_config.lora_dropout},
         "time_min": (time.time() - start) / 60.0,
         "cuda_max_memory_allocation": torch.cuda.max_memory_allocated() / 1024**2,
-        "n_test": metrics[1],
-        "n_valid": metrics[2],
-        "metrics": metrics[0],
+        "test_metrics": metrics,
     }
 
     print(meta)
@@ -326,6 +135,28 @@ def main():
     append_meta_file(meta, MODEL_DIR)
     with open(os.path.join(model_dir, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
+
+def main():
+
+    # ARGPARSE
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--lang", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--learning_rate", type=float, required=True)
+    parser.add_argument("--batch_size", type=int, required=True)
+    parser.add_argument("--epochs", type=int, required=True)
+    parser.add_argument("--grad_acc", type=int, required=True)
+    parser.add_argument("--max_grad_norm", type=float, required=True)
+    parser.add_argument("--weight_decay", type=float, required=True)
+    parser.add_argument("--warmup_ratio", type=float, required=True)
+    parser.add_argument("--plw", type=int, default=0)
+    args = parser.parse_args()
+    args.plw = bool(args.plw)
+    args.model = MODEL_MAPPING[args.model]
+
+    print("\n\n",  "="*10, f"Running MODEL {args.model} - LANG {args.lang}","="*10)
+
+    run(args)
 
 if __name__ == "__main__":
     main()

@@ -9,6 +9,7 @@ PLM_DIR = os.path.join(BASE_DIR, "data/models/plm/hp")
 SLM_SFT_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
 SLM_ICL_DIR = os.path.join(BASE_DIR, "data/models/slm/icl")
 SLM_CLASSY_DIR = os.path.join(BASE_DIR, "data/models/slm/test")
+SLM_PWL_DIR = os.path.join(BASE_DIR, "data/models/pwl")
 
 MODEL_MAPPING =  {
     "mBert": "google-bert/bert-base-multilingual-uncased",
@@ -69,7 +70,10 @@ def load_slms_sft():
         lang = meta['data'][:2]
         model_number = meta['model_number']
         model_name = meta['model'].split("/")[-1] + " (sft)"
-        test_accuracy = meta['metrics']['accuracy']
+        try:
+            test_accuracy = meta['metrics']['accuracy']
+        except:
+            test_accuracy = meta['test_metrics']['accuracy']
         if model_name not in rows:
             accs = {l: None for l in LANGS}
             rows[model_name] = accs
@@ -112,6 +116,28 @@ def load_slms_classy():
         model_number = meta['model_number'] 
         model_name = meta['model'].split("/")[-1] + f" (ch)"
         test_accuracy = meta['test_metrics']['eval_accuracy']
+        if model_name not in rows:
+            accs = {l: None for l in LANGS}
+            rows[model_name] = accs
+            
+        if not rows[model_name][lang]:
+            rows[model_name][lang] = test_accuracy
+        if rows[model_name][lang] and test_accuracy > rows[model_name][lang]:
+            rows[model_name][lang] = test_accuracy
+    return rows
+
+def load_slms_pwl():
+    paths = glob.glob(os.path.join(SLM_PWL_DIR, "model_*"))
+    classy_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
+    
+    rows = defaultdict(dict)
+    for path in classy_dir:
+        with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        lang = meta['data'][:2]
+        model_number = meta['model_number'] 
+        model_name = meta['model'].split("/")[-1] + f" (pwl)"
+        test_accuracy = meta['test_metrics']['accuracy']
         if model_name not in rows:
             accs = {l: None for l in LANGS}
             rows[model_name] = accs
@@ -178,12 +204,14 @@ def main():
     rows_sft = load_slms_sft()
     rows_icl = load_slms_icl()
     rows_classy = load_slms_classy()
+    rows_pwl = load_slms_pwl()
 
     print(rows_sft)
     
     r = merge_defaultdicts(rows_plm, rows_icl)
     r = merge_defaultdicts(r, rows_sft)
     r = merge_defaultdicts(r, rows_classy)
+    r = merge_defaultdicts(r, rows_pwl)
 
     latex_table(r)
 

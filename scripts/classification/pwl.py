@@ -12,53 +12,47 @@ import time
 from datetime import datetime
 from tqdm import tqdm
 import numpy as np
+import torch
 from utils import (
                     MODEL_MAPPING, 
                     append_meta_file, 
                     get_model_number,
-                    plot_loss_curves
+                    collect_and_save_losses,
+                    evaluation_non_tok,
+                    get_tokenizer,
+                    get_train_dev,
+                    get_test
 )
-from prompts import SYSTEM_PROMPTS_SLM
-
-from qlora2 import  (preprocess_function_generation,
-                     collect_and_save_losses,
-                     get_tokenizer)
-
-import torch
+from trl import SFTTrainer, SFTConfig
 from datasets import load_from_disk
 from peft import LoraConfig, AutoPeftModelForCausalLM
-from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed, BitsAndBytesConfig
-from trl import SFTTrainer, SFTConfig
-# from transformers import TrainingArguments
-import evaluate
-from sklearn.metrics import confusion_matrix
-import re
+from transformers import (set_seed, BitsAndBytesConfig)
+from prompts import SYSTEM_PROMPTS_SLM
 
 """
 1. Check whether the decoding is correct. Print some outputs
 """
 
-acc_metric = evaluate.load("accuracy")
-f1_metric = evaluate.load("f1")
-
 set_seed(42)
 
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-MODEL_DIR = os.path.join(BASE_DIR, "data/models/slm/pwl")
+MODEL_DIR = os.path.join(BASE_DIR, "data/models/pwl")
 
 def get_data(args):
     ds = load_from_disk(os.path.join(DATA_DIR, args.lang))
-    return ds['train'], ds['dev'], ds['test']
+    return ds['train'], ds['dev']
 
 def check_labels(tokenizer, tokenised_item):
     token_ids = np.array(tokenised_item['input_ids'])
     labels = np.array(tokenised_item['labels'])
     mask = labels != -100
 
+    print("Supervised tokens:")
     print(tokenizer.decode(token_ids[mask]))
 
-def tokenise_data(data, 
+
+def tokenise_train_dev(data, 
                   tokenizer):
     """custom tokenise to implement pwl"""
 
@@ -98,7 +92,7 @@ def tokenise_data(data,
         ]
         }
 
-        example['text'] = tokenizer.apply_chat_template(messages,
+        example['text'] = tokenizer.apply_chat_template(messages['messages'],
                                                         tokenize=False,
                                                         add_generation_prompt=False,
                                                         enable_thinking=False
@@ -172,7 +166,7 @@ def get_config(args, tokenizer):
         num_train_epochs=args.epochs,                     # number of training epochs
         per_device_train_batch_size=args.batch_size,          # batch size per device during training
         gradient_accumulation_steps=args.grad_acc, #2 before          # number of steps before performing a backward/update pass
-        gradient_checkpointing=True,            # use gradient checkpointing to save memory
+        gradient_checkpointing=False,            # use gradient checkpointing to save memory
         bf16=True,                              # use bfloat16 precision
         learning_rate=args.learning_rate,                     # learning rate, based on QLoRA paper
         max_grad_norm=args.max_grad_norm,                      # max gradient norm based on QLoRA paper
@@ -191,84 +185,20 @@ def get_config(args, tokenizer):
     return training_args, bnb_config, lora_config
  
 
-def inference(test, model_dir, tokenizer, bnb_config, batch_size=8):
-    """
-    Need to set model eval and torch no grad: https://discuss.pytorch.org/t/model-eval-vs-with-torch-no-grad/19615
-    """
-    model = AutoPeftModelForCausalLM.from_pretrained(model_dir, 
-                                                     device_map="auto", 
-                                                     torch_dtype="auto", 
-                                                     trust_remote_code=True,
-                                                     quantization_config=bnb_config)
-    model.eval()
-
-    # batch inference
-    predictions, labels = [], []
-    for i in tqdm(range(0, len(test), batch_size), desc="Running batch inference ..."):
-        batch = test[i:i+batch_size]
-        labels.extend(batch['labels'])
-        
-        with torch.no_grad():
-            out = model.generate(
-                torch.tensor(batch["input_ids"]).to(model.device),
-                max_new_tokens=24, 
-                )
-
-        for j in range(len(batch["input_ids"])):
-            output_ids = out[j][len(input_ids["input_ids"][j]):].tolist()
-            try:
-                idx = len(output_ids) - output_ids[::-1].index(151668)  # </think> for Qwen
-            except ValueError:
-                idx = 0
-            response = tokenizer.decode(output_ids[idx:], skip_special_tokens=True).strip()
-
-            # identify labels            
-            label = None
-            match = re.search(r"<label>\s*([01])\s*</label>", response, re.DOTALL | re.IGNORECASE)
-            if match:
-                label = int(match.group(1))
-            predictions.append(label)
-    return predictions, labels
-
-
-def compute_metrics(preds, labels):
-    
-    acc = acc_metric.compute(predictions=preds, references=labels)["accuracy"]
-    f1  = f1_metric.compute(predictions=preds, references=labels, average="binary")["f1"]
-
-    tn, fp, fn, tp = confusion_matrix(labels, preds).ravel()
-
-    return {
-        "accuracy": acc,
-        "f1": f1,
-        "true_positives": int(tp),
-        "false_positives": int(fp),
-        "true_negatives": int(tn),
-        "false_negatives": int(fn)
-    }
-
-def evaluation(test, model_dir, tokenizer, bnb_config):
-
-    
-    predictions, labels = inference(test, model_dir, tokenizer, bnb_config)
-
-    valid = [(p, y) for p, y in zip(predictions, labels) if p is not None]
-    if valid:
-        p_clean, y_clean = zip(*valid)
-        metrics = compute_metrics(list(p_clean), list(y_clean))
-    else:
-        raise ValueError("No valid predictions.")
-
-    metrics['valid'] = len(valid)
-            
-    return metrics
 
 def run(args):
+    start = time.time()
+
     # Get tokenizer and data
     tokenizer = get_tokenizer(args)
-    train, dev, test = get_data(args)
-    train_tok, dev_tok, test_tok = tokenise_data(train, tokenizer), tokenise_data(dev, tokenizer), tokenise_data(test, tokenizer)
-    print(train[0]['text'])
+    train, dev = get_data(args)
+    test = get_test(args, tokenizer)
+    if args.smoke_test:
+        train, dev, test = train.select(range(128)), dev.select(range(128)), test.select(range(16))
+    train_tok, dev_tok = tokenise_train_dev(train, tokenizer), tokenise_train_dev(dev, tokenizer)
+
+    if args.smoke_test:
+        check_labels(tokenizer, train_tok[0])
 
     # configs
     training_args, bnb_config, lora_config = get_config(args, tokenizer)
@@ -296,7 +226,7 @@ def run(args):
 
     # EVAL
     tokenizer = get_tokenizer(args, inference=True)
-    metrics = evaluation(test_tok, model_dir, tokenizer, bnb_config)
+    metrics = evaluation_non_tok(test, model_dir, tokenizer, bnb_config)
 
     meta = {
         "model_number": model_number,
@@ -312,9 +242,7 @@ def run(args):
         "lora": {"r": lora_config.r, "alpha": lora_config.lora_alpha, "dropout": lora_config.lora_dropout},
         "time_min": (time.time() - start) / 60.0,
         "cuda_max_memory_allocation": torch.cuda.max_memory_allocated() / 1024**2,
-        "n_test": metrics[1],
-        "n_valid": metrics[2],
-        "metrics": metrics[0],
+        "test_metrics": metrics,
     }
 
     print(meta)
@@ -324,7 +252,6 @@ def run(args):
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
 def main():
-    start = time.time()
 
     # ARGPARSE
     parser = argparse.ArgumentParser()
@@ -337,12 +264,15 @@ def main():
     parser.add_argument("--max_grad_norm", type=float, required=True)
     parser.add_argument("--weight_decay", type=float, required=True)
     parser.add_argument("--warmup_ratio", type=float, required=True)
+    parser.add_argument("--smoke_test", type=int, default=0)
     args = parser.parse_args()
     args.model = MODEL_MAPPING[args.model]
+    args.smoke_test = bool(args.smoke_test)
 
     print("="*10, f"Running MODEL {args.model} - LANG {args.lang}","="*10)
 
     run(args)
+
 
 if __name__ == "__main__":
     main()
