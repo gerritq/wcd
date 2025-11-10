@@ -6,4 +6,4 @@
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=20GB
 
-uv run synthetic.py --lang "en" --model "openai/gpt-4o-mini"
+uv run synthetic.py --lang "en" --model "openai/gpt-4o-mini" --smoke_test 0

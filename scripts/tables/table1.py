@@ -5,11 +5,10 @@ import glob
 from collections import defaultdict
 
 BASE_DIR = os.getenv("BASE_WCD")
-PLM_DIR = os.path.join(BASE_DIR, "data/models/plm/hp")
-SLM_SFT_DIR = os.path.join(BASE_DIR, "data/models/slm/sft")
-SLM_ICL_DIR = os.path.join(BASE_DIR, "data/models/slm/icl")
-SLM_CLASSY_DIR = os.path.join(BASE_DIR, "data/models/slm/test")
-SLM_PWL_DIR = os.path.join(BASE_DIR, "data/models/pwl")
+PLM_DIR = os.path.join(BASE_DIR, "data/models/plm")
+SLM_SFT_DIR = os.path.join(BASE_DIR, "data/models/vanilla")
+SLM_PWL_DIR = os.path.join(BASE_DIR, "data/models/atl")
+SLM_C_DIR = os.path.join(BASE_DIR, "data/models/classifier")
 
 MODEL_MAPPING =  {
     "mBert": "google-bert/bert-base-multilingual-uncased",
@@ -39,113 +38,44 @@ def load_metrics(path):
     with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
         return json.load(f)
 
-def load_plms():
-    plm_dir = sorted(glob.glob(os.path.join(PLM_DIR, "model_*")),
-               key=lambda p: int(re.search(r"model_(\d+)", p).group(1)) if re.search(r"model_(\d+)\.json$", p) else 1e9)
-    
+def load_models(path: str, variant: str):
     rows = defaultdict(dict)
-    for path in plm_dir:
-        meta = load_metrics(path)
-        lang = meta['data']
-        model_number = meta['model_number']
-        model_name = meta['model'].split("/")[-1] + " (hp)"
-        test_accuracy = meta['test_metrics']['eval_accuracy']
-        if model_name not in rows:
-            accs = {l: None for l in LANGS}
-            rows[model_name] = accs
-        rows[model_name][lang] = test_accuracy
-    return rows
-
-def load_slms_sft():
-    # sft_dir = sorted(glob.glob(os.path.join(SLM_SFT_DIR, "model_(\d+)")),
-    #            key=lambda p: int(re.search(r"model_(\d+)", p).group(1)))
-
-    paths = glob.glob(os.path.join(SLM_SFT_DIR, "model_*"))
-    sft_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
-
-
-    rows = defaultdict(dict)
-    for path in sft_dir:
-        meta = load_metrics(path)
-        lang = meta['data'][:2]
-        model_number = meta['model_number']
-        model_name = meta['model'].split("/")[-1] + " (sft)"
-        try:
-            test_accuracy = meta['metrics']['accuracy']
-        except:
-            test_accuracy = meta['test_metrics']['accuracy']
-        if model_name not in rows:
-            accs = {l: None for l in LANGS}
-            rows[model_name] = accs
-
-        if not rows[model_name][lang]:
-            rows[model_name][lang] = test_accuracy
-        if rows[model_name][lang] and test_accuracy > rows[model_name][lang]:
-            rows[model_name][lang] = test_accuracy
-    return rows
-
-def load_slms_icl():
-    icl_dir = sorted(glob.glob(os.path.join(SLM_ICL_DIR, "model_*")),
-               key=lambda p: int(re.search(r"model_(\d+)", p).group(1)) if re.search(r"model_(\d+)\.json$", p) else 1e9)
-    
-    rows = defaultdict(dict)
-    for path in icl_dir:
-        with open(os.path.join(path), "r", encoding="utf-8") as f:
-            meta = json.load(f)
-        lang = meta['data'][:2]
-        model_number = meta['model_number'] 
-        model_name = meta['model'].split("/")[-1] + f" ({'xs' if meta['shots'] else '0s'})"
-        test_accuracy = meta['metrics']['accuracy']
-        if model_name not in rows:
-            accs = {l: None for l in LANGS}
-            rows[model_name] = accs
-        rows[model_name][lang] = test_accuracy
-    return rows
-
-
-
-def load_slms_classy():
-    paths = glob.glob(os.path.join(SLM_CLASSY_DIR, "model_*"))
-    classy_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
-    
-    rows = defaultdict(dict)
-    for path in classy_dir:
-        with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
-            meta = json.load(f)
-        lang = meta['data'][:2]
-        model_number = meta['model_number'] 
-        model_name = meta['model'].split("/")[-1] + f" (ch)"
-        test_accuracy = meta['test_metrics']['eval_accuracy']
-        if model_name not in rows:
-            accs = {l: None for l in LANGS}
-            rows[model_name] = accs
+    for lang in LANGS:
+        paths = glob.glob(os.path.join(path, lang, "model_*"))
+        dirs = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
+        for dir_ in dirs:
+            try:
+                meta = load_metrics(dir_)
+                lang = meta['lang']
+            except:
+                print(f"No meta for path: {dir_}")
+                continue
+            model_number = meta['model_number']
+            model_name = meta['model_name'].replace("_", "-") + f" ({variant})"
             
-        if not rows[model_name][lang]:
-            rows[model_name][lang] = test_accuracy
-        if rows[model_name][lang] and test_accuracy > rows[model_name][lang]:
-            rows[model_name][lang] = test_accuracy
-    return rows
+            try:
+                dev_accuracy = meta['dev_metrics']['accuracy']
+                test_accuracy = meta['test_metrics']['accuracy']
+            except:
+                dev_accuracy = meta['dev_metrics']['eval_accuracy']
+                test_accuracy = meta['test_metrics']['eval_accuracy']
 
-def load_slms_pwl():
-    paths = glob.glob(os.path.join(SLM_PWL_DIR, "model_*"))
-    classy_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
+            score = (dev_accuracy, test_accuracy)
+
+            if model_name not in rows:
+                accs = {l: None for l in LANGS}
+                rows[model_name] = accs
+
+            if not rows[model_name][lang]:
+                rows[model_name][lang] = score
+            if rows[model_name][lang] and score[0] > rows[model_name][lang][0]:
+                rows[model_name][lang] = score
     
-    rows = defaultdict(dict)
-    for path in classy_dir:
-        with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
-            meta = json.load(f)
-        lang = meta['data'][:2]
-        model_number = meta['model_number'] 
-        model_name = meta['model'].split("/")[-1] + f" (pwl)"
-        test_accuracy = meta['test_metrics']['accuracy']
-        if model_name not in rows:
-            accs = {l: None for l in LANGS}
-            rows[model_name] = accs
-            
-        if not rows[model_name][lang]:
-            rows[model_name][lang] = test_accuracy
-        if rows[model_name][lang] and test_accuracy > rows[model_name][lang]:
-            rows[model_name][lang] = test_accuracy
+    # keep test scores
+    for m, v in rows.items():
+        for l, s in v.items():
+            if s:
+                rows[m][l] = s[1]
     return rows
 
 def latex_table(rows):
@@ -200,56 +130,19 @@ def merge_defaultdicts(d,d1):
     return d
 
 def main():
-    rows_plm = load_plms()
-    rows_sft = load_slms_sft()
-    rows_icl = load_slms_icl()
-    rows_classy = load_slms_classy()
-    rows_pwl = load_slms_pwl()
+
+    rows_plm = load_models(PLM_DIR, "HP")
+    rows_sft = load_models(SLM_SFT_DIR, "SFT")
+    rows_pwl = load_models(SLM_PWL_DIR, "ATL")
+    rows_c = load_models(SLM_C_DIR, "CH")
 
     print(rows_sft)
     
-    r = merge_defaultdicts(rows_plm, rows_icl)
-    r = merge_defaultdicts(r, rows_sft)
-    r = merge_defaultdicts(r, rows_classy)
+    r = merge_defaultdicts(rows_plm, rows_sft)
     r = merge_defaultdicts(r, rows_pwl)
+    r = merge_defaultdicts(r, rows_c)
 
     latex_table(r)
 
 if __name__ == "__main__":
     main()
-
-# rows_sorted = sorted(rows, key=lambda x: LANGS.index(x[2]) if x[2] in LANGS+['mix'] else len(LANGS))
-
-# # print LaTeX table
-# table = ""
-# colspec = "l" + "c" * len(LANGS)
-# header = "Model & " + " & ".join(LANGS) + " \\\\"
-
-# table += "\\begin{tabular}{" + colspec + "}\n"
-# table += "\\hline\n"
-# table += header + "\n"
-# table += "\\hline\n"
-
-# for name, accs, _ in rows_sorted:
-#     cells = []
-#     # find the max value among numbers (ignore None or non-floats)
-#     vals = [v for v in accs.values() if isinstance(v, (int, float))]
-#     max_val = max(vals) if vals else None
-
-#     for l in LANGS:
-#         v = accs[l]
-#         if isinstance(v, (int, float)) and v == max_val:
-#             cells.append(f"\\textbf{{{v:.3f}}}")
-#         else:
-#             cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
-
-#     table += f"{name} & " + " & ".join(cells) + " \\\\\n"
-
-# table += "\\hline\n"
-# table += "\\end{tabular}\n"
-
-# # Save to file
-# with open("slm.tex", "w", encoding="utf-8") as f:
-#     f.write(table)
-
-# print(table)

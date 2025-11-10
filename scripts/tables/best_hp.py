@@ -3,35 +3,44 @@ import re
 import json
 import glob
 from collections import defaultdict
+import sys
+
+type_ = sys.argv[1]
+lang = sys.argv[2]
 
 BASE_DIR = os.getenv("BASE_WCD") 
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-SLM_CLASSY_DIR = os.path.join(BASE_DIR, "data/models/slm/test")
+MODEL_DIR = os.path.join(BASE_DIR, f"data/models/{type_}/{lang}")
 
 def load_slms_classy():
-    paths = glob.glob(os.path.join(SLM_CLASSY_DIR, "model_*"))
-    classy_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
+    paths = glob.glob(os.path.join(MODEL_DIR, "model_*"))
+    model_dir = [p for p in paths if re.search(r"model_\d+$", os.path.basename(p))]
+    print(model_dir)
     
     rows = defaultdict(list)
-    for path in classy_dir:
-        with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
-            meta = json.load(f)
-        lang = meta['data'][:2]
-        model_number = meta['model_number'] 
-        model_name = meta['model'].split("/")[-1] + f" (ch)"
-        test_accuracy = meta['test_metrics']['eval_accuracy']
-        
+    for path in model_dir:
         try:
-            batch = meta['training_args']['per_device_train_batch_size']
-            grad_acc = meta['training_args']['gradient_accumulation_steps']
-            lr = meta['training_args']['learning_rate']
-            wd = meta['training_args']['weight_decay']
-            epochs = meta['training_args']['num_train_epochs']
-            warmup_r = meta['training_args']['warmup_ratio']
-            max_grad_norm = meta['training_args']['max_grad_norm']
-            hps = [epochs, batch, grad_acc, lr, wd, warmup_r, max_grad_norm]
+            with open(os.path.join(path, "meta.json"), "r", encoding="utf-8") as f:
+                meta = json.load(f)
         except:
-            hps = []
+            print(f"No meta for {path}")
+            continue
+        lang = meta['lang']
+        model_number = meta['model_number'] 
+        model_name = meta['model_name']
+        try:
+            test_accuracy = meta['test_metrics']['accuracy']
+        except:
+            test_accuracy = meta['test_metrics']['eval_accuracy']
+        
+        hps = {}
+        try:
+            hps['epochs'] = meta['epochs']
+            hps['learning_rate'] = meta['learning_rate']
+            hps['batch_size'] = meta['batch_size']
+            hps['max_grad_norm'] = meta['max_grad_norm']
+        except:
+            pass
 
         rows[lang].append([model_number, model_name, test_accuracy, hps])
     
@@ -44,11 +53,11 @@ def load_slms_classy():
 
 def main():
 
-    rows_classy = load_slms_classy()
+    rows_models = load_slms_classy()
 
-    for key, value in rows_classy.items():
-        print("\n", key, f"[epochs, batch, grad_acc, lr, wd, warmup_r, max_grad_norm]")
-        for model in value[:5]:
+    for key, value in rows_models.items():
+        print("\n", key)
+        for model in value[:15]:
             print("\t", model)
 
 

@@ -5,7 +5,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
-
+import random
 import torch
 import re
 from tqdm import tqdm
@@ -16,6 +16,8 @@ from datasets import load_from_disk
 from prompts import SYSTEM_PROMPTS_SLM
 # https://huggingface.co/collections/meta-llama/llama-33-67531d5c405ec5d08a852000
 # https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f
+
+random.seed(42)
 
 accuracy_metric = evaluate.load("accuracy")
 f1_metric = evaluate.load("f1")
@@ -240,7 +242,7 @@ def evaluation_tok(test, model_dir, tokenizer, bnb_config):
             with torch.no_grad():
                 out = model.generate(
                     torch.tensor(batch["input_ids"]).to(model.device),
-                    max_new_tokens=24, 
+                    max_new_tokens=24,
                     )
 
             for j in range(len(batch["input_ids"])):

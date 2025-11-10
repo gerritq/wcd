@@ -1,11 +1,11 @@
 import os
 import re
 import json
-import copy
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from datasets import load_from_disk
+from datasets import load_from_disk, DatasetDict, concatenate_datasets, Dataset
 from openai import OpenAI
+from typing import List
 
 PROMPT = (
     "You are a Wikipedia citation reasoning assistant. "
@@ -39,23 +39,43 @@ PROMPT = (
 
 BASE_DIR = os.getenv("BASE_WCD") 
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-ANNOTATION_DIR = os.path.join(BASE_DIR, "data/annotation")
+OUT_DIR = os.path.join(BASE_DIR, "data/sets/annotation")
 
-def get_dataset(lang):
-    """loads train data and returns it as a list of dict"""
-    
+def get_dataset(lang: str, smoke_test: bool) -> list[dict]:
+    """
+    Load full dataset and return as a single list.
+    """
     ds = load_from_disk(os.path.join(DATA_DIR, lang))
-    train = ds['train'].to_list()
+    
+    train = ds["train"].add_column("split", ["train"] * len(ds["train"]))
+    dev   = ds["dev"].add_column("split", ["dev"] * len(ds["dev"]))
+    test  = ds["test"].add_column("split", ["test"] * len(ds["test"]))
 
-    return train
+    if smoke_test:
+        train = train.select(range(3))
+        dev = dev.select(range(3))
+        test = test.select(range(3))
+        print("Smoke testing.")
+    
+    combined = concatenate_datasets([train, dev, test])
+    
+    return combined.to_list()
 
-def format_prompt(train):
-    """formats the prompt for each claim"""
-    for claim in train:
+
+def format_prompt(ds: List):
+    """
+    Takes a ds as a list. Format the prompt of each item.
+    """
+    for claim in ds:
         claim['prompt'] = PROMPT.format(**claim)
-    return train
+    return ds
 
-def query(claim, model, client) -> str:
+def query(claim: dict, 
+          model: str, 
+          client: OpenAI) -> str:
+    """
+    Takes a claim as a dict, queries model and returns the claim dict with category and explanation.
+    """
 
     completion = client.chat.completions.create(
         model=model,
@@ -66,8 +86,12 @@ def query(claim, model, client) -> str:
     claim['category'], claim['explanation'] = retrieve_response(completion.choices[0].message.content)
     return claim
 
-def retrieve_response(response: str):
-    print(response)
+def retrieve_response(response: str) -> tuple[str, str]:
+    """
+    Takes a response as a str. 
+    Find the json key-value paris and returns them.
+    Expected to find and return two: category and explanation.
+    """
     match = re.search(r"```json\s*(\{.*?\})\s*```", response, re.DOTALL)
     if match:
         json_str = match.group(1)
@@ -76,13 +100,16 @@ def retrieve_response(response: str):
             data = json.loads(json_str)
             return data["category"], data["explanation"]
         except json.JSONDecodeError:
-            return None, None
             print("Failed to decode JSON.")
+            return None, None
+            
     else:
         print("No JSON block found in response.")
         return None, None
 
-def run(prompts, model, client):
+def run(prompts: list[dict], 
+        model: str, 
+        client: OpenAI) -> list[dict]:
     def process(claim):
         out = query(claim, model, client)
         return out
@@ -90,95 +117,59 @@ def run(prompts, model, client):
     with ThreadPoolExecutor(max_workers=4) as executor:
         annotated_claims = list(executor.map(process, prompts))
 
+    # rm prompt
+    for x in annotated_claims:
+        x.pop("prompt")
     return annotated_claims
 
 
+def save_data(data: list[dict], lang: str) -> DatasetDict:
+    """
+    Converts a list of dicts into a DatasetDict with train/dev/test splits.
+    Saves this in the path.
+    """
+    train = [x for x in data if x["split"] == "train"]
+    dev   = [x for x in data if x["split"] == "dev"]
+    test  = [x for x in data if x["split"] == "test"]
+
+    train_ds = Dataset.from_list(train)
+    dev_ds   = Dataset.from_list(dev)
+    test_ds  = Dataset.from_list(test)
+
+    ds = DatasetDict({
+        "train": train_ds,
+        "dev": dev_ds,
+        "test": test_ds,
+    })
+
+    out_path = os.path.join(OUT_DIR, f"{lang}")
+    ds.save_to_disk(out_path)
+
 def main():
+    # argpaese
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", type=str, required=True)
     parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--smoke_test", type=int, required=True)
     args = parser.parse_args()
     args.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=os.environ["OPENROUTER_API_KEY"]
             )
+    args.smoke_test = bool(args.smoke_test)
 
-    train = get_dataset(args.lang)
-    prompts = format_prompt(train)
-    annotated_claims = run(prompts, args.model, args.client)
+    # get data
+    data = get_dataset(args.lang, args.smoke_test)
     
-    with open(os.path.join(ANNOTATION_DIR, f"{args.lang}.jsonl"), "w", encoding="utf-8") as f:
-        for entry in annotated_claims:
-            json.dump(entry, f, ensure_ascii=False)
-            f.write("\n")
+    # get prompts
+    prompts = format_prompt(data)
+    
+    # annotate claims
+    annotated_claims = run(prompts, 
+                           args.model, 
+                           args.client)
+    
+    save_data(annotated_claims, args.lang)
 
 if __name__ == "__main__":
     main()
-
-# class LLMAsAJudge:
-#     def __init__(self, model: str, max_workers: int = 4):
-#         self.model = model
-#         self.client = OpenAI(
-#             base_url="https://openrouter.ai/api/v1",
-#             api_key=os.environ["OPENROUTER_API_KEY"]
-#         )
-#         self.max_workers = max_workers
-
-#     def _rearrange_subclaims(self, subclaims: List[Subclaim], top_k=3) -> List[Subclaim]:
-#         """Create subclaim-evidence pairs"""
-#         out = []
-#         for subclaim in subclaims:
-#             for evidence in subclaim['reranked'][:top_k]:
-#                 new_subclaim = copy.deepcopy(subclaim)
-#                 new_subclaim['evidence'] = evidence  # this will be a tuple: (text, score, url)
-#                 out.append(new_subclaim)
-                
-#         return out
-
-#     def _format_response(self, response: str) -> List[str]:
-#         match = re.search(r"```json\s*(\{.*?\})\s*```", response, re.DOTALL)
-#         if match:
-#             json_str = match.group(1)
-#             try:
-#                 data = json.loads(json_str)
-#                 return data["label"], data["justification"]
-#             except json.JSONDecodeError:
-#                 raise ValueError("Failed to decode JSON.")
-#         else:
-#             raise ValueError("No JSON block found in response.")
-
-#     def _judge(self, claim: Claim) -> Dict[str, str]:
-    
-#         claim_txt = claim['claim']
-#         evidence = claim['evidence'][0] # txt, score, link
-
-#         prompt = LLM_JUDGE_PROMPT.format(
-#             claim=claim_txt,
-#             evidence=evidence
-#         )
-
-#         completion = self.client.chat.completions.create(
-#             model=self.model,
-#             temperature=0.0,
-#             messages=[{"role": "user", "content": prompt}]
-#         )
-
-#         result = self._format_response(completion.choices[0].message.content)
-#         assert isinstance(result, tuple), f"Judgement is not a tuple: {result}"
-
-#         return result
-
-#     def run(self, subclaims: List[Subclaim]) -> List[Subclaim]:
-        
-#         print("N of subclaims:", len(subclaims))
-#         subclaims = self._rearrange_subclaims(subclaims)
-#         print("N of subclaim-evidence pairs (Nx3):", len(subclaims))
-        
-#         def process(subclaim: Subclaim) -> Subclaim:
-#             subclaim['judgement'] = self._judge(subclaim)
-#             return subclaim
-
-#         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-#             subclaims_with_judgements = list(executor.map(process, subclaims))
-
-#         return subclaims_with_judgements
