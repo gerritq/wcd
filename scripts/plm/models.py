@@ -29,11 +29,13 @@ class PLM(ABC):
                  model_name: str, 
                  lang: str,
                  training_size: int,
+                 context: bool,
                  smoke_test: bool):
 
         self.model_name = MODEL_MAPPING[model_name]
         self.lang = lang
         self.smoke_test = smoke_test
+        self.context = context
 
         # Dirs
         self.data_dir = DATA_DIR
@@ -104,8 +106,8 @@ class PLM(ABC):
             self._resample_train_data(self.training_size)
             print(f"Training data resampled to {len(self.train_tok)}")
 
-            self.model_dir = os.path.join(MODEL_DIR, "length", self.lang)
-            os.makedirs(self.model_dir, exist_ok=True)
+            # self.model_dir = os.path.join(MODEL_DIR, "length", self.lang)
+            # os.makedirs(self.model_dir, exist_ok=True)
 
         # Print overview
         self._print_setting()
@@ -116,8 +118,13 @@ class VanillaPLM(PLM):
                  model_name: str, 
                  lang: str,
                  training_size: int,
+                 context: bool,
                  smoke_test: bool):
-        super().__init__(model_name, lang, training_size, smoke_test)
+        super().__init__(model_name=model_name, 
+                         lang=lang, 
+                         training_size=training_size, 
+                         smoke_test=smoke_test,
+                         context=context)
         
         self.model_type = "Vanilla"
 
@@ -128,14 +135,14 @@ class VanillaPLM(PLM):
         # get all data
         train, dev, test = get_all_data_sets(self.data_dir, self.lang)
 
-        self.train_tok = tokenize_data(train, self.tokenizer)
-        self.dev_tok = tokenize_data(dev, self.tokenizer)
-        self.test_tok = tokenize_data(test, self.tokenizer)
+        self.train_tok = tokenize_data(train, self.tokenizer, self.context)
+        self.dev_tok = tokenize_data(dev, self.tokenizer, self.context)
+        self.test_tok = tokenize_data(test, self.tokenizer, self.context)
         
         if self.smoke_test:
-            self.train_tok = self.train_tok.select(range(64))
-            self.dev_tok = self.dev_tok.select(range(64))
-            self.test_tok = self.test_tok.select(range(64))
+            self.train_tok = self.train_tok.select(range(32))
+            self.dev_tok = self.dev_tok.select(range(16))
+            self.test_tok = self.test_tok.select(range(16))
 
     
 PLM_REGISTRY = {
@@ -146,6 +153,11 @@ def build_plm(model_type: str,
               model_name: str,
               lang: str,
               training_size: int,
+              context: bool,
               smoke_test: bool):
     cls = PLM_REGISTRY.get(model_type)
-    return cls(model_name, lang, training_size, smoke_test).build()
+    return cls(model_name=model_name,
+               lang=lang,
+               training_size=training_size, 
+               smoke_test=smoke_test,
+               context=context).build()

@@ -9,8 +9,8 @@ SEED = 42
 random.seed(SEED)
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
-IN_DIR = os.path.join(BASE_DIR, "data/sents")
-OUT_DIR = os.path.join(BASE_DIR, "data/sets")
+IN_DIR = os.path.join(BASE_DIR, "data/sents_new")
+OUT_DIR = os.path.join(BASE_DIR, "data/sets_new")
 
 def load_data(lang: str) -> list:
     path = os.path.join(IN_DIR, f"{lang}_sents.json")
@@ -66,7 +66,8 @@ def build_monolingual_dataset(lang: str, total_n: int) -> None:
                      "label": int(x["label"]),
                      "title": x['title'],
                      "section": x['section'],
-                     "context": x['context'],
+                     "previous_sentence": x['previous_sentence'],
+                     "subsequent_sentence": x['subsequent_sentence'],
                      "source": x['source'],
                      "lang": lang })
 
@@ -103,7 +104,7 @@ def build_monolingual_dataset(lang: str, total_n: int) -> None:
         "test": Dataset.from_list(test),
     })
 
-    out_dir = os.path.join(OUT_DIR, "main", f"{lang}_8k")
+    out_dir = os.path.join(OUT_DIR, "main", f"{lang}")
     ds.save_to_disk(out_dir)
 
 # def build_multilingual_training_data(languages: List[str], total_n: int, out_dir: str) -> None:
@@ -205,7 +206,7 @@ def main():
 
     languages  = [
         "en",  # English
-        # "nl",  # Dutch
+        "nl",  # Dutch
         # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
         # "it",  # Italian
         # "pt",  # Portuguese
@@ -219,7 +220,7 @@ def main():
     ]
     
     # set n
-    training_n = 8000
+    training_n = 5000
     total_n = training_n / .8 # assuming .1 dev and test
     random_n = (training_n / .8) * .1
 

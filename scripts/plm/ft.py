@@ -14,6 +14,7 @@ from datetime import datetime
 import argparse
 import os
 import json
+import torch
 
 set_seed(42)
 
@@ -27,6 +28,7 @@ def run_fine_tuning():
     parser.add_argument("--lang", type=str, required=True)
     parser.add_argument("--training_size", type=int, required=True)
     parser.add_argument("--smoke_test", type=int, required=True)
+    parser.add_argument("--context", type=int, required=True)
     parser.add_argument("--notes", type=str, required=True)
 
     # HPs
@@ -36,9 +38,11 @@ def run_fine_tuning():
 
     args = parser.parse_args()
     
-    assert (args.smoke_test in [0,1]), "Incorrect boolean values"
+    assert (args.smoke_test in [0,1] and 
+            args.context in [0,1]), "Incorrect boolean values"
 
     args.smoke_test = bool(args.smoke_test)
+    args.context = bool(args.context)
 
     # create meta
     meta = vars(args)
@@ -53,6 +57,7 @@ def run_fine_tuning():
                     lang=args.lang,
                     training_size=args.training_size,
                     smoke_test=args.smoke_test,
+                    context=args.context
                     )
 
     # Use data collator and pass tokenizer to trainer
@@ -70,7 +75,7 @@ def run_fine_tuning():
         warmup_ratio=0.03,
         gradient_accumulation_steps=1, # no need for grad acc for plms
         gradient_checkpointing=False,
-        bf16=True,
+        bf16=torch.cuda.is_bf16_supported(),
         per_device_eval_batch_size=16,
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
@@ -94,8 +99,8 @@ def run_fine_tuning():
 
     # save model
     model_number = get_model_number(plm.model_dir)
-    model_path = os.path.join(plm.model_dir, f"model_{model_number}")
-    trainer.save_model(model_path)
+    # model_path = os.path.join(plm.model_dir, f"model_{model_number}")
+    # trainer.save_model(model_path)
 
     end = time.time()
 
@@ -108,11 +113,11 @@ def run_fine_tuning():
     meta['date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     meta['loss_history'] = trainer.state.log_history
     
-    with open(os.path.join(model_path, "meta.json"), "w") as f:
+    with open(os.path.join(plm.model_dir, f"meta_{model_number}.json"), "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     # add loss plot
-    collect_and_save_losses(trainer.state.log_history, model_path)
+    # collect_and_save_losses(trainer.state.log_history, model_path)
 
     print("="*10)
     print("RUN SUCCESSFULL.")

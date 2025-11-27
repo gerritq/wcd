@@ -53,17 +53,17 @@ def append_meta_file(meta: dict, model_dir: str) -> None:
 
 def get_model_number(model_dir: str) -> int:
     """
-    Identifies latest model in the model_dir.
-    Returns an int of the next model.
+    Identifies the latest meta_<n>.json file in model_dir.
+    Returns the next available number.
     """
-    model_names = [os.path.splitext(d)[0] for d in os.listdir(model_dir) if d.startswith("model_")]
-    
+    meta_files = [f for f in os.listdir(model_dir) if f.startswith("meta_") and f.endswith(".json")]
+
     numbers = []
-    for name in model_names:
-        num = int(name.split("_")[1])
+    for fname in meta_files:
+        num = int(fname.split("_")[1].split(".")[0])
         numbers.append(num)
-    next_number = max(numbers) + 1 if numbers else 1
-    return next_number
+
+    return max(numbers) + 1 if numbers else 1
 
 def collect_and_save_losses(history, model_dir):
     """
@@ -111,8 +111,21 @@ def collect_and_save_losses(history, model_dir):
 
 def tokenize_data(ds:Dataset, 
                   tokenizer: PreTrainedTokenizerBase,
+                  context: bool,
                   max_length=512) -> Dataset:
+    SEP = f" {tokenizer.sep_token} "
     def _tok(example):
+        if context:
+            parts = [
+                example.get("section"),
+                example.get("previous_sentence"),
+                example["claim"],
+                example.get("subsequent_sentence"),
+            ]
+            text = SEP.join(p for p in parts if p).strip()
+        else:
+            text = example["claim"].strip()
+        # print("\n", text)
         enc = tokenizer(
             example['claim'],
             truncation=True,

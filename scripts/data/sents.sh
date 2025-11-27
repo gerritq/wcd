@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=s-1
+#SBATCH --job-name=s-3
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=02:30:00
+#SBATCH --time=05:30:00
 # SBATCH --partition=cpu,nmes_cpu
 #SBATCH --partition=nmes_gpu,gpu,interruptible_gpu
 #SBATCH --mem=20GB
@@ -16,11 +16,11 @@ nvidia-smi
 # "it" "pt" "ro"
 # "ru" "uk" "bg"
 # "id" "vi" "tr"
-LANGUAGES=("en")
+LANGUAGES=("id" "vi" "tr")
 
 start=$(date +%s)
 
-uv run sents.py --languages "${LANGUAGES[@]}"
+uv run sents.py --languages "${LANGUAGES[@]}" --smoke_test 0
 
 end=$(date +%s)
 runtime=$((end - start))
