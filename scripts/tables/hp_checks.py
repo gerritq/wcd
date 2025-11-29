@@ -50,6 +50,7 @@ for lang_dir in ROOT.iterdir():
                     best_for_run = {
                         "run_dir": str(run_dir),
                         "meta_file": str(meta_path),
+                        "model_type": meta['model_type'],
                         'lang': meta['lang'],
                         'atl': meta['atl'],
                         'context': meta['context'],
@@ -72,6 +73,7 @@ for r in results:
     print(f"Meta file:    {r['meta_file']}")
     print(f"Best epoch:   {r['epoch']}")
     print(f"Lang:         {r['lang']}")
+    print(f"Model type:   {r['model_type']}")
     print(f"ATL:          {r['atl']}")
     print(f"Context:      {r['context']}")
     print(f"Prompt Extension:      {r['prompt_extension']}")

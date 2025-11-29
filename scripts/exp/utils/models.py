@@ -19,6 +19,14 @@ from transformers.utils import is_flash_attn_2_available
 from transformers import set_seed
 set_seed(42)
 
+use_bf16 = (
+    torch.cuda.is_available()
+    and torch.cuda.is_bf16_supported()
+)
+print("="*20)
+print(f'Using bf16 to load the model: {use_bf16}')
+print("="*20)
+
 # --------------------------------------------------------------------------------------------------
 # Config
 # --------------------------------------------------------------------------------------------------
@@ -117,6 +125,7 @@ class LM(ABC):
             device_map="auto",
             trust_remote_code=True,
             attn_implementation=self.attn_impl,
+            dtype=torch.bfloat16 if use_bf16 else "auto",
         )
         
         if self.quantization:
@@ -188,7 +197,8 @@ class SLMClassifier(LM):
             num_labels=2,
             device_map="auto",
             trust_remote_code=True,
-            attn_implementation=self.attn_impl
+            attn_implementation=self.attn_impl,
+            dtype=torch.bfloat16 if use_bf16 else "auto",
         )
 
         # Replace classification head
@@ -207,51 +217,12 @@ class SLMClassifier(LM):
         model.enable_input_require_grads()  
         model.config.use_cache = False         # disable cache
         model.print_trainable_parameters()
-
-        # Appears to only be corrected for the classifier case
-        if not model.config.pad_token_id:
-            model.config.pad_token_id = self.tokenizer.pad_token_id
-
-        # Ensure that new head is also on cuda
-        model.to(device="cuda", dtype=torch.bfloat16)
-
+        
         self.model = model
 
         self._print_setting()
 
         return self
-
-    def _prepare_data(self):
-        # get all data
-        train, dev, test = get_all_data_sets(self.data_dir, self.lang)
-
-        # Tokenize function expects a text field
-        train = train.rename_column("claim", "text")
-        dev = dev.rename_column("claim", "text")
-        test = test.rename_column("claim", "text")        
-
-        # Tokenize
-        train_tok = tokenize_ds(train, self.tokenizer)
-        dev_tok = tokenize_ds(dev, self.tokenizer)
-        test_tok = tokenize_ds(test, self.tokenizer)
-
-        # Adjustment: make lables the cd_labels (lables=input_ids in LM)
-        train_tok = train_tok.remove_columns("labels").rename_column("cd_labels", "labels")
-        dev_tok = dev_tok.remove_columns("labels").rename_column("cd_labels", "labels")
-        test_tok = test_tok.remove_columns("labels").rename_column("cd_labels", "labels")
-
-        # Assign to attributes (dev_train_tok just to avoid if conditions in trainer)
-        self.train_tok = train_tok
-        self.dev_tok = dev_tok
-        self.dev_train_tok = self.dev_tok
-        self.test_tok = test_tok
-
-        # if self.smoke_test:
-        #     self.train_tok = train_tok.select(range(96))
-        #     self.dev_tok = dev_tok.select(range(96))
-        #     self.dev_train_tok = self.dev_tok
-        #     self.test_tok = self.test_tok.select(range(32))
-
 
 class CustomClassificationHead(nn.Module):
     """

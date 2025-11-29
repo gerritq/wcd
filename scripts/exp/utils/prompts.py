@@ -1,7 +1,8 @@
 VANILLA_PROMPTS = {
     "en": {
         "system": (
-            "You are a classifier. Decide whether the given claim requires a citation.\n"
+            "You are a multilingual classifier. "
+            "Decide whether the given English claim requires a citation. "
             "Use 1 if the claim needs a citation. Use 0 if the claim does not need a citation.\n\n"
             "Return only JSON in the format: {\"label\": 0} or {\"label\": 1}. "
             "No explanations or extra text."
@@ -19,6 +20,23 @@ VANILLA_PROMPTS = {
         "system": (
             "You are a multilingual classifier. "
             "Decide whether the given Dutch claim requires a citation. "
+            "Use 1 if the claim needs a citation. Use 0 if the claim does not need a citation.\n\n"
+            "Return only JSON in the format: {\"label\": 0} or {\"label\": 1}. "
+            "No explanations or extra text."
+        ),
+        "user_claim": "Claim: {claim}",
+        "user_context": (
+            "Section: {section}\n"
+            "Previous Sentence: {previous_sentence}\n"
+            "Claim: {claim}\n"
+            "Subsequent Sentence: {subsequent_sentence}"
+        ),
+        "assistant": '{{"label": {label}}}'
+    },
+    "it": {
+        "system": (
+            "You are a multilingual classifier. "
+            "Decide whether the given Italian claim requires a citation. "
             "Use 1 if the claim needs a citation. Use 0 if the claim does not need a citation.\n\n"
             "Return only JSON in the format: {\"label\": 0} or {\"label\": 1}. "
             "No explanations or extra text."

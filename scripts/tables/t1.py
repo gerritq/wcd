@@ -6,7 +6,7 @@ from collections import defaultdict
 import sys
 from pathlib import Path
 
-print("new")
+print('new')
 
 BASE_DIR = os.getenv("BASE_WCD")
 SLM_DIR = os.path.join(BASE_DIR, "data/exp1")
@@ -22,12 +22,17 @@ MODEL_MAPPING =  {
     "llama3_3b": "meta-llama/Llama-3.2-3B-Instruct",
     "llama3_8b": "meta-llama/Llama-3.1-8B-Instruct",
     "llama3_70b": "meta-llama/Llama-3.3-70B-Instruct",
+    "llama3_8b_base": "meta-llama/Llama-3.1-8B",
     "qwen3_06b": "Qwen/Qwen3-0.6B",
     "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
     "qwen3_8b": "Qwen/Qwen3-8B",
+    "qwen3_8b_base": "Qwen/Qwen3-8B-Base",
     "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
     "qwen3_32b": "Qwen/Qwen3-32B",
     "gemma3_12b": "google/gemma-3-12b-it",
+    "gpt_oss": "openai/gpt-oss-20b",
+    "mistral_8b": "mistralai/Ministral-8B-Instruct-2410",
+    "ds_llama": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
     "aya": "CohereLabs/aya-101",
     "gpt-4o-mini": "openai/gpt-4o-mini",
     "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite"
@@ -48,6 +53,7 @@ def load_metrics(path):
 def load_slm_models(path: str, is_context: bool):
     root = Path(path)
     rows = defaultdict(dict)
+    count = defaultdict(int)
 
     for lang_dir in root.iterdir():
         if not lang_dir.is_dir():
@@ -85,11 +91,17 @@ def load_slm_models(path: str, is_context: bool):
                     # skip unknown models
                     continue
 
-                atl_flag = "atl" if meta["atl"] else "van"
-                model_name = f"{short_name} ({atl_flag})"
+                if meta["model_type"] == "classifier":
+                    variant = "(cl)"
+                else:
+                    variant = "(atl)" if meta["atl"] else "(van)"
+    
+                model_name = f"{short_name} {variant}"
 
                 dev_metrics = meta.get("dev_metrics", [])
                 test_metrics = meta.get("test_metrics", [])
+
+                count[(model_name, meta['lang'], is_context)] += 1
 
                 # go over epochs in *this* meta file
                 for dev_entry in dev_metrics:
@@ -120,7 +132,10 @@ def load_slm_models(path: str, is_context: bool):
                 m = best_for_run["model_name"]
                 l = best_for_run["lang"]
                 rows[m][l] = best_for_run["test_acc"]
-
+    print("="*20)
+    print("SLM COUNT")
+    print(count) 
+    print("="*20)  
     return rows
 
 def load_plm_models(path: str,
@@ -176,8 +191,10 @@ def load_plm_models(path: str,
         for l, s in v.items():
             if s:
                 rows[m][l] = s[1]
-    print("\n", f"Collection counts")
-    print(count)                
+    print("="*20)
+    print("PLM COUNT")
+    print(count) 
+    print("="*20)         
     return rows
 
 def latex_table(rows, context):
@@ -246,24 +263,24 @@ def merge_defaultdicts(d,d1):
 
 def main():
 
-    context = int(sys.argv[1])
-    assert context in [0,1], f"Context is not binary {context}"
-    context = bool(context)
+    for context in [True, False]:
+        print("="*20)
+        print(f"Context {context}")
+        print("="*20)
+        rows_plm = load_plm_models(path=PLM_DIR, 
+                            model_type="vanilla", 
+                            display_name='hp',
+                            context=context,
+                            training_size=-1 
+                            )
 
-    rows_plm = load_plm_models(path=PLM_DIR, 
-                           model_type="vanilla", 
-                           display_name='hp',
-                           context=context,
-                           training_size=-1 
-                           )
+        rows_slm = load_slm_models(path=SLM_DIR,
+                                is_context=context,)
+        
+        
+        r = merge_defaultdicts(rows_plm, rows_slm)
+        latex_table(r, context)
 
-    rows_slm = load_slm_models(path=SLM_DIR,
-                               is_context=context,)
-    
-    
-    r = merge_defaultdicts(rows_plm, rows_slm)
-    print(r)
-    latex_table(r, context)
 
 if __name__ == "__main__":
     main()

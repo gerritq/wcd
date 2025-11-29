@@ -75,11 +75,11 @@ def get_tokenizer(model_type: str, model_name: str, inference=False):
     # if tokenizer has no padding token, then reuse the end of sequence token
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    if tokenizer.model_max_length > 100_000:
-        tokenizer.model_max_length = 512*2 
     if model_type != "classifier":
         if not tokenizer.chat_template:
             raise Exception("tokenizer has not cha template.")
+    
+    tokenizer.model_max_length = 512
     return tokenizer
 
 def atl_loss_tokenize(example: dict,
@@ -227,6 +227,7 @@ def tokenize_fn(example: Dict,
     enc = tokenizer(
             example["text"],
             truncation=True,
+            max_length=tokenizer.model_max_length,
             return_attention_mask=True,
         )
     enc["labels"] = enc["input_ids"].copy()
@@ -293,6 +294,29 @@ def init_eval_collate_fn(tokenizer_test: PreTrainedTokenizerBase) -> Callable:
 
         return batch
     return eval_collate_fn
+
+
+def init_collate_classification_fn(tokenizer) -> Callable:
+    def collate_fn(features):
+        
+        batch_inputs = {
+            "input_ids": [f["input_ids"] for f in features],
+            "attention_mask": [f["attention_mask"] for f in features],
+        }
+
+        
+        batch = tokenizer.pad(
+            batch_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        labels = [int(f["labels"]) for f in features]
+        batch["labels"] = torch.tensor(labels, dtype=torch.long)
+
+        return batch
+
+    return collate_fn
 # --------------------------------------------------------------------------------------------------
 # Get data function wrapper
 # --------------------------------------------------------------------------------------------------
@@ -464,7 +488,7 @@ def prepare_data(args: Namespace,
 
     return train_tok, dev_train_tok, dev_test_tok, test_tok
 
-def get_data(args: Namespace,
+def get_data_lm(args: Namespace,
              tokenizer_train,
              tokenizer_test,
             ) -> tuple:
@@ -500,3 +524,102 @@ def get_data(args: Namespace,
     )
 
     return train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader
+
+def tokenize_fn_classification(example: Dict, 
+                              tokenizer: PreTrainedTokenizerBase
+    ):
+    """
+    Basic tok function.
+    Returns input_ids, am, and labels.
+    """
+    
+    enc = tokenizer(
+            example["text"],
+            truncation=True,
+            max_length=tokenizer.model_max_length,
+            return_attention_mask=True,
+        )
+    enc["labels"] = example["label"]
+    return enc    
+
+def get_data_classifier(args: Namespace,
+             tokenizer_train: PreTrainedTokenizerBase,
+            ) -> tuple:
+    
+    def build_context(example: dict) -> str:
+        text = (f"Section: {example['section']}\n"
+                f"Previous Sentence: {example['previous_sentence']}\n"
+                f"Claim: {example['claim']}"
+                f"Subsequent Sentence: {example['subsequent_sentence']}")
+        return text
+    
+    if args.explanation == "none":
+        data_dir = os.path.join(DATA_DIR, "main", args.lang)
+    if args.explanation == "basic":
+        data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
+
+    train, dev, test = get_all_data_sets(data_dir)
+    
+    # Tokenize function expects a text field
+    if args.context:
+        train = train.map(lambda x: {'text': build_context(x)})
+        dev = dev.map(lambda x: {'text': build_context(x)})
+        test = test.map(lambda x: {'text': build_context(x)})
+    else:
+        train = train.rename_column("claim", "text")
+        dev = dev.rename_column("claim", "text")
+        test = test.rename_column("claim", "text")       
+    
+    train_tok = train.map(tokenize_fn_classification, 
+                                   fn_kwargs={"tokenizer": tokenizer_train}, 
+                                   batched=False
+                                   )
+    dev_tok = dev.map(tokenize_fn_classification, 
+                                   fn_kwargs={"tokenizer": tokenizer_train}, 
+                                   batched=False
+                                   )
+    test_tok = test.map(tokenize_fn_classification, 
+                                   fn_kwargs={"tokenizer": tokenizer_train}, 
+                                   batched=False
+                                   )
+    
+    if args.smoke_test:
+        train_tok = train_tok.select(range(96))
+        dev_tok = dev_tok.select(range(96))
+        test_tok = test_tok.select(range(32))
+
+    train_dataloader = DataLoader(
+        train_tok,
+        shuffle=True,
+        batch_size=args.batch_size,
+        collate_fn=init_collate_classification_fn(tokenizer_train),
+    )
+
+    dev_dataloader = DataLoader(
+        dev_tok,
+        batch_size=EVAL_BATCH,
+        collate_fn=init_collate_classification_fn(tokenizer_train),
+    )
+
+    test_dataloader = DataLoader(
+        test_tok,
+        batch_size=EVAL_BATCH,
+        collate_fn=init_collate_classification_fn(tokenizer_train),
+    )
+    # return dev twice to match the return of lm
+    return train_dataloader, dev_dataloader, dev_dataloader, test_dataloader
+
+
+def get_data(args: Namespace,
+             tokenizer_train,
+             tokenizer_test,
+            ) -> tuple:
+    if args.model_type == "slm":
+        return get_data_lm(args,
+                           tokenizer_train,
+                           tokenizer_test,
+                           )
+    if args.model_type == "classifier":
+        return get_data_classifier(args,
+                                   tokenizer_train,
+                                   )

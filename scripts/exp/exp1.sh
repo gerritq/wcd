@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=exp1-van-hp-nl2-no-context
+#SBATCH --job-name=exp1-van-hp-it-context-512
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=15:00:00
+#SBATCH --time=03:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
@@ -27,31 +27,33 @@ get_run_number() {
 }
 
 # VARs
-MODEL_TYPE="slm" # classifier
-LANG="nl"
+MODEL_TYPE="slm" # classifier slm
+LANG="it"
 ATL=0
-MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b llama3_8b_base qwen3_8b_base
+MODEL_NAME="qwen3_06b" # qwen3_06b llama3_8b qwen3_8b llama3_8b_base qwen3_8b_base
 TRAINING_SIZE=5000
-CONTEXT=0
+CONTEXT=1
 
 QUANTIZATION=1
-SMOKE_TEST=0
+SMOKE_TEST=1
 NOTES=""
-PROMPT_EXTENSION="nl" # do not add "_"
+PROMPT_EXTENSION="" # do not add "_"
 
 # HPs (single)
-# EPOCHS=1
-# LR_LIST=(2e-4)
-# BATCH_SIZE=24
-# GRAD_NORM_LIST=(0.4)
-# WEIGHT_DECAY=0.01
+EPOCHS=1
+LR_LIST=(2e-4)
+BATCH_SIZE=24
+GRAD_NORM_LIST=(0.4)
+WEIGHT_DECAY=0.01
 
 # HPs (search - 9 combos)
-EPOCHS=3
-LR_LIST=(5e-4 2e-4 5e-5)
-BATCH_SIZE=24
-GRAD_NORM_LIST=(0.4 0.6 0.8)
-WEIGHT_DECAY=0.01
+# EPOCHS=3
+# LR_LIST=(5e-4 2e-4 5e-5)
+# LR_LIST=(5e-5)
+# BATCH_SIZE=24
+# GRAD_NORM_LIST=(0.4 0.6 0.8)
+# GRAD_NORM_LIST=(0.6 0.8)
+# WEIGHT_DECAY=0.01
 
 MODEL_LANG_DIR="${MODEL_DIR}/${LANG}"
 mkdir -p "$MODEL_LANG_DIR"

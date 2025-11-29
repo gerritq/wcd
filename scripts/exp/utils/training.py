@@ -6,6 +6,7 @@ from torch.optim import AdamW
 from tqdm.auto import tqdm
 from argparse import Namespace
 import time
+from torch.amp import autocast
 
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from transformers import PreTrainedTokenizerBase, get_linear_schedule_with_warmup
@@ -18,7 +19,16 @@ else:
     device = torch.device("cpu")
 
 from transformers import set_seed
+
 set_seed(42)
+use_bf16 = (
+    torch.cuda.is_available()
+    and torch.cuda.is_bf16_supported()
+)
+print("="*20)
+print(f'Using device: {device}')
+print(f'Using bf16: {use_bf16}')
+print("="*20)
 
 def get_optimizer(model: Module,
                   args: Namespace) -> Optimizer:
@@ -47,6 +57,7 @@ def train(args: Namespace,
     ):
     
     start = time.time()
+    model.to(device)
     optimizer = get_optimizer(args=args, model=model)
     num_training_steps = args.epochs * len(train_dataloader)
     warmup_steps = int(0.03 * num_training_steps)
@@ -70,16 +81,23 @@ def train(args: Namespace,
         total_batches = len(train_dataloader)
 
         for batch_idx, batch in enumerate(train_dataloader):
+
             batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
+            
+            with autocast(
+                device_type='cuda',
+                dtype=torch.bfloat16,
+                enabled=use_bf16
+            ):
+                outputs = model(**batch)
+                loss = outputs.loss
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.max_grad_norm)
 
             optimizer.step()
             scheduler.step() 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             # Train loss
             if batch_idx % args.train_log_step == 0:
@@ -93,6 +111,7 @@ def train(args: Namespace,
 
             # Dev loss
             if batch_idx % (args.train_log_step * 3) == 0:
+                
                 eval_loss = evaluate_dev_loss(model, dev_train_dataloader)
                 print(f"Epoch {epoch} | "
                       f"Batch {batch_idx+1}/{total_batches} | "
@@ -112,24 +131,26 @@ def train(args: Namespace,
         
         print("\n", "="*20)
         print("DEV SET EVALUATION ...")
-        metrics = evaluate_slm(
-            model=model,
-            explanation_flag=args.evaluation_explanation_flag,
-            tokenizer_test=tokenizer_test,
-            dataloader=dev_test_dataloader
-        )
+
+        metrics = evaluate_wrapper(
+                    model_type=args.model_type,
+                    model=model,
+                    explanation_flag=args.evaluation_explanation_flag,
+                    tokenizer_test=tokenizer_test,
+                    dataloader=dev_test_dataloader
+                    )
 
         dev_metrics.append({'epoch': epoch, "metrics": metrics})
 
         print("\n", "="*20)
         print("TEST SET EVALUATION ...")
-        metrics = evaluate_slm(
-            model=model,
-            explanation_flag=args.evaluation_explanation_flag,
-            tokenizer_test=tokenizer_test,
-            dataloader=test_dataloader
-        )
-
+        metrics = evaluate_wrapper(
+                    model_type=args.model_type,
+                    model=model,
+                    explanation_flag=args.evaluation_explanation_flag,
+                    tokenizer_test=tokenizer_test,
+                    dataloader=test_dataloader
+                    )
         test_metrics.append({'epoch': epoch, "metrics": metrics})
 
     end = time.time()
@@ -141,7 +162,7 @@ def evaluate_slm(model: Module,
                  tokenizer_test,
                  dataloader: torch.utils.data.DataLoader
                  ) -> dict[str, float]:
-    
+    """Test set evluation for SLM models"""
     progress_bar = tqdm(range(len(dataloader)))
 
     model.eval()
@@ -225,11 +246,80 @@ def evaluate_dev_loss(model: Module,
     with torch.no_grad():
         for batch in dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
+            with autocast(
+                device_type="cuda",
+                dtype=torch.bfloat16,
+                enabled=use_bf16,
+            ):
+                outputs = model(**batch)
+                loss = outputs.loss
+            
             total_loss += loss.item()
             n_batches += 1
 
             progress_bar.update(1)
 
     return round(total_loss / n_batches, 4)
+
+def evaluate_classification(model: torch.nn.Module,
+                            dataloader: torch.utils.data.DataLoader
+                            ) -> dict[str, float]:
+    """"Evaluation for classification models"""
+    model.eval()
+
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Evaluating (classification) ..."):
+            labels = batch["labels"]
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+
+            outputs = model(input_ids=input_ids,
+                            attention_mask=attention_mask)
+            logits = outputs.logits
+
+            # 2 classes
+            preds = torch.argmax(logits, dim=-1)
+
+            all_preds.extend(preds.cpu().tolist())
+            all_labels.extend(labels.tolist())
+
+    # Compute metrics
+    accuracy = accuracy_score(all_labels, all_preds)
+    f1 = f1_score(all_labels, all_preds)
+    cm = confusion_matrix(all_labels, all_preds, labels=[0, 1])
+    tn, fp, fn, tp = cm.ravel()
+
+    print("\n" + "=" * 20)
+    print(f"\tAccuracy: {accuracy:.4f}")
+    print(f"\tF1:       {f1:.4f}")
+    print("=" * 20 + "\n")
+
+    return {
+        "accuracy": float(accuracy),
+        "f1": float(f1),
+        "tp": int(tp),
+        "fp": int(fp),
+        "tn": int(tn),
+        "fn": int(fn),
+        "n_total": len(all_labels),
+    }
+
+def evaluate_wrapper(model_type: str,
+                  model: Module,
+                  explanation_flag: bool,
+                  tokenizer_test,
+                  dataloader: DataLoader) -> float:
+    """Wrapper for test set evaluation"""
+    if model_type == "classifier":
+        metrics = evaluate_classification(model=model, 
+                                          dataloader=dataloader)
+        return metrics
+    if model_type == "slm":
+        metrics = evaluate_slm(model=model, 
+                              explanation_flag=explanation_flag,
+                              tokenizer_test=tokenizer_test,
+                              dataloader=dataloader)
+        return metrics

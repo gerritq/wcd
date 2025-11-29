@@ -108,9 +108,11 @@ def main():
     )
 
     # Just for generation
-    slm.model.generation_config.pad_token_id = tokenizer_test.pad_token_id
+    if not slm.model.config.pad_token_id:
+        slm.model.config.pad_token_id = tokenizer_test.pad_token_id
 
     train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader = get_data(
+        
         args=args, 
         tokenizer_train=tokenizer_train,
         tokenizer_test=tokenizer_test, 

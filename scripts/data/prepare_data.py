@@ -9,8 +9,8 @@ SEED = 42
 random.seed(SEED)
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
-IN_DIR = os.path.join(BASE_DIR, "data/sents_new")
-OUT_DIR = os.path.join(BASE_DIR, "data/sets_new")
+IN_DIR = os.path.join(BASE_DIR, "data/sents")
+OUT_DIR = os.path.join(BASE_DIR, "data/sets/main")
 
 def load_data(lang: str) -> list:
     path = os.path.join(IN_DIR, f"{lang}_sents.json")
@@ -205,18 +205,18 @@ def build_random_test_set(lang: str, total_n: int):
 def main():
 
     languages  = [
-        "en",  # English
-        "nl",  # Dutch
-        # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-        # "it",  # Italian
-        # "pt",  # Portuguese
-        # "ro",  # Romanian
-        # "ru",  # Russian
-        # "uk",  # Ukrainian
-        # "bg",  # Bulgarian
-        # "id",   # Indonesian
-        # "vi",
-        # "tr"
+        # "en",  # English
+        # "nl",  # Dutch
+        "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
+        "it",  # Italian
+        "pt",  # Portuguese
+        "ro",  # Romanian
+        "ru",  # Russian
+        "uk",  # Ukrainian
+        "bg",  # Bulgarian
+        "id",   # Indonesian
+        "vi",
+        "tr"
     ]
     
     # set n
