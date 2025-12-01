@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040,erc-hpc-comp050
 
 # comp050 slow
 # comp039 has error
@@ -17,11 +17,11 @@ nvidia-smi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # VARs
-MAIN=0
+MAIN=1
 MODEL_TYPE="classifier" # classifier slm
 LANG="en"
 ATL=0
-CONTEXT=0
+CONTEXT=1
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b
 TRAINING_SIZE=5000

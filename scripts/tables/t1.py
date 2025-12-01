@@ -40,7 +40,7 @@ MODEL_MAPPING =  {
 
 MODEL_MAPPING_REVERSE = {v: k for k, v in MODEL_MAPPING.items()}
 
-run_re = re.compile(r"run_\d+")
+run_re = re.compile(r"run_\w+")
 meta_re = re.compile(r"meta_\d+")
 
 
@@ -96,7 +96,7 @@ def load_slm_models(path: str, is_context: bool):
                 else:
                     variant = "(atl)" if meta["atl"] else "(van)"
     
-                model_name = f"{short_name} {variant}"
+                model_name = f"{short_name} {variant}".replace("_", "-")
 
                 dev_metrics = meta.get("dev_metrics", [])
                 test_metrics = meta.get("test_metrics", [])

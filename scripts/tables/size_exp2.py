@@ -73,7 +73,7 @@ def plot_training_vs_accuracy(runs, out_path: str):
     plt.close()
 
 def main():
-    LANGS  = ["en", "nl", "it"]
+    LANGS  = ["en", "nl", "it" ,"bg"]
     for lang in LANGS:
         # check if dir exists
         lang_dir = os.path.join(EXP2_DIR, f"{lang}")
