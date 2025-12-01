@@ -4,10 +4,11 @@ from transformers import AutoTokenizer
 # LLaMA tokenizer
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B")
 
-data_dir = "/scratch/prj/inf_nlg_ai_detection/wcd/data/sets/main/nl"
+data_dir = "/scratch/prj/inf_nlg_ai_detection/wcd/data/sets/main/it"
 ds = load_from_disk(data_dir)
 
 dataset = ds["train"]
+
 prompt =(   "You are a multilingual classifier. "
             "Decide whether the given English claim requires a citation. "
             "Use 1 if the claim needs a citation. Use 0 if the claim does not need a citation.\n\n"
@@ -24,7 +25,8 @@ def concat_fields(example):
     prev = example.get(PREV_COL, "") or ""
     claim = example.get(CLAIM_COL, "") or ""
     nxt = example.get(NEXT_COL, "") or ""
-    text = " ".join([s for s in [prompt,  prev, claim, nxt] if s.strip()])
+    # text = " ".join([s for s in [prompt,  prev, claim, nxt] if s.strip()])
+    text = " ".join([s for s in [prev, claim, nxt] if s.strip()])
 
     title = example.get(TITLE_COL, "") or ""
 
@@ -47,6 +49,12 @@ sorted_indices = sorted(
     key=lambda i: dataset_with_concat[i]["tok_len"],
     reverse=True,
 )
+
+n_above = len([x for x in dataset_with_concat if x["tok_len"] > 500])
+print("Larger than 500", n_above)
+
+n_above = len([x for x in dataset_with_concat if x["concat_len"] > 1000])
+print("Larger than 1k chars", n_above)
 
 top10_indices = sorted_indices[:10]
 

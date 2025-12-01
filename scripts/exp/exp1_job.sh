@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=e1-cls-en-c0
+#SBATCH --job-name=exp1
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=10:00:00
@@ -12,17 +12,25 @@
 # comp050 slow
 # comp039 has error
 
+set -euo pipefail
+
 nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# VARs
-MAIN=0
-MODEL_TYPE="classifier" # classifier slm
-LANG="en"
-ATL=0
-CONTEXT=0
+LANG="$1"
+CONTEXT="$2"
+MODEL_TYPE="$3"
+ATL="$4"
 
+echo "Running with:"
+echo "  LANG       = $LANG"
+echo "  CONTEXT    = $CONTEXT"
+echo "  MODEL_TYPE = $MODEL_TYPE"
+echo "  ATL        = $ATL"
+echo
+
+MAIN=1
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b
 TRAINING_SIZE=5000
 SMOKE_TEST=0
@@ -31,13 +39,6 @@ EXP_N=1
 QUANTIZATION=1
 PROMPT_EXTENSION="" # do not add "_"
 NOTES=""
-
-# HPs (single)
-# EPOCHS=1
-# LR_LIST=(2e-4)
-# BATCH_SIZE=24
-# GRAD_NORM_LIST=(0.4)
-# WEIGHT_DECAY=0.01
 
 # HPs (search - 9 combos)
 EPOCHS=3
@@ -53,14 +54,19 @@ else
     MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1_test"
 fi
 
-# Create a uniqure run dir
+# Create a unique run dir
 MODEL_LANG_DIR="${MODEL_DIR}/${LANG}"
 mkdir -p "$MODEL_LANG_DIR"
 RUN_DIR=$(mktemp -d "${MODEL_LANG_DIR}/run_XXXXXX")
 
+echo "Run directory: $RUN_DIR"
+echo
+
+
 for LR in "${LR_LIST[@]}"; do
     for GN in "${GRAD_NORM_LIST[@]}"; do
 
+      echo ">>> Starting run with LR=$LR, max_grad_norm=$GN"
       uv run run.py \
         --model_type "$MODEL_TYPE" \
         --model_name "$MODEL_NAME" \
@@ -80,5 +86,7 @@ for LR in "${LR_LIST[@]}"; do
         --prompt_extension "$PROMPT_EXTENSION" \
         --experiment_number "$EXP_N"
 
+      echo "<<< Finished run with LR=$LR, max_grad_norm=$GN"
+      echo
     done
 done

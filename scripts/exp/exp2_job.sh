@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=e2-cls-it
+#SBATCH --job-name=e2-cls-bg
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=04:00:00
@@ -15,10 +15,14 @@ nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# VARs
-MODEL_TYPE="classifier" # classifier slm
-LANG="it"
-ATL=0
+MODEL_TYPE="${1}"
+LANG="${2}"           
+ATL="${3}"                  
+
+echo "Running exp2 with:"
+echo "  MODEL_TYPE = ${MODEL_TYPE}"
+echo "  LANG       = ${LANG}"
+echo "  ATL        = ${ATL}"
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b
 CONTEXT=1
@@ -29,7 +33,6 @@ EXP_N=2
 QUANTIZATION=1
 NOTES=""
 
-# Explanation
 EXPLANATION="none"
 ANNOTATION_TYPE=""
 

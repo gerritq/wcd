@@ -75,7 +75,7 @@ def train(args: Namespace,
     dev_metrics = []
     test_metrics = []
 
-    for epoch in range(args.epochs):
+    for epoch in range(1, args.epochs + 1):
         model.train() 
         total_loss = 0.0
         total_batches = len(train_dataloader)

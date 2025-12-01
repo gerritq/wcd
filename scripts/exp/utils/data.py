@@ -20,17 +20,72 @@ set_seed(42)
 
 EVAL_BATCH=16
 
+PROMPT_LANGUAGE_MAP = {"en": "English",
+                       "nl": "Dutch",
+                       "no": "Norwegian",
+                       "it": "Italian",
+                       "pt": "Portuguese",
+                       "ro": "Romanian",
+                       "ru": "Russian",
+                       "uk": "Ukrainian",
+                       "bg": "Bulgarian",
+                       "id": "Indonesian",
+                       "vi": "Vietnamese",
+                       "tr": "Turkish"
+                        }
+
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets")
 MODEL_DIR = os.path.join(BASE_DIR, "data/exp2")
 
-def get_all_data_sets(path: str) -> List[Dataset]:
+def filter_long_context_examples(example: dict) -> bool:
+    max_chars = 1000
+
+    text = (
+        f"Section: {example['section']}\n"
+        f"Previous Sentence: {example['previous_sentence']}\n"
+        f"Claim: {example['claim']}\n"
+        f"Subsequent Sentence: {example['subsequent_sentence']}"
+    )
+
+    return len(text) <= max_chars
+
+def get_all_data_sets(args: Namespace, path: str) -> List[Dataset]:
     """
-    Takes a path and language.
-    Returns all three datasets.
+    Takes args and path. Loads data, renames lang to match the language name expected in promtps,
+    and filter overly long context items.
+    Return train, dev, test/
     """
     ds = load_from_disk(path)
-    return ds['train'], ds['dev'], ds['test']
+
+    # change the lang name
+    for split in ["train", "dev", "test"]:
+        ds[split] = ds[split].map(
+            lambda x: {**x, "lang": PROMPT_LANGUAGE_MAP[x["lang"]]}
+        )
+
+    if args.context:
+        train_before = len(ds["train"])
+        dev_before   = len(ds["dev"])
+        test_before  = len(ds["test"])
+
+        # filter out those long context items due to oom errors
+        ds["train"] = ds["train"].filter(filter_long_context_examples)
+        ds["dev"]   = ds["dev"].filter(filter_long_context_examples)
+        ds["test"]  = ds["test"].filter(filter_long_context_examples)
+
+        train_removed = train_before - len(ds["train"])
+        dev_removed   = dev_before - len(ds["dev"])
+        test_removed  = test_before - len(ds["test"])
+
+        print("="*20)
+        print("Filtered long-context examples:")
+        print(f"Train removed: {train_removed}")
+        print(f"Dev removed:   {dev_removed}")
+        print(f"Test removed:  {test_removed}")
+        print("="*20)
+
+    return ds["train"], ds["dev"], ds["test"]
 
 def resample_data(ds: Dataset, total_size: int) -> Dataset:
     """
@@ -92,7 +147,7 @@ def atl_loss_tokenize(example: dict,
     Returns a tokenized dataset which is not padded!
     """
     # Build messages
-    system_msg = prompt['system']
+    system_msg = prompt['system'].format(**example)
     user_msg = prompt['user'].format(**example)
     assistant_msg = prompt['assistant'].format(**example)
 
@@ -154,7 +209,7 @@ def preprocess_function_training(example: dict,
     Takes an example, applies the chat template, and returns it.
     """
 
-    system = prompt_template['system']
+    system = prompt_template['system'].format(**example)
     user = prompt_template['user'].format(**example)
     assistant = prompt_template['assistant'].format(**example)
     
@@ -176,7 +231,7 @@ def preprocess_function_generation(example: dict,
     """
     Preprocess function for evaluation -- set generation to true and no assitant message.
     """
-    system = prompt_template['system']
+    system = prompt_template['system'].format(**example)
     user = prompt_template['user'].format(**example)
     
     messages = {
@@ -331,14 +386,14 @@ def prepare_data(args: Namespace,
     
     if args.explanation == "none":
         data_dir = os.path.join(DATA_DIR, "main", args.lang)
-        prompt = prompts.VANILLA_PROMPTS[args.lang+prompt_extension]
+        prompt = prompts.VANILLA_PROMPTS
     if args.explanation == "basic":
         data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
-        prompt = prompts.RATIONALE_LABEL_PROMPTS[args.lang+prompt_extension]
+        prompt = prompts.RATIONALE_LABEL_PROMPTS
     if args.explanation == "mix":
         data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
-        prompt = prompts.VANILLA_PROMPTS[args.lang+prompt_extension] # label prompt
-        prompt_rationale = prompts.RATIONALE_PROMPTS[args.lang+prompt_extension] # rationale prompt
+        prompt = prompts.VANILLA_PROMPTS # label prompt
+        prompt_rationale = prompts.RATIONALE_PROMPTS # rationale prompt
         prompt_rationale['user'] = (prompt_rationale['user_context'] if args.context 
                         else prompt_rationale['user_claim']
                         )
@@ -349,7 +404,7 @@ def prepare_data(args: Namespace,
                     )
 
     # Get all data
-    train, dev, test = get_all_data_sets(data_dir)
+    train, dev, test = get_all_data_sets(args=args, path=data_dir)
 
     # Resample training
     if args.training_size < len(train):
@@ -558,8 +613,16 @@ def get_data_classifier(args: Namespace,
     if args.explanation == "basic":
         data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
 
-    train, dev, test = get_all_data_sets(data_dir)
+    train, dev, test = get_all_data_sets(args=args, path=data_dir)
     
+    if args.training_size < len(train):
+        print("="*20)
+        print(f"Len original training data {len(train)}")
+        train = resample_data(train, args.training_size)
+        print("="*20)
+        print(f"Training data resampled to {len(train)}")
+        print("="*20)
+        
     # Tokenize function expects a text field
     if args.context:
         train = train.map(lambda x: {'text': build_context(x)})

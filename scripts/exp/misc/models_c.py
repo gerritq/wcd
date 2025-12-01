@@ -26,9 +26,6 @@ from transformers.modeling_layers import GenericForSequenceClassification
 from transformers.models.qwen3.modeling_qwen3 import Qwen3PreTrainedModel
 from transformers.models.llama.modeling_llama import LlamaPreTrainedModel
 
-from transformers import PreTrainedModel
-from transformers.modeling_outputs import SequenceClassifierOutput
-
 # --------------------------------------------------------------------------------------------------
 # Config
 # --------------------------------------------------------------------------------------------------
@@ -44,14 +41,29 @@ print(f'Using bf16 to load the model: {use_bf16}')
 print("="*20)
 
 MODEL_MAPPING =  {
+    "mBert": "google-bert/bert-base-multilingual-uncased",
+    "xlm-r-b": "FacebookAI/xlm-roberta-base",
+    "xlm-r-l": "FacebookAI/xlm-roberta-large",
+    "mDeberta-b": "microsoft/mdeberta-v3-base",
+    "mDeberta-l": "microsoft/deberta-v3-large",
     "llama3_1b": "meta-llama/Llama-3.2-1B-Instruct",
     "llama3_3b": "meta-llama/Llama-3.2-3B-Instruct",
     "llama3_8b": "meta-llama/Llama-3.1-8B-Instruct",
+    "llama3_70b": "meta-llama/Llama-3.3-70B-Instruct",
     "llama3_8b_base": "meta-llama/Llama-3.1-8B",
     "qwen3_06b": "Qwen/Qwen3-0.6B",
     "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
     "qwen3_8b": "Qwen/Qwen3-8B",
     "qwen3_8b_base": "Qwen/Qwen3-8B-Base",
+    "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "qwen3_32b": "Qwen/Qwen3-32B",
+    "gemma3_12b": "google/gemma-3-12b-it",
+    "gpt_oss": "openai/gpt-oss-20b",
+    "mistral_8b": "mistralai/Ministral-8B-Instruct-2410",
+    "ds_llama": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+    "aya": "CohereLabs/aya-101",
+    "gpt-4o-mini": "openai/gpt-4o-mini",
+    "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite"
     }
 
 BNB_CONFIG = BitsAndBytesConfig(
@@ -167,67 +179,104 @@ class SLM(LM):
         )
 
 class SLMClassifier(LM):
+    """
+    Class that uses a Classification Head instead of a LM head.
+    """
     def __init__(self, 
-                 model_type: str, 
+                 model_type: str,
                  model_name: str, 
-                 quantization: bool):
-        super().__init__(model_type=model_type, 
+                 quantization: bool,
+    ):
+        super().__init__(model_type=model_type,
                          model_name=model_name, 
-                         quantization=quantization)
-
-        self.FamilyPretrainedModel = Qwen3PreTrainedModel if "qwen" in model_name else LlamaPreTrainedModel
-
-    def build(self):
-        class CustomGenericForSequenceClassification(GenericForSequenceClassification, self.FamilyPretrainedModel):
-            """This is a custom `GenericForSequenceClassification` class whicih replaces the default
-            classification head
-            """
-            def __init__(self, config, base_model: nn.Module):
-                super().__init__(config)
-                self.num_labels = config.num_labels
-                # Similar to `self.model = AutoModel.from_config(config)` but allows to change the base model name if needed in the child class
-                
-                # We pass the quantised base_model
-                # setattr(self, self.base_model_prefix, AutoModel.from_config(config))
-                setattr(self, self.base_model_prefix, base_model)
-                
-                # We replace the self.score default implementation with our classification head
-                # self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
-                self.score = CustomClassificationHead(config.hidden_size, self.num_labels)
-                
-                # Initialize weights and apply final processing
-                self.post_init()
-                
-        base_model = AutoModel.from_pretrained(
-                        self.model_name,
-                        quantization_config=self.bnb_config,
-                        num_labels=2,
-                        device_map="auto",
-                        trust_remote_code=True,
-                        attn_implementation=self.attn_impl,
-                        dtype=torch.bfloat16 if use_bf16 else "auto",
+                         quantization=quantization, 
+                        
         )
-
+        
+        # Family model that is inherited in `Family`ModelForSequenceClassification
+        self.FamilyPretrainedModel = {"qwen3": Qwen3PreTrainedModel,
+                                      "llama": LlamaPreTrainedModel}
     
-        config = base_model.config
+    def build(self):
+        config = AutoConfig.from_pretrained(self.model_name)
+        # Needs to be set as the GenericClass uses the config (not model) to select the pad tok
         if config.pad_token_id is None:
             tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             config.pad_token_id = tokenizer.pad_token_id
 
-        model = CustomGenericForSequenceClassification(config=config, base_model=base_model)
+        FamilyPretrainedModel = self.FamilyPretrainedModel[config.model_type]
 
+        class CustomModelForSequenceClassification(CustomGenericForSequenceClassification,
+                                                   FamilyPretrainedModel):
+            pass
+
+        # Build model with our custom class
+        model = CustomModelForSequenceClassification.from_pretrained(self.model_name,
+                                                                    quantization_config=self.bnb_config,
+                                                                    device_map="auto",
+                                                                    dtype=torch.bfloat16 if use_bf16 else "auto",
+                                                                    trust_remote_code=True,
+                                                                    config=config,
+                                                                    attn_implementation=self.attn_impl,
+                                                                )
+        
+        # Quant
         if self.quantization:
             model = prepare_model_for_kbit_training(model)
         model = get_peft_model(model, self.lora_config)
 
-        model.gradient_checkpointing_enable()
+        # This does the trick to enable check pointing: https://discuss.huggingface.co/t/i-used-to-have-no-problem-with-peft-fine-tuning-after-hundreds-of-trainings-but-now-i-have-encountered-the-error-runtimeerror-element-0-of-tensors-does-not-require-grad-and-does-not-have-a-grad-fn/168829/3
+        # Set checkpointing to false in trainer args        
+        model.gradient_checkpointing_enable()  # PEFT + checkpointing
         model.enable_input_require_grads()
-        model.config.use_cache = False
+        model.config.use_cache = False     # disable cache
         model.print_trainable_parameters()
-
+        
         self.model = model
+
+        print(model)
         self._print_setting()
+
         return self
+
+    # def build(self):
+    #     """
+    #     Overwrite the build function to accomodate classification head.
+    #     """
+        
+    #     # Load model and replace classification head
+    #     model = AutoModelForSequenceClassification.from_pretrained(
+    #         self.model_name,
+    #         quantization_config=self.bnb_config,
+    #         num_labels=2,
+    #         device_map="auto",
+    #         trust_remote_code=True,
+    #         attn_implementation=self.attn_impl,
+    #         dtype=torch.bfloat16 if use_bf16 else "auto",
+    #     )
+
+    #     # Replace classification head
+    #     hidden_size = model.config.hidden_size
+    #     num_labels = model.config.num_labels
+    #     model.score = CustomClassificationHead(hidden_size, num_labels)
+        
+    #     # Quant
+    #     if self.quantization:
+    #         model = prepare_model_for_kbit_training(model)
+    #     model = get_peft_model(model, self.lora_config)
+
+    #     # This does the trick to enable check pointing: https://discuss.huggingface.co/t/i-used-to-have-no-problem-with-peft-fine-tuning-after-hundreds-of-trainings-but-now-i-have-encountered-the-error-runtimeerror-element-0-of-tensors-does-not-require-grad-and-does-not-have-a-grad-fn/168829/3
+    #     # Set checkpointing to false in trainer args        
+    #     model.gradient_checkpointing_enable()  # PEFT + checkpointing
+    #     model.enable_input_require_grads()  
+    #     model.config.use_cache = False         # disable cache
+    #     model.print_trainable_parameters()
+        
+    #     self.model = model
+
+    #     self._print_setting()
+
+    #     return self
 
 class CustomClassificationHead(nn.Module):
     """
@@ -263,6 +312,33 @@ class CustomClassificationHead(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
+class CustomGenericForSequenceClassification(GenericForSequenceClassification):
+    """This is a custom `GenericForSequenceClassification` class whicih replaces the default
+    classification head
+    """
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        # Similar to `self.model = AutoModel.from_config(config)` but allows to change the base model name if needed in the child class
+        setattr(self, self.base_model_prefix, AutoModel.from_config(config))
+        # We replace the self.score default implementation with our classification head
+        # self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
+        # self.score = CustomClassificationHead(config.hidden_size, self.num_labels)
+
+        intermediate1 = config.hidden_size // 2
+        intermediate2 = intermediate1 // 2
+        self.score = nn.Sequential(
+            nn.Linear(config.hidden_size, intermediate1),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(intermediate1, intermediate2),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(intermediate2, self.num_labels, bias=False)
+        )
+        # Initialize weights and apply final processing
+        self.post_init()
 
 SLM_REGISTRY = {
     "slm": SLM,
