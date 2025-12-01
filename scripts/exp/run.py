@@ -1,3 +1,5 @@
+from email import parser
+import uuid
 from utils.training import train
 from utils import prompts
 from utils.models import build_slm, MODEL_MAPPING
@@ -9,6 +11,8 @@ import argparse
 from transformers import set_seed
 import os
 import json
+import tempfile
+import copy
 """
 - classifier class needs different data processing
 
@@ -18,6 +22,7 @@ BASE_DIR = os.getenv("BASE_WCD")
 EX1 = os.path.join(BASE_DIR, "data/exp1")
 EX2 = os.path.join(BASE_DIR, "data/exp2")
 EX3 = os.path.join(BASE_DIR, "data/exp3")
+EX4 = os.path.join(BASE_DIR, "data/exp4")
 
 
 def get_save_path(args):
@@ -53,6 +58,16 @@ def get_save_path(args):
 
             save_path = os.path.join(EX2, args.lang, save_name+".json")
 
+    if args.experiment_number == 4:
+        if args.smoke_test:
+            test_dir = os.path.join(EX4, "smoke_test")
+            os.makedirs(test_dir, exist_ok=True)
+            model_number = get_model_number(test_dir)
+            save_path = os.path.join(test_dir, f"meta_{model_number}.json")
+        else:
+            model_number = get_model_number(args.ft_model_dir)
+            save_path = os.path.join(args.ft_model_dir, f"meta_{model_number}.json")
+    
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)
 
@@ -72,29 +87,7 @@ def get_model_number(model_dir: str) -> int:
 
     return max(numbers) + 1 if numbers else 1
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_type", type=str, required=True)
-    parser.add_argument("--model_name", type=str, required=True)
-    parser.add_argument("--lang", type=str, required=True)
-    parser.add_argument("--atl", type=int, required=True)
-    parser.add_argument("--context", type=int, required=True)
-    parser.add_argument("--quantization", type=int, required=True)
-    parser.add_argument("--smoke_test", type=int, required=True)
-    parser.add_argument("--training_size", type=int, required=True)
-    parser.add_argument("--run_dir", type=str, default="")
-    parser.add_argument("--notes", type=str, required=True)
-    parser.add_argument("--explanation", type=str, default="none")
-    parser.add_argument("--epochs", type=int, required=True)
-    parser.add_argument("--learning_rate", type=float, required=True)
-    parser.add_argument("--batch_size", type=int, required=True)
-    parser.add_argument("--max_grad_norm", type=float, required=True)
-    parser.add_argument("--weight_decay", type=float, required=True)
-    parser.add_argument("--train_log_step", type=int, default=20)
-    parser.add_argument("--prompt_extension", type=str, default="")
-    parser.add_argument("--experiment_number", type=int, required=True)
-    parser.add_argument("--annotation_type", type=str, default="")
-    args = parser.parse_args()
+def single_stage_training(args):
 
     # checks and turn to bool
     assert (
@@ -105,7 +98,7 @@ def main():
         ), "Incorrect boolean values"
 
     if args.model_type not in ['slm', 'classifier']:
-        raise ValueError(f"Unknown model type: {model_type}")
+        raise ValueError(f"Unknown model type: {args.model_type}")
 
     args.smoke_test = bool(args.smoke_test)
     args.quantization = bool(args.quantization)
@@ -118,9 +111,12 @@ def main():
     save_path = get_save_path(args)
 
     # Get hf model name
-    suffix = "_base" if args.model_type == "classifier" else ""
-    args.model_name = MODEL_MAPPING[args.model_name+suffix]
-    
+    if getattr(args, 'ft_model_dir', ""):
+        load_model = args.ft_model_dir
+    else:
+        suffix = "_base" if args.model_type == "classifier" else ""
+        load_model = MODEL_MAPPING[args.model_name+suffix]
+        
     meta = vars(args).copy()
 
     set_seed(42)
@@ -143,7 +139,7 @@ def main():
     print("="*20)
     
     slm = build_slm(model_type=args.model_type, 
-                    model_name=args.model_name,
+                    model_name=load_model,
                     quantization=args.quantization,
     )
 
@@ -187,8 +183,84 @@ def main():
     meta['dev_metrics'] = dev_metrics
     meta['test_metrics'] = test_metrics
 
+    # save model
+    if args.save_checkpoint:
+        slm.model.save_pretrained(args.ft_model_dir)
+
     with open(save_path, "w") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
+
+    return meta
+
+def two_stage_training(args):
+    
+    stage1_args = copy.deepcopy(args)
+    stage1_args.training_size = 10*100000
+    print("="*20)
+    print(f"STAGE 1: SOURCE LANGUAGE TRAINING  {args.training_langs}")
+    print(f"TEST LANGUAGE: {args.test_lang}")
+    print("="*20)
+
+    # add saving checkpoint flag
+    stage1_args.save_checkpoint = True
+
+    # create a random folder with tempfile
+    ft_model_dir = os.path.join(EX4, stage1_args.test_lang)
+    os.makedirs(ft_model_dir, exist_ok=True)
+    ft_model_dir = tempfile.mkdtemp(dir=ft_model_dir)
+    stage1_args.ft_model_dir = ft_model_dir
+        
+    stage_1_meta = single_stage_training(stage1_args)
+    
+    print("="*20)
+    print(f"STAGE 2: EVALUATION ON TARGET LANGUAGE  {args.test_lang}")
+    print("="*20)
+
+    stage2_args = copy.deepcopy(args)
+    stage2_args.experiment_number = 1
+    stage2_args.lang = args.test_lang
+    stage2_args.ft_model_dir = ft_model_dir
+
+    for training_size in [100, 200, 300,]:
+        stage2_args.training_size = training_size
+        print("="*20)
+        print(f"Fine-tuning with training size: {training_size} ---")
+        stage_2_meta = single_stage_training(stage2_args)
+
+def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_type", type=str, required=True)
+    parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--lang", type=str, required=True)
+    parser.add_argument("--atl", type=int, required=True)
+    parser.add_argument("--context", type=int, required=True)
+    parser.add_argument("--quantization", type=int, required=True)
+    parser.add_argument("--smoke_test", type=int, required=True)
+    parser.add_argument("--training_size", type=int, required=True)
+    parser.add_argument("--run_dir", type=str, default="")
+    parser.add_argument("--notes", type=str, required=True)
+    parser.add_argument("--explanation", type=str, default="none")
+    parser.add_argument("--epochs", type=int, required=True)
+    parser.add_argument("--learning_rate", type=float, required=True)
+    parser.add_argument("--batch_size", type=int, required=True)
+    parser.add_argument("--max_grad_norm", type=float, required=True)
+    parser.add_argument("--weight_decay", type=float, required=True)
+    parser.add_argument("--train_log_step", type=int, default=20)
+    parser.add_argument("--prompt_extension", type=str, default="")
+    parser.add_argument("--experiment_number", type=int, required=True)
+    parser.add_argument("--training_langs", nargs="+", default=[])
+    parser.add_argument("--test_lang", type=str, required=True)
+    parser.add_argument("--ft_model_dir", type=str, default="")
+    parser.add_argument("--save_checkpoint", type=int, default=0)
+    args = parser.parse_args()        
+
+    args.save_checkpoint = bool(args.save_checkpoint)
+
+    if args.experiment_number == 1 or args.experiment_number == 2:
+        single_stage_training(args)
+    else:
+        two_stage_training(args)
 
 if __name__ == "__main__":
     main()

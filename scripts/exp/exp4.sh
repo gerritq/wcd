@@ -17,7 +17,9 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # VARs
 MODEL_TYPE="classifier" # classifier slm
-LANG="it"
+TRAINING_LANGS=("en" "it" "ru")
+TEST_LANG="no"
+LANG="$TEST_LANG"
 ATL=0
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b
@@ -25,13 +27,12 @@ CONTEXT=1
 TRAINING_SIZE_LIST=(250 500 1000 2500)
 SMOKE_TEST=0
 
-EXP_N=4
+EXP_N=2
 QUANTIZATION=1
 NOTES=""
 
 # Explanation
 EXPLANATION="none"
-ANNOTATION_TYPE=""
 
 # HPs
 EPOCHS=3
@@ -59,10 +60,11 @@ for TRAINING_SIZE in "${TRAINING_SIZE_LIST[@]}"; do
           --learning_rate "$LR" \
           --batch_size "$BS" \
           --max_grad_norm "$GN" \
-          --annotation_type "$ANNOTATION_TYPE" \
           --weight_decay "$WEIGHT_DECAY" \
           --atl "$ATL" \
-          --experiment_number "$EXP_N"
+          --experiment_number "$EXP_N" \
+          --training_langs "${TRAINING_LANGS[*]}" \
+          --test_lang "$TEST_LANG"
 
       done
     done

@@ -18,6 +18,12 @@ set_seed(42)
 # Config
 # --------------------------------------------------------------------------------------------------
 
+"""
+- Resampling only for monolingual setting.
+- training size has no effect in multilingual setting.
+
+"""
+
 EVAL_BATCH=16
 
 PROMPT_LANGUAGE_MAP = {"en": "English",
@@ -50,13 +56,72 @@ def filter_long_context_examples(example: dict) -> bool:
 
     return len(text) <= max_chars
 
-def get_all_data_sets(args: Namespace, path: str) -> List[Dataset]:
+
+def get_monolingual_data_set(args: Namespace, 
+                             data_path: str
+                            ) -> List[Dataset]:
+    """Data loader for the monolinugual setting."""
+    data_dir = os.path.join(data_path, args.lang)
+    ds = load_from_disk(data_dir)
+    
+    train = ds["train"]
+    dev = ds["dev"]
+    test = ds["test"]
+    
+    # Resample training
+    if args.training_size < len(train):
+        print("="*20)
+        print(f"Len original training data {len(train)}")
+        train = resample_data(train, args.training_size)
+        print("="*20)
+        print(f"Training data resampled to {len(train)}")
+        print("="*20)
+
+    # return data dict
+    ds = {"train": train,
+          "dev": dev,
+          "test": test
+          }
+    return ds
+
+def get_multilingual_data_sets(args: Namespace, 
+                               data_path: str
+                               ) -> List[Dataset]:
+    """Data loader for the multilingual training setting. 
+    Loads specified training langauuges in args.
+    Keeps the dev and test of the target language.
+    """
+    train = []
+    for training_lang in args.training_langs:
+        data_dir = os.path.join(data_path, training_lang)
+        ds_lang = load_from_disk(data_dir)
+
+        # get train
+        train.extend(ds_lang["train"])
+    
+    # get target lang dev and test
+    data_dir = os.path.join(data_path, args.test_lang)
+    ds_target = load_from_disk(data_dir)    
+    dev = ds_target["dev"]
+    test = ds_target["test"]
+
+    # return datast dict
+    dataset = {"train": Dataset.from_list(train),
+               "dev": dev,
+               "test": test
+               }
+    return dataset
+
+def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
     """
     Takes args and path. Loads data, renames lang to match the language name expected in promtps,
     and filter overly long context items.
     Return train, dev, test/
     """
-    ds = load_from_disk(path)
+    if args.experiment_number == 4:
+        ds = get_multilingual_data_sets(args=args, data_path=data_path)
+    else:
+        ds = get_monolingual_data_set(args=args, data_path=data_path)
 
     # change the lang name
     for split in ["train", "dev", "test"]:
@@ -385,13 +450,13 @@ def prepare_data(args: Namespace,
     prompt_extension = "_" + args.prompt_extension if args.prompt_extension else ""
     
     if args.explanation == "none":
-        data_dir = os.path.join(DATA_DIR, "main", args.lang)
+        data_dir = os.path.join(DATA_DIR, "main")
         prompt = prompts.VANILLA_PROMPTS
     if args.explanation == "basic":
-        data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
+        data_dir = os.path.join(DATA_DIR, "main")
         prompt = prompts.RATIONALE_LABEL_PROMPTS
     if args.explanation == "mix":
-        data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
+        data_dir = os.path.join(DATA_DIR, "main")
         prompt = prompts.VANILLA_PROMPTS # label prompt
         prompt_rationale = prompts.RATIONALE_PROMPTS # rationale prompt
         prompt_rationale['user'] = (prompt_rationale['user_context'] if args.context 
@@ -404,16 +469,7 @@ def prepare_data(args: Namespace,
                     )
 
     # Get all data
-    train, dev, test = get_all_data_sets(args=args, path=data_dir)
-
-    # Resample training
-    if args.training_size < len(train):
-        print("="*20)
-        print(f"Len original training data {len(train)}")
-        train = resample_data(train, args.training_size)
-        print("="*20)
-        print(f"Training data resampled to {len(train)}")
-        print("="*20)
+    train, dev, test = get_all_data_sets(args=args, data_path=data_dir)
 
     # Get chat templates
     if not args.atl:
@@ -609,19 +665,11 @@ def get_data_classifier(args: Namespace,
         return text
     
     if args.explanation == "none":
-        data_dir = os.path.join(DATA_DIR, "main", args.lang)
+        data_dir = os.path.join(DATA_DIR, "main")
     if args.explanation == "basic":
-        data_dir = os.path.join(DATA_DIR, "main", args.lang, "_", args.annotation_version)
+        data_dir = os.path.join(DATA_DIR, "main")
 
-    train, dev, test = get_all_data_sets(args=args, path=data_dir)
-    
-    if args.training_size < len(train):
-        print("="*20)
-        print(f"Len original training data {len(train)}")
-        train = resample_data(train, args.training_size)
-        print("="*20)
-        print(f"Training data resampled to {len(train)}")
-        print("="*20)
+    train, dev, test = get_all_data_sets(args=args, data_path=data_dir)
         
     # Tokenize function expects a text field
     if args.context:
