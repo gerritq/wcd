@@ -10,7 +10,8 @@ from datasets import Dataset, concatenate_datasets
 from peft import (get_peft_model, 
                   prepare_model_for_kbit_training,
                   LoraConfig, 
-                  TaskType
+                  TaskType,
+                  PeftModel
 )
 from transformers import (AutoModelForCausalLM, 
                           AutoModelForSequenceClassification, 
@@ -49,6 +50,7 @@ MODEL_MAPPING =  {
     "llama3_8b": "meta-llama/Llama-3.1-8B-Instruct",
     "llama3_8b_base": "meta-llama/Llama-3.1-8B",
     "qwen3_06b": "Qwen/Qwen3-0.6B",
+    "qwen3_06b_base": "Qwen/Qwen3-0.6B-Base",
     "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
     "qwen3_8b": "Qwen/Qwen3-8B",
     "qwen3_8b_base": "Qwen/Qwen3-8B-Base",
@@ -98,12 +100,16 @@ class LM(ABC):
     def __init__(self, 
                  model_type: str,
                  model_name: str, 
-                 quantization: bool,
+                 quantization: bool = True,
+                 model_dir: str = "",
+                 from_checkpoint: bool = False,
     ):
         
         self.model_type = model_type
         self.model_name = model_name
         self.quantization = quantization
+        self.model_dir = model_dir
+        self.from_checkpoint = from_checkpoint
         self.attn_impl = "flash_attention_2" if is_flash_attn_2_available() else "sdpa"
 
         # Model
@@ -116,7 +122,8 @@ class LM(ABC):
         """Standard for LM init"""
         
         # Load model and peft
-        model = AutoModelForCausalLM.from_pretrained(
+        
+        base_model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             quantization_config=self.bnb_config,
             device_map="auto",
@@ -124,10 +131,23 @@ class LM(ABC):
             attn_implementation=self.attn_impl,
             dtype=torch.bfloat16 if use_bf16 else "auto",
         )
-        
+
         if self.quantization:
-            model = prepare_model_for_kbit_training(model)
-        model = get_peft_model(model, self.lora_config)
+            base_model = prepare_model_for_kbit_training(base_model)
+
+
+        if self.from_checkpoint:
+            print("="*20)
+            print(f"Loading model from checkpoint {self.model_dir}")
+            print("="*20)
+        
+            # FT model config
+            model = PeftModel.from_pretrained(model=base_model, 
+                                              model_id=self.model_dir,
+                                              is_trainable=True
+            )
+        else:
+            model = get_peft_model(base_model, self.lora_config)
 
         # This does the trick to enable check pointing: https://discuss.huggingface.co/t/i-used-to-have-no-problem-with-peft-fine-tuning-after-hundreds-of-trainings-but-now-i-have-encountered-the-error-runtimeerror-element-0-of-tensors-does-not-require-grad-and-does-not-have-a-grad-fn/168829/3
         # Set checkpointing to false in trainer args        
@@ -158,22 +178,33 @@ class SLM(LM):
     def __init__(self, 
                  model_type: str,
                  model_name: str, 
-                 quantization: bool,
+                 quantization: bool = True,
+                 model_dir: str = "",
+                 from_checkpoint: bool = False,
     ):
         super().__init__(model_type=model_type,
                         model_name=model_name, 
+                        model_dir=model_dir,
+                        from_checkpoint=from_checkpoint, 
                         quantization=quantization, 
                         
         )
 
 class SLMClassifier(LM):
     def __init__(self, 
-                 model_type: str, 
+                 model_type: str,
                  model_name: str, 
-                 quantization: bool):
-        super().__init__(model_type=model_type, 
-                         model_name=model_name, 
-                         quantization=quantization)
+                 quantization: bool = True,
+                 model_dir: str = "",
+                 from_checkpoint: bool = False,
+    ):
+        super().__init__(model_type=model_type,
+                        model_name=model_name, 
+                        model_dir=model_dir,
+                        from_checkpoint=from_checkpoint, 
+                        quantization=quantization, 
+                        
+        )
 
         self.FamilyPretrainedModel = Qwen3PreTrainedModel if "qwen" in model_name else LlamaPreTrainedModel
 
@@ -208,17 +239,38 @@ class SLMClassifier(LM):
                         dtype=torch.bfloat16 if use_bf16 else "auto",
         )
 
-    
         config = base_model.config
         if config.pad_token_id is None:
             tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             config.pad_token_id = tokenizer.pad_token_id
 
-        model = CustomGenericForSequenceClassification(config=config, base_model=base_model)
-
+        # Before lora adapters (done incorreclty beofore!)
         if self.quantization:
-            model = prepare_model_for_kbit_training(model)
-        model = get_peft_model(model, self.lora_config)
+            base_model = prepare_model_for_kbit_training(base_model)
+
+        # Base cls model
+        base_cls_model = CustomGenericForSequenceClassification(
+                                                            config=config,
+                                                            base_model=base_model,
+        )
+
+        if self.from_checkpoint:
+            print("="*20)
+            print(f"Loading model from checkpoint {self.model_dir}")
+            print("="*20)
+            # model from checkpoint: lora adapters and cls head!
+            model = PeftModel.from_pretrained(
+                model=base_cls_model,
+                model_id=self.model_dir,
+                is_trainable=True,
+            )
+
+            # param_names = [name for name, _ in model.named_parameters()]
+
+            # print(param_names)
+        else:
+            model = get_peft_model(base_cls_model, self.lora_config)
+
 
         model.gradient_checkpointing_enable()
         model.enable_input_require_grads()
@@ -270,10 +322,14 @@ SLM_REGISTRY = {
 }
 
 def build_slm(model_type: str,
-              model_name: str, 
-              quantization: bool,):
+                 model_name: str, 
+                 quantization: bool = True,
+                 model_dir: str = "",
+                 from_checkpoint: bool = False,):
     cls_ = SLM_REGISTRY.get(model_type)
     return cls_(model_type=model_type,
-              model_name=model_name, 
-              quantization=quantization, 
+                 model_name=model_name, 
+                 quantization=quantization,
+                 model_dir=model_dir,
+                 from_checkpoint=from_checkpoint,
               ).build()

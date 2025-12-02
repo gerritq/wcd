@@ -97,13 +97,21 @@ def get_multilingual_data_sets(args: Namespace,
         ds_lang = load_from_disk(data_dir)
 
         # get train
-        train.extend(ds_lang["train"])
+        train_lang = ds_lang["train"]
+        if args.training_size < len(train_lang):
+             train_lang = resample_data(train_lang, args.training_size)
+        train.extend(train_lang)
     
     # get target lang dev and test
     data_dir = os.path.join(data_path, args.test_lang)
     ds_target = load_from_disk(data_dir)    
     dev = ds_target["dev"]
     test = ds_target["test"]
+
+    print("="*20)
+    print("MULTILINGUAL TRAINING DATA")
+    print("N:", len(train))
+    print("="*20)
 
     # return datast dict
     dataset = {"train": Dataset.from_list(train),
@@ -118,11 +126,11 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
     and filter overly long context items.
     Return train, dev, test/
     """
-    if args.experiment_number == 4:
+    if args.experiment == "cl":
         ds = get_multilingual_data_sets(args=args, data_path=data_path)
-    else:
+    else: # binary, size, second_stage
         ds = get_monolingual_data_set(args=args, data_path=data_path)
-
+    
     # change the lang name
     for split in ["train", "dev", "test"]:
         ds[split] = ds[split].map(
@@ -150,6 +158,12 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
         print(f"Test removed:  {test_removed}")
         print("="*20)
 
+        if args.smoke_test:
+            print("="*20)
+            print("SMOKE _TEST")
+            print("="*20)
+            return ds["train"].select(range(96)), ds["dev"].select(range(32)), ds["test"].select(range(32))
+    
     return ds["train"], ds["dev"], ds["test"]
 
 def resample_data(ds: Dataset, total_size: int) -> Dataset:
@@ -591,11 +605,11 @@ def prepare_data(args: Namespace,
         atl_check_tokenize(example=dev_train_tok[0], tokenizer=tokenizer_train)
         print("="*20)
 
-    if args.smoke_test:
-        train_tok = train_tok.select(range(96))
-        dev_train_tok = dev_train_tok.select(range(96))
-        dev_test_tok = dev_test_tok.select(range(32))
-        test_tok = test_tok.select(range(32))
+    # if args.smoke_test:
+    #     train_tok = train_tok.select(range(96))
+    #     dev_train_tok = dev_train_tok.select(range(96))
+    #     dev_test_tok = dev_test_tok.select(range(32))
+    #     test_tok = test_tok.select(range(32))
 
     return train_tok, dev_train_tok, dev_test_tok, test_tok
 
@@ -694,10 +708,10 @@ def get_data_classifier(args: Namespace,
                                    batched=False
                                    )
     
-    if args.smoke_test:
-        train_tok = train_tok.select(range(96))
-        dev_tok = dev_tok.select(range(96))
-        test_tok = test_tok.select(range(32))
+    # if args.smoke_test:
+    #     train_tok = train_tok.select(range(96))
+    #     dev_tok = dev_tok.select(range(96))
+    #     test_tok = test_tok.select(range(32))
 
     train_dataloader = DataLoader(
         train_tok,
