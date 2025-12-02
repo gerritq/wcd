@@ -17,8 +17,8 @@ from transformers import (AutoModelForCausalLM,
                           AutoModelForSequenceClassification, 
                           BitsAndBytesConfig,
                           AutoModel,
-                          AutoConfig,
-                          AutoTokenizer
+                          AutoTokenizer,
+                          AutoModelForSequenceClassification
 )
 from transformers.utils import is_flash_attn_2_available
 
@@ -89,7 +89,7 @@ MODEL_DIR = os.path.join(BASE_DIR, "data/exp2")
 - we modify the prep data only for atl atm
 """
 
-random.seed(42)
+set_seed(42)
 
 # --------------------------------------------------------------------------------------------------
 # Models
@@ -190,6 +190,43 @@ class SLM(LM):
                         
         )
 
+class PLM(LM):
+    """
+    Encoder class.
+    """
+    def __init__(self, 
+                 model_type: str,
+                 model_name: str, 
+                 quantization: bool = True,
+                 model_dir: str = "",
+                 from_checkpoint: bool = False,
+    ):
+        super().__init__(
+            model_type=model_type,
+            model_name=model_name, 
+            quantization=quantization,
+            model_dir=model_dir,
+            from_checkpoint=from_checkpoint,
+        )
+
+    def build(self):
+
+        if self.from_checkpoint:
+            model_path = self.model_dir
+        else:
+            model_path = self.model_name
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_path,
+            num_labels=2,
+            device_map="auto",
+            trust_remote_code=True,
+            dtype=torch.bfloat16 if use_bf16 else "auto",
+        )
+        self.model = model
+        self._print_setting()
+        return self
+        
+    
 class SLMClassifier(LM):
     def __init__(self, 
                  model_type: str,

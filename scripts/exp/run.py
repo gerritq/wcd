@@ -21,55 +21,36 @@ import copy
 BASE_DIR = os.getenv("BASE_WCD")
 EX1 = os.path.join(BASE_DIR, "data/exp1")
 EX2 = os.path.join(BASE_DIR, "data/exp2")
-EX3 = os.path.join(BASE_DIR, "data/exp3")
-EX4 = os.path.join(BASE_DIR, "data/exp4")
 
 # CL_TRAINING_SIZES = [200, 400, 600, 800]
 CL_TRAINING_SIZES = [200, 400, 600, 800]
 
 def get_save_path(args):
-    
+    if args.smoke_test:
+        if args.experiment == "binary":
+            test_dir = os.path.join(EX1 + "_test", "smoke_test")
+
+        if args.experiment in ["cl", "second_stage"]:
+            test_dir = os.path.join(EX2, "smoke_test")
+
+        # Get model number and return test dir
+        os.makedirs(test_dir, exist_ok=True)
+        model_number = get_model_number(test_dir)
+        save_path = os.path.join(test_dir, f"meta_{model_number}.json")
+        return save_path
+
+
     # Define model fir 
     if args.experiment == "binary":
-        if args.smoke_test:
-            test_dir = os.path.join(EX1 + "_test", "smoke_test")
-            os.makedirs(test_dir, exist_ok=True)
-            model_number = get_model_number(test_dir)
-            save_path = os.path.join(test_dir, f"meta_{model_number}.json")
-        else:    
-            if not args.run_dir:
-                raise ValueError("For experiment 1 run dir must be given.")
-            model_number = get_model_number(args.run_dir)
-            save_path = os.path.join(args.run_dir, f"meta_{model_number}.json")
+        if not args.run_dir:
+            raise ValueError("For experiment 1 run dir must be given.")
+        model_number = get_model_number(args.run_dir)
+        save_path = os.path.join(args.run_dir, f"meta_{model_number}.json")
     
-    if args.experiment == "size":
-        
-        if args.smoke_test:
-            test_dir = os.path.join(EX2, "smoke_test")
-            os.makedirs(test_dir, exist_ok=True)
-            model_number = get_model_number(test_dir)
-            save_path = os.path.join(test_dir, f"meta_{model_number}.json")
-        else:
-            if args.model_type == "slm":
-                if not args.atl:
-                    save_name = f"van_{args.training_size}"
-                else: 
-                    save_name = f"atl_{args.training_size}"
-            else:
-                save_name = f"cls_{args.training_size}"
-
-            save_path = os.path.join(EX2, args.lang, save_name+".json")
-
     if args.experiment in ["cl", "second_stage"]:
-        if args.smoke_test:
-            test_dir = os.path.join(EX4, "smoke_test")
-            os.makedirs(test_dir, exist_ok=True)
-            model_number = get_model_number(test_dir)
-            save_path = os.path.join(test_dir, f"meta_{model_number}.json")
-        else:
-            model_number = get_model_number(args.model_dir)
-            save_path = os.path.join(args.model_dir, f"meta_{model_number}.json")
-    
+        model_number = get_model_number(args.model_dir)
+        save_path = os.path.join(args.model_dir, f"meta_{model_number}.json")
+        
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)
 
@@ -93,16 +74,10 @@ def single_stage_training(args):
 
     # Get saving path
     save_path = get_save_path(args)
-
-    # Get hf model name
-    if args.from_checkpoint:
-        load_model = args.model_dir
-    else:
-        load_model = args.model_name
             
     meta = vars(args).copy()
 
-    set_seed(42)
+    set_seed(args.seed)
 
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -182,7 +157,6 @@ def two_stage_training(args):
     stage1_args = copy.deepcopy(args)
     print("="*20)
     print(f"STAGE 1: SOURCE LANGUAGE TRAINING  {args.training_langs}")
-    print(f"TEST LANGUAGE: {args.test_lang}")
     print("="*20)
 
     # add saving checkpoint flag
@@ -200,13 +174,12 @@ def two_stage_training(args):
     print(f"STAGE 2: EVALUATION ON TARGET LANGUAGE  {args.test_lang}")
     print("="*20)
 
+    # Define args for stage 2
     stage2_args = copy.deepcopy(args)
     stage2_args.experiment = "second_stage"
-    stage2_args.lang = args.test_lang
-    stage2_args.model_name = args.model_name
-    stage2_args.model_dir = model_dir
-    stage2_args.from_checkpoint = True
-
+    stage2_args.model_dir = model_dir # this is the local dir where the first stage model is saved
+    stage2_args.from_checkpoint = True # flag to load from checkpoint   
+    
     for training_size in CL_TRAINING_SIZES:
         stage2_args.training_size = training_size
         print("="*20)
@@ -223,7 +196,6 @@ def main():
     parser.add_argument("--context", type=int, required=True)
     parser.add_argument("--smoke_test", type=int, required=True)
     parser.add_argument("--training_size", type=int, required=True)
-    parser.add_argument("--lang", type=str, required=True)
     parser.add_argument("--experiment", type=str, required=True)
 
     # HPs
@@ -235,11 +207,13 @@ def main():
     parser.add_argument("--quantization", type=int, default=1) # we always quantise
 
     # Defaults
+    parser.add_argument("--lang", type=str, default="")
     parser.add_argument("--run_dir", type=str, default="")
     parser.add_argument("--notes", type=str, default="")
     parser.add_argument("--explanation", type=str, default="none")
     parser.add_argument("--train_log_step", type=int, default=20)
     parser.add_argument("--prompt_extension", type=str, default="")
+    parser.add_argument("--seed", type=int, default=42)
 
     # EXP4
     parser.add_argument("--training_langs", nargs='+', default=[])

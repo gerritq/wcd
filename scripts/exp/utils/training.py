@@ -20,7 +20,6 @@ else:
 
 from transformers import set_seed
 
-set_seed(42)
 use_bf16 = (
     torch.cuda.is_available()
     and torch.cuda.is_bf16_supported()
@@ -55,6 +54,8 @@ def train(args: Namespace,
           test_dataloader: DataLoader,
           tokenizer_test: PreTrainedTokenizerBase,
     ):
+
+    set_seed(args.seed)
     
     start = time.time()
     model.to(device)
@@ -308,12 +309,12 @@ def evaluate_classification(model: torch.nn.Module,
     }
 
 def evaluate_wrapper(model_type: str,
-                  model: Module,
-                  explanation_flag: bool,
-                  tokenizer_test,
-                  dataloader: DataLoader) -> float:
+                        model: Module,
+                        explanation_flag: bool,
+                        tokenizer_test,
+                        dataloader: DataLoader) -> float:
     """Wrapper for test set evaluation"""
-    if model_type == "classifier":
+    if model_type == "classifier" or model_type == "plm":
         metrics = evaluate_classification(model=model, 
                                           dataloader=dataloader)
         return metrics

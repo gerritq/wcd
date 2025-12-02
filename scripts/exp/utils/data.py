@@ -13,7 +13,6 @@ from argparse import Namespace
 
 from transformers import set_seed
 
-set_seed(42)
 # --------------------------------------------------------------------------------------------------
 # Config
 # --------------------------------------------------------------------------------------------------
@@ -739,6 +738,9 @@ def get_data(args: Namespace,
              tokenizer_train,
              tokenizer_test,
             ) -> tuple:
+    
+    set_seed(args.seed)
+    
     if args.model_type == "slm":
         return get_data_lm(args,
                            tokenizer_train,
