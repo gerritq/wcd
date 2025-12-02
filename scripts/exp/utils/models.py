@@ -54,6 +54,11 @@ MODEL_MAPPING =  {
     "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
     "qwen3_8b": "Qwen/Qwen3-8B",
     "qwen3_8b_base": "Qwen/Qwen3-8B-Base",
+    "mBert": "google-bert/bert-base-multilingual-uncased",
+    "xlm-r-b": "FacebookAI/xlm-roberta-base",
+    "xlm-r-l": "FacebookAI/xlm-roberta-large",
+    "mDeberta-b": "microsoft/mdeberta-v3-base",
+    "mDeberta-l": "microsoft/deberta-v3-large",
     }
 
 BNB_CONFIG = BitsAndBytesConfig(
@@ -115,7 +120,7 @@ class LM(ABC):
         # Model
         self.model = None
         self.bnb_config = BNB_CONFIG if self.quantization else None
-        self.lora_config = LORA_CONFIG_CLS if self.model_type == "classifier" else LORA_CONFIG_LM
+        self.lora_config = LORA_CONFIG_CLS if self.model_type == "cls" else LORA_CONFIG_LM
         
 
     def build(self):
@@ -355,7 +360,8 @@ class CustomClassificationHead(nn.Module):
 
 SLM_REGISTRY = {
     "slm": SLM,
-    "classifier": SLMClassifier,
+    "cls": SLMClassifier,
+    "plm": PLM,
 }
 
 def build_slm(model_type: str,

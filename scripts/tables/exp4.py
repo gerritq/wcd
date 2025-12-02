@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import argparse
 
 BASE_DIR = os.getenv("BASE_WCD")
-EXP4_DIR = os.path.join(BASE_DIR, "data/exp4")
+EXP2_DIR = os.path.join(BASE_DIR, "data/exp2")
 
 def get_metas(lang_dir: str):
     all_metas = [
@@ -30,8 +30,10 @@ def get_metas(lang_dir: str):
             name = "atl"
         elif meta['atl'] == 0 and meta['model_type'] == "slm":
             name = "van"
-        if meta['model_type'] == "classifier":
+        if meta['model_type'] in ["classifier", "cls"]:
             name = "clf"
+        if meta['model_type'] == "plm":
+            name = "plm"
                 
         # if met path is meta_1
         if 'meta_1' in os.path.basename(meta_path):
@@ -80,13 +82,13 @@ def main():
 
     # find all lang folder in exp4
     all_langs = [
-        f for f in os.listdir(EXP4_DIR)
-        if os.path.isdir(os.path.join(EXP4_DIR, f))
+        f for f in os.listdir(EXP2_DIR)
+        if os.path.isdir(os.path.join(EXP2_DIR, f))
         if f != "smoke_test"
     ]
     for lang in all_langs:
         # check if dir exists
-        lang_dir = os.path.join(EXP4_DIR, f"{lang}")
+        lang_dir = os.path.join(EXP2_DIR, f"{lang}")
         print(lang_dir)
 
         all_runs = [

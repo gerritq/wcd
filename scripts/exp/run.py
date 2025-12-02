@@ -163,7 +163,7 @@ def two_stage_training(args):
     stage1_args.save_checkpoint = True
 
     # create a random folder with tempfile
-    model_dir = os.path.join(EX4, stage1_args.test_lang)
+    model_dir = os.path.join(EX2, stage1_args.test_lang)
     os.makedirs(model_dir, exist_ok=True)
     model_dir = tempfile.mkdtemp(dir=model_dir)
     stage1_args.model_dir = model_dir
@@ -225,7 +225,7 @@ def main():
     args = parser.parse_args()        
     
     # Checks
-    if args.model_type not in ['slm', 'classifier']:
+    if args.model_type not in ['slm', 'cls', "plm"]:
         raise ValueError(f"Unknown model type: {args.model_type}")
 
     assert (
@@ -248,7 +248,7 @@ def main():
     args.evaluation_explanation_flag = True if args.explanation == "basic" else False
 
     # Select the HF model name
-    suffix = "_base" if args.model_type == "classifier" else ""
+    suffix = "_base" if args.model_type == "cls" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
 
     # Select single run or two stage

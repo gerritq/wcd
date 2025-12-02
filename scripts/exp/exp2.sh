@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=e2-cls-it
+#SBATCH --job-name=exp4-atl-enru-bg
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=04:00:00
+#SBATCH --time=03:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
@@ -16,33 +16,51 @@ nvidia-smi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # VARs
-MODEL_TYPE="classifier" # classifier slm
-LANG="it"
-ATL=0
+MODEL_TYPE="plm" # classifier slm
+TRAINING_LANGS=("en" "ru")
+TEST_LANG="bg"
+LANG="$TEST_LANG"
+ATL=1
 
-MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b
+MODEL_NAME="mBert" # qwen3_06b llama3_8b qwen3_8b mBert
 CONTEXT=1
-TRAINING_SIZE_LIST=(250 500 1000 2500)
+TRAINING_SIZE_LIST=(5000)
 SMOKE_TEST=0
 
-EXP_N=4
+EXP="cl"
 QUANTIZATION=1
 NOTES=""
 
 # Explanation
 EXPLANATION="none"
-ANNOTATION_TYPE=""
 
 # HPs
-EPOCHS=3
-LR_LIST=(2e-4)
-BATCH_LIST=(24)
-GRAD_NORM_LIST=(0.4)
-WEIGHT_DECAY=0.01
+# EPOCHS=3
+# LR_LIST=(2e-4)
+# BATCH_LIST=(24)
+# GRAD_NORM_LIST=(0.4)
+# WEIGHT_DECAY=0.01
+
+if [ "$MODEL_TYPE" == "plm" ]; then
+    # HPs PLMS (12 combos)
+    EPOCHS=3
+    LR_LIST=(5e-5)
+    BATCH_SIZE_LIST=(32)    
+    GRAD_NORM_LIST=(1)
+    WEIGHT_DECAY=0.01
+else
+    # HPs SLM (9 combos)
+    EPOCHS=3
+    LR_LIST=(2e-4)
+    BATCH_SIZE_LIST=(24)
+    GRAD_NORM_LIST=(0.4)
+    WEIGHT_DECAY=0.01
+fi
+    
 
 for TRAINING_SIZE in "${TRAINING_SIZE_LIST[@]}"; do
   for LR in "${LR_LIST[@]}"; do
-    for BS in "${BATCH_LIST[@]}"; do
+    for BS in "${BATCH_SIZE_LIST[@]}"; do
       for GN in "${GRAD_NORM_LIST[@]}"; do
 
         uv run run.py \
@@ -59,10 +77,12 @@ for TRAINING_SIZE in "${TRAINING_SIZE_LIST[@]}"; do
           --learning_rate "$LR" \
           --batch_size "$BS" \
           --max_grad_norm "$GN" \
-          --annotation_type "$ANNOTATION_TYPE" \
           --weight_decay "$WEIGHT_DECAY" \
           --atl "$ATL" \
-          --experiment_number "$EXP_N"
+          --experimen "$EXP" \
+          --training_langs "${TRAINING_LANGS[@]}" \
+          --test_lang "$TEST_LANG"
+
 
       done
     done

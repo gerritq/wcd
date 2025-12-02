@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=exp4-atl-enru-bg
+#SBATCH --job-name=e2-cls-it
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=03:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
@@ -16,23 +16,22 @@ nvidia-smi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # VARs
-MODEL_TYPE="slm" # classifier slm
-TRAINING_LANGS=("en" "ru")
-TEST_LANG="bg"
-LANG="$TEST_LANG"
-ATL=1
+MODEL_TYPE="classifier" # classifier slm
+LANG="it"
+ATL=0
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b
 CONTEXT=1
-TRAINING_SIZE_LIST=(2000)
+TRAINING_SIZE_LIST=(250 500 1000 2500)
 SMOKE_TEST=0
 
-EXP="cl"
+EXP_N=4
 QUANTIZATION=1
 NOTES=""
 
 # Explanation
 EXPLANATION="none"
+ANNOTATION_TYPE=""
 
 # HPs
 EPOCHS=3
@@ -60,12 +59,10 @@ for TRAINING_SIZE in "${TRAINING_SIZE_LIST[@]}"; do
           --learning_rate "$LR" \
           --batch_size "$BS" \
           --max_grad_norm "$GN" \
+          --annotation_type "$ANNOTATION_TYPE" \
           --weight_decay "$WEIGHT_DECAY" \
           --atl "$ATL" \
-          --experimen "$EXP" \
-          --training_langs "${TRAINING_LANGS[@]}" \
-          --test_lang "$TEST_LANG"
-
+          --experiment_number "$EXP_N"
 
       done
     done

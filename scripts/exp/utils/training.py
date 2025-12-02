@@ -314,7 +314,7 @@ def evaluate_wrapper(model_type: str,
                         tokenizer_test,
                         dataloader: DataLoader) -> float:
     """Wrapper for test set evaluation"""
-    if model_type == "classifier" or model_type == "plm":
+    if model_type == "cls" or model_type == "plm":
         metrics = evaluate_classification(model=model, 
                                           dataloader=dataloader)
         return metrics

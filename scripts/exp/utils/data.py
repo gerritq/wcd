@@ -208,7 +208,7 @@ def get_tokenizer(model_type: str, model_name: str, inference=False):
     # if tokenizer has no padding token, then reuse the end of sequence token
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    if model_type != "classifier":
+    if model_type == "slm":
         if not tokenizer.chat_template:
             raise Exception("tokenizer has not cha template.")
     
@@ -670,13 +670,25 @@ def get_data_classifier(args: Namespace,
              tokenizer_train: PreTrainedTokenizerBase,
             ) -> tuple:
     
-    def build_context(example: dict) -> str:
-        text = (f"Section: {example['section']}\n"
-                f"Previous Sentence: {example['previous_sentence']}\n"
-                f"Claim: {example['claim']}"
-                f"Subsequent Sentence: {example['subsequent_sentence']}")
+    def build_context(args: Namespace, example: dict) -> str:
+        if args.model_type == "cls":
+            text = (f"Section: {example['section']}\n"
+                    f"Previous Sentence: {example['previous_sentence']}\n"
+                    f"Claim: {example['claim']}\n"
+                    f"Subsequent Sentence: {example['subsequent_sentence']}")
+        if args.model_type == "plm":
+                parts = [
+                    example["section"],
+                    example["previous_sentence"],
+                    example["claim"],
+                    example["subsequent_sentence"],
+                ]
+                text = SEP.join(p for p in parts if p).strip()
         return text
     
+    if args.model_type == "plm":
+        SEP = f" {tokenizer_train.sep_token} "
+
     if args.explanation == "none":
         data_dir = os.path.join(DATA_DIR, "main")
     if args.explanation == "basic":
@@ -686,9 +698,9 @@ def get_data_classifier(args: Namespace,
         
     # Tokenize function expects a text field
     if args.context:
-        train = train.map(lambda x: {'text': build_context(x)})
-        dev = dev.map(lambda x: {'text': build_context(x)})
-        test = test.map(lambda x: {'text': build_context(x)})
+        train = train.map(lambda x: {'text': build_context(args, x)})
+        dev = dev.map(lambda x: {'text': build_context(args, x)})
+        test = test.map(lambda x: {'text': build_context(args, x)})
     else:
         train = train.rename_column("claim", "text")
         dev = dev.rename_column("claim", "text")
@@ -746,7 +758,7 @@ def get_data(args: Namespace,
                            tokenizer_train,
                            tokenizer_test,
                            )
-    if args.model_type == "classifier":
+    if args.model_type in ["cls", "plm"]:
         return get_data_classifier(args,
                                    tokenizer_train,
                                    )
