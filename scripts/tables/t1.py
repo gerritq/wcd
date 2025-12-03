@@ -3,205 +3,189 @@ import re
 import json
 import glob
 from collections import defaultdict
-import sys
 from pathlib import Path
+from argparse import Namespace
 
-print('new')
-
+# ------------------------------------------------------------------------------------------
+# configs
+# ------------------------------------------------------------------------------------------
 BASE_DIR = os.getenv("BASE_WCD")
 SLM_DIR = os.path.join(BASE_DIR, "data/exp1")
-PLM_DIR = os.path.join(BASE_DIR, "data/models/plm")
 
-MODEL_MAPPING =  {
-    "mBert": "google-bert/bert-base-multilingual-uncased",
-    "xlm-r-b": "FacebookAI/xlm-roberta-base",
-    "xlm-r-l": "FacebookAI/xlm-roberta-large",
-    "mDeberta-b": "microsoft/mdeberta-v3-base",
-    "mDeberta-l": "microsoft/deberta-v3-large",
-    "llama3_1b": "meta-llama/Llama-3.2-1B-Instruct",
-    "llama3_3b": "meta-llama/Llama-3.2-3B-Instruct",
-    "llama3_8b": "meta-llama/Llama-3.1-8B-Instruct",
-    "llama3_70b": "meta-llama/Llama-3.3-70B-Instruct",
-    "llama3_8b_base": "meta-llama/Llama-3.1-8B",
-    "qwen3_06b": "Qwen/Qwen3-0.6B",
-    "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
-    "qwen3_8b": "Qwen/Qwen3-8B",
-    "qwen3_8b_base": "Qwen/Qwen3-8B-Base",
-    "qwen3_30b": "Qwen/Qwen3-30B-A3B-Instruct-2507",
-    "qwen3_32b": "Qwen/Qwen3-32B",
-    "gemma3_12b": "google/gemma-3-12b-it",
-    "gpt_oss": "openai/gpt-oss-20b",
-    "mistral_8b": "mistralai/Ministral-8B-Instruct-2410",
-    "ds_llama": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
-    "aya": "CohereLabs/aya-101",
-    "gpt-4o-mini": "openai/gpt-4o-mini",
-    "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite"
-    }
-
-MODEL_MAPPING_REVERSE = {v: k for k, v in MODEL_MAPPING.items()}
+MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
+                      "meta-llama/Llama-3.1-8B-Instruct": "Llama3-8B", # same for cls and slm
+                       "Qwen/Qwen3-8B-Base": "Qwen3-8B",
+                       "microsoft/mdeberta-v3-base": "mDeberta-base",
+                       "microsoft/deberta-v3-large": "mDeberta-large",
+                       "google-bert/bert-base-multilingual-uncased": "mBert",
+                       "FacebookAI/xlm-roberta-base": "XLM-R-base",
+                       "FacebookAI/xlm-roberta-large": "XLM-R-large",
+                       "openai/gpt-4o-mini": "GPT-4o-mini"
+                        }
 
 run_re = re.compile(r"run_\w+")
 meta_re = re.compile(r"meta_\d+")
 
-
 LANGS = ["en","nl","no","it","pt","ro","ru","uk","bg","id", "vi", "tr"]
 
 def load_metrics(path):
+    """"Load a sinlge meta_file"""
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def load_slm_models(path: str, is_context: bool):
+def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     root = Path(path)
     rows = defaultdict(dict)
     count = defaultdict(int)
 
+    # iteratore over all lang dirs
     for lang_dir in root.iterdir():
         if not lang_dir.is_dir():
+            print(f"Skipping non-lang-dir: {lang_dir}")
             continue
-        lang = lang_dir.name
-        if lang not in LANGS:
-            continue
-
+        
+        # iteratre over runs
         for run_dir in lang_dir.iterdir():
-            if not (run_dir.is_dir() and run_re.fullmatch(run_dir.name)):
+            if not (run_dir.is_dir()):
+                print(f"Skipping non-run-dir: {run_dir}")
                 continue
 
-            best_for_run = None  # will store dict with dev_acc + test_acc etc.
+            # store best run in a dict
+            best_run: dict = None 
 
+            #iteratre over all met files
             for meta_path in run_dir.iterdir():
-                if not (meta_path.is_file() and meta_re.match(meta_path.stem)):
+                if not (meta_path.is_file()):
+                    print(f"Skipping non-meta-file: {meta_path}")
                     continue
 
-                with meta_path.open() as f:
-                    meta = json.load(f)
+                meta = load_metrics(meta_path)
 
                 # filter by context
-                if meta["context"] != is_context:
-                    continue
-
-                pe = meta.get("prompt_extension", "")
-
-                if pe:
+                if meta["context"] != configs['context']:
+                    print(f"Skipping due to context mismatch: {meta_path}")
                     continue
                     
-                # map HF model name -> short name
-                try:
-                    short_name = MODEL_MAPPING_REVERSE[meta["model_name"]]
-                except KeyError:
-                    # skip unknown models
-                    continue
+                print(meta_path)
+                # variant generation
+                variant = ""
+                model_name = MODEL_DISPLAY_NAMES[meta["model_name"]]
+                if meta["model_type"] == "cls":
+                    variant = "(clf)"
+                if meta["model_type"] == "slm" and meta["atl"]  == True:
+                    variant = "(atl)"
+                if meta["model_type"] == "slm" and meta["atl"]  == False:
+                    variant = "(van)"
 
-                if meta["model_type"] == "classifier":
-                    variant = "(cl)"
+
+                if meta["model_type"] == "icl":
+                    if meta['shots'] == True and meta["verbose"]  == True:
+                        variant = "(x-s\&v)"
+                    if meta['shots'] == True and meta["verbose"]  == False:
+                        variant = "(x-s)"
+                    if meta['shots'] == False and meta["verbose"]  == True:
+                        variant = "(0-s\&v)"
+                    if meta['shots'] == False and meta["verbose"]  == False:
+                        variant = "(0-s)"
+                
+                if variant != "":
+                    model_name = f"{model_name} {variant}"
+
+                # panel generation
+                if meta["model_type"] == "icl":
+                    panel = "LLMs"
+                if meta["model_type"] in ["slm", "cls"]:
+                    panel = "SLMs"
+                if meta["model_type"] in ["plm"]:
+                    panel = "PLMs"
+
+                model_name = (model_name, panel)
+                
+                # icl has only one meta file
+                if meta["model_type"] == "icl":
+                    test_metric = meta["test_metrics"][configs['metric']]
+                    best_run = {
+                        "model_name": model_name,
+                        "panel": panel,
+                        "lang": meta["lang"],
+                        "dev_metric": None,
+                        "test_metric": test_metric,
+                    }
                 else:
-                    variant = "(atl)" if meta["atl"] else "(van)"
-    
-                model_name = f"{short_name} {variant}".replace("_", "-")
+                    # get the best metrics
+                    dev_metrics = meta.get("dev_metrics", [])
+                    test_metrics = meta.get("test_metrics", [])
 
-                dev_metrics = meta.get("dev_metrics", [])
-                test_metrics = meta.get("test_metrics", [])
+                    count[(model_name, meta['lang'], panel)] += 1
 
-                count[(model_name, meta['lang'], is_context)] += 1
+                    # go over epochs
+                    for dev_entry in dev_metrics:
+                        epoch = dev_entry["epoch"]
+                        dev_metric = dev_entry["metrics"][configs['metric']]
 
-                # go over epochs in *this* meta file
-                for dev_entry in dev_metrics:
-                    epoch = dev_entry["epoch"]
-                    dev_acc = dev_entry["metrics"]["accuracy"]
+                        if (
+                            best_run is None
+                            or dev_metric > best_run["dev_metric"]
+                        ):
+                            test_entry = next(
+                                (t for t in test_metrics if t["epoch"] == epoch),
+                                None
+                            )
+                            if test_entry is None:
+                                continue
 
-                    if (
-                        best_for_run is None
-                        or dev_acc > best_for_run["dev_acc"]
-                    ):
-                        test_entry = next(
-                            (t for t in test_metrics if t["epoch"] == epoch),
-                            None
-                        )
-                        if test_entry is None:
-                            continue
-
-                        best_for_run = {
-                            "model_name": model_name,
-                            "lang": lang,
-                            "dev_acc": dev_acc,
-                            "dev_f1": dev_entry["metrics"]["f1"],
-                            "test_acc": test_entry["metrics"]["accuracy"],
-                        }
+                            best_run = {
+                                "model_name": model_name,
+                                "panel": panel,
+                                "lang": meta["lang"],
+                                "dev_metric": dev_metric,
+                                "test_metric": test_entry["metrics"][configs['metric']],
+                            }
 
             # after scanning all meta_* in this run
-            if best_for_run:
-                m = best_for_run["model_name"]
-                l = best_for_run["lang"]
-                rows[m][l] = best_for_run["test_acc"]
+            if best_run:
+                m = best_run["model_name"]
+                l = best_run["lang"]
+                panel = best_run["panel"]
+                rows[(m, panel)][l] = best_run["test_metric"]
     print("="*20)
-    print("SLM COUNT")
-    print(count) 
-    print("="*20)  
-    return rows
-
-def load_plm_models(path: str,
-                model_type: str,
-                context: bool,
-                display_name: str,
-                training_size: int):
-    
-    rows = defaultdict(dict)
-    count = defaultdict(int)
-
-    for lang in LANGS:
-        paths = glob.glob(os.path.join(path, lang, "meta_*.json"))
-        for p in paths:
-            try:
-                meta = load_metrics(p)
-                lang = meta['lang']
-                model_name = meta['model_name'].replace("_", "-")
-            except:
-                print(f"Error when loading meta for path: {p}")
-                continue
-
-            if not (meta['training_size'] == training_size and 
-                    meta['model_type'] == model_type and 
-                    meta['context'] == context and
-                    meta['smoke_test'] == False):
-                continue
-            
-            count[(model_type, model_name, meta['lang'], context, training_size)] += 1
-            
-            model_number = meta['model_number']
-            model_name = model_name + f" ({display_name})"
-            try:
-                dev_accuracy = meta['dev_metrics']['accuracy']
-                test_accuracy = meta['test_metrics']['accuracy']
-            except:
-                dev_accuracy = meta['dev_metrics']['eval_accuracy']
-                test_accuracy = meta['test_metrics']['eval_accuracy']
-
-            score = (dev_accuracy, test_accuracy)
-
-            if model_name not in rows:
-                accs = {l: None for l in LANGS}
-                rows[model_name] = accs
-
-            if not rows[model_name][lang]:
-                rows[model_name][lang] = score
-            if rows[model_name][lang] and score[0] > rows[model_name][lang][0]:
-                rows[model_name][lang] = score
-    
-    # keep test scores
-    for m, v in rows.items():
-        for l, s in v.items():
-            if s:
-                rows[m][l] = s[1]
+    print("MODEL COUNT")
+    for k,v in count.items():
+        print(f"{k}: {v}") 
     print("="*20)
-    print("PLM COUNT")
-    print(count) 
-    print("="*20)         
-    return rows
+
+    panel_order = ["LLMs", "PLMs", "SLMs"]
+    sorted_rows = {}
+
+    for panel in panel_order:
+        panel_rows = {k[0]: v for k, v in rows.items() if k[1] == panel}
+
+        if panel == "SLMs":
+            def slm_sort_key(model_key):
+                # get the name
+                name = model_key[0]
+                # get the variant
+                variant = name.split("(")[-1].replace(")", "").strip()
+                # defien custom order (painn)
+                order = {"van": 0, "atl": 1, "clf": 2}
+                return (order.get(variant, 999), name)
+
+            panel_sorted = dict(sorted(panel_rows.items(),
+                                    key=lambda x: slm_sort_key(x[0])))
+        else:
+            # sort alphabetically
+            panel_sorted = dict(sorted(panel_rows.items(),
+                                    key=lambda x: x[0][0]))
+
+        sorted_rows.update(panel_sorted)
+
+    return sorted_rows
 
 def latex_table(rows, context):
     # print LaTeX table
     table = "\n\n"
     colspec = "l" + "c" * len(LANGS)
-    header = "Model & " + " & ".join(LANGS) + " \\\\"
+    header = "Model $\\downarrow$\\ Language $\\rightarrow$  & " + " & ".join(LANGS) + " \\\\"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += "\\hline\n"
@@ -211,8 +195,8 @@ def latex_table(rows, context):
     lang_max = {l: float("-inf") for l in LANGS}
     lang_second_max = {l: float("-inf") for l in LANGS}
 
-    for model, accs in rows.items():
-        for lang, v in accs.items():
+    for (_, panel), metrics in rows.items():
+        for lang, v in metrics.items():
             if v is None:
                 continue
             # update max and second max in one go
@@ -223,14 +207,13 @@ def latex_table(rows, context):
                 lang_second_max[lang] = v
     
     prev=None
-    for name, accs in rows.items():
+    for (name, panel), metrics in rows.items():
         cells = []
-        regime = re.search(r"\((.*?)\)", name).group(1)
         for l in LANGS:
-            if l not in accs.keys():
+            if l not in metrics.keys():
                 v = None
             else:
-                v = accs[l]
+                v = metrics[l]
             if isinstance(v, (int, float)) and v == lang_max[l]:
                 cells.append(f"\\textbf{{{v:.3f}}}")
             elif isinstance(v, (int, float)) and v == lang_second_max[l]:
@@ -238,17 +221,29 @@ def latex_table(rows, context):
             else:
                 cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
 
-        if prev and prev != regime:
-            table += f"\\hline \n"    
+        if prev is None and panel == "LLMs":
+                # table += "\\hline\n"
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based Large Language Models}}}} \\\\\n"
+                table += "\\hline\n"
+        if prev and prev != panel:
+            if panel == "PLMs":
+                table += "\\hline\n"
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Encoder-based PLMs}}}} \\\\\n"
+                table += "\\hline\n"
+            elif panel == "SLMs":
+                table += "\\hline\n"    
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based Small Language Models}}}} \\\\\n"   
+                table += "\\hline\n"
+        
         table += f"{name} & " + " & ".join(cells) + " \\\\\n"
         
-        prev = regime
+        prev = panel
 
     table += "\\hline\n"
     table += "\\end{tabular}\n"
 
     # Save to file
-    with open(f"table1_c{1 if context else 0}.tex", "w", encoding="utf-8") as f:
+    with open(f"table1_test.tex", "w", encoding="utf-8") as f:
         f.write(table)
 
     print(table)
@@ -263,24 +258,12 @@ def merge_defaultdicts(d,d1):
 
 def main():
 
-    for context in [True, False]:
-        print("="*20)
-        print(f"Context {context}")
-        print("="*20)
-        rows_plm = load_plm_models(path=PLM_DIR, 
-                            model_type="vanilla", 
-                            display_name='hp',
-                            context=context,
-                            training_size=-1 
-                            )
+    configs: dict = {"context": True,
+                     "metric": "accuracy", # accuracy or f1
+                     }
 
-        rows_slm = load_slm_models(path=SLM_DIR,
-                                is_context=context,)
-        
-        
-        r = merge_defaultdicts(rows_plm, rows_slm)
-        latex_table(r, context)
-
+    all_models = load_all_models(configs=configs, path=SLM_DIR)
+    latex_table(all_models, configs["context"])
 
 if __name__ == "__main__":
     main()

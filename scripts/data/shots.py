@@ -5,6 +5,7 @@ from datasets import load_from_disk
 BASE_DIR = os.getenv("BASE_WCD", ".")
 IN_DIR = os.path.join(BASE_DIR, "data/sets/main")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets/shots")
+os.makedirs(OUT_DIR, exist_ok=True)
 
 def main():
 
@@ -31,7 +32,12 @@ def main():
         neg = [x for x in data if x['label'] == 0][:2]
 
         shots = pos + neg
-        shots = [{"section": x['section'], "context": x['context'], "claim": x['claim'], "label": x['label']} for x in shots]
+        shots = [{"section": x['section'],
+                  "previous_sentence": x['previous_sentence'], 
+                  "claim": x['claim'],
+                  "subsequent_sentence": x['subsequent_sentence'], 
+                  "claim": x['claim'],
+                  "label": x['label']} for x in shots]
         all_shots[lang] = shots
 
     shots_path = os.path.join(OUT_DIR, f"shots.json")
