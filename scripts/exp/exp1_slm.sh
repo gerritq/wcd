@@ -3,9 +3,11 @@ set -euo pipefail
 
 LANGS=("no" "ro" "bg" "tr")
 CONTEXTS=(1)
-MODEL_TYPES=("cls") # slm cls
+MODEL_TYPES=("clf") # slm clf
 ATLS=(0 1)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b"
+
+TIME="02:00:00"
 
 for lang in "${LANGS[@]}"; do
   for ctx in "${CONTEXTS[@]}"; do
@@ -14,13 +16,13 @@ for lang in "${LANGS[@]}"; do
         for mname in "${MODEL_NAMES[@]}"; do
 
           # skip classifier + atl=1 since it has no effect
-          if [[ "$mtype" == "cls" && "$atl" -eq 1 ]]; then
+          if [[ "$mtype" == "clf" && "$atl" -eq 1 ]]; then
             echo "Skipping classifier with ATL=1"
             continue
           fi
 
           # select time
-          if [[ "$mtype" == "cls" ]]; then
+          if [[ "$mtype" == "clf" ]]; then
             TIME="05:00:00"
           else
             TIME="10:00:00"

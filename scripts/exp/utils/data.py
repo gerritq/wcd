@@ -36,7 +36,8 @@ PROMPT_LANGUAGE_MAP = {"en": "English",
                        "bg": "Bulgarian",
                        "id": "Indonesian",
                        "vi": "Vietnamese",
-                       "tr": "Turkish"
+                       "tr": "Turkish",
+                       "ar": "Arabic" # for the nlp4if data
                         }
 
 BASE_DIR = os.getenv("BASE_WCD")
@@ -60,7 +61,8 @@ def get_monolingual_data_set(args: Namespace,
                              data_path: str
                             ) -> List[Dataset]:
     """Data loader for the monolinugual setting."""
-    data_dir = os.path.join(data_path, args.lang)
+    lang = args.lang if args.lang != "" else args.test_lang # for the cl case
+    data_dir = os.path.join(data_path, lang)
     ds = load_from_disk(data_dir)
     
     train = ds["train"]
@@ -71,7 +73,7 @@ def get_monolingual_data_set(args: Namespace,
     if args.training_size < len(train):
         print("="*20)
         print(f"Len original training data {len(train)}")
-        train = resample_data(train, args.training_size)
+        train = resample_data(args=args, ds=train)
         print("="*20)
         print(f"Training data resampled to {len(train)}")
         print("="*20)
@@ -98,19 +100,19 @@ def get_multilingual_data_sets(args: Namespace,
         # get train
         train_lang = ds_lang["train"]
         if args.training_size < len(train_lang):
-             train_lang = resample_data(train_lang, args.training_size)
+             train_lang = resample_data(args=args, ds=train_lang)
         train.extend(train_lang)
     
+    print("="*20)
+    print("MULTILINGUAL TRAINING DATA")
+    print("N:", len(train))
+    print("="*20)
+
     # get target lang dev and test
     data_dir = os.path.join(data_path, args.test_lang)
     ds_target = load_from_disk(data_dir)    
     dev = ds_target["dev"]
     test = ds_target["test"]
-
-    print("="*20)
-    print("MULTILINGUAL TRAINING DATA")
-    print("N:", len(train))
-    print("="*20)
 
     # return datast dict
     dataset = {"train": Dataset.from_list(train),
@@ -133,7 +135,7 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
     # change the lang name
     for split in ["train", "dev", "test"]:
         ds[split] = ds[split].map(
-            lambda x: {**x, "lang": PROMPT_LANGUAGE_MAP[x["lang"]]}
+            lambda x: {**x, "lang": PROMPT_LANGUAGE_MAP[x["lang"][:2]]} # [:2] to only get the lanf
         )
 
     if args.context:
@@ -165,13 +167,13 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
     
     return ds["train"], ds["dev"], ds["test"]
 
-def resample_data(ds: Dataset, total_size: int) -> Dataset:
+def resample_data(args: Namespace, ds: Dataset) -> Dataset:
     """
     Resample a dataset to total_size with 50/50 label balance.
     Returns a new Dataset; does not use or modify `self`.
     """
-    assert total_size % 2 == 0, f"Total size ({total_size}) must be even."
-    n_per_label = total_size // 2
+    assert args.training_size % 2 == 0, f"Total size ({args.training_size}) must be even."
+    n_per_label = args.training_size // 2
 
     pos_all = [x for x in ds if x["label"] == 1]
     neg_all = [x for x in ds if x["label"] == 0]
@@ -188,7 +190,17 @@ def resample_data(ds: Dataset, total_size: int) -> Dataset:
             pos_count += 1
         else:
             neg_count += 1
-    assert pos_count == neg_count, "Dataset unbalanced after resampling."
+    
+    if len(args.lang) > 2:
+        # Do not need balanced data for the external data
+        print("="*20)
+        print("DATA BALANCE FOR {args.lang}")
+        print(f"LABEL=1 {pos_count}")
+        print(f"LABEL=1 {neg_count}")
+        print("="*20)
+    else:
+        assert pos_count == neg_count, "Dataset unbalanced after resampling."
+        
 
     return Dataset.from_list(combined)
 
@@ -196,23 +208,24 @@ def resample_data(ds: Dataset, total_size: int) -> Dataset:
 # Tokenization functions
 # --------------------------------------------------------------------------------------------------
 
-def get_tokenizer(model_type: str, model_name: str, inference=False):
+def get_tokenizer(args: Namespace, inference=False):
     """
     Loads and prepares the tokenizer.
     Return it for training or inference (bool keyword)
     """
     if inference:
-        tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side='left')
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name, padding_side='left')
     else:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     # if tokenizer has no padding token, then reuse the end of sequence token
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    if model_type == "slm":
+    if args.model_type == "slm":
         if not tokenizer.chat_template:
             raise Exception("tokenizer has not cha template.")
     
-    tokenizer.model_max_length = 512
+    # This is variably set based on which prompt is being used (default to 512)
+    tokenizer.model_max_length = args.max_length
     return tokenizer
 
 def atl_loss_tokenize(example: dict,
@@ -459,24 +472,28 @@ def prepare_data(args: Namespace,
                  tokenizer_test,
                 ) -> tuple:
     
-    # For experiment with prompts
-    prompt_extension = "_" + args.prompt_extension if args.prompt_extension else ""
-    
-    if args.explanation == "none":
+    # Pick the right data dir
+    if len(args.lang) > 2:
+        print("="*20)
+        print("USING EXTERNAL DATA")
+        print("="*20)
+        data_dir = os.path.join(DATA_DIR, "ex")
+    else:
+        # empty (as for cl or two chars as for binary)
         data_dir = os.path.join(DATA_DIR, "main")
-        prompt = prompts.VANILLA_PROMPTS
-    if args.explanation == "basic":
-        data_dir = os.path.join(DATA_DIR, "main")
-        prompt = prompts.RATIONALE_LABEL_PROMPTS
-    if args.explanation == "mix":
-        data_dir = os.path.join(DATA_DIR, "main")
-        prompt = prompts.VANILLA_PROMPTS # label prompt
-        prompt_rationale = prompts.RATIONALE_PROMPTS # rationale prompt
-        prompt_rationale['user'] = (prompt_rationale['user_context'] if args.context 
-                        else prompt_rationale['user_claim']
-                        )
+        print("="*20)
+        print("USING WIKIPEDIA DATA")
+        print("="*20)
 
-    # Define the user message (ie context)
+    # Pick the right prompt template
+    if args.prompt_template == "minimal":
+        prompt = prompts.MINIMAL_PROMPT
+    if args.prompt_template == "instruct":
+        prompt = prompts.INSTRUCT_PROMPT
+    if args.prompt_template == "verbose":
+        prompt = prompts.VERBOSE_PROMPT
+    
+    # Define the user message (ie context or no context)
     prompt['user'] = (prompt['user_context'] if args.context 
                         else prompt['user_claim']
                     )
@@ -484,24 +501,12 @@ def prepare_data(args: Namespace,
     # Get all data
     train, dev, test = get_all_data_sets(args=args, data_path=data_dir)
 
-    # Get chat templates
     if not args.atl:
         train_chat = ds_apply_chat_templates(ds=train, 
                                             tokenizer=tokenizer_train,
                                             prompt_template=prompt,
                                             preprocess_function=preprocess_function_training
                                             )
-        if args.explanation == "mix":
-            # Double the train data
-            train_chat_rationale = ds_apply_chat_templates(ds=train, 
-                                            tokenizer=tokenizer_train,
-                                            prompt_template=prompt_rationale,
-                                            preprocess_function=preprocess_function_training
-                                            )
-            train_chat = concatenate_datasets([train_chat, train_chat_rationale]).shuffle(seed=42)
-            print("="*20)
-            print(f"Total size of mixed training data {len(train_chat)}")
-            print("="*20)
 
         dev_train_chat = ds_apply_chat_templates(ds=dev, 
                                                 tokenizer=tokenizer_train,
@@ -511,8 +516,8 @@ def prepare_data(args: Namespace,
 
         print("="*20)
         print("EXAMPLE TRAINING CHAT TEMPLATES")
-        print("Train instance 1:\n", train_chat[0]['text'], "\n\n")
-        print("Train instance 2:\n", train_chat[1]['text'], "\n")
+        print("TRAINING SAMPLE 1:\n", train_chat[0]['text'], "\n\n")
+        print("TRAINING SAMPLE 2:\n", train_chat[1]['text'], "\n")
         print("="*20)
 
     dev_test_chat = ds_apply_chat_templates(ds=dev, 
@@ -536,41 +541,20 @@ def prepare_data(args: Namespace,
     # Tokenise data
     if args.atl:
         print("="*20)
-        print(f"EXAMPLE ATL {args.explanation.upper()} CHAT TEMPLATES")
+        print(f"EXAMPLE TRAINING ATL CHAT TEMPLATES")
         print(preprocess_function_training(example=train[0],
-                            prompt_template=prompt,
-                            tokenizer=tokenizer_train)['text']
+                                           prompt_template=prompt,
+                                           tokenizer=tokenizer_train)['text']
         )
         print("="*20)
         # Note: we perform atl on the raw data not the chat templates
         # We use the chat templ. to identfy the assistant tokens
-        if args.explanation != "mix":
-            train_tok = train.map(lambda x: atl_loss_tokenize(x, prompt=prompt,
-                                                                tokenizer=tokenizer_train), 
-                                    remove_columns=train.column_names
-                                    )
-        else:
-            # combine train label and tok
-            train_label_tok = train.map(lambda x: atl_loss_tokenize(x, prompt=prompt,
-                                                    tokenizer=tokenizer_train), 
-                        remove_columns=train.column_names
-                        )
-            train_rationale_tok = train.map(lambda x: atl_loss_tokenize(x, prompt=prompt_rationale,
-                                                    tokenizer=tokenizer_train), 
-                        remove_columns=train.column_names
-                        )
-            
-            train_tok = concatenate_datasets([train_label_tok, train_rationale_tok])
-            print("="*20)
-            print(f"EXAMPLE ATL {args.explanation.upper()} TRAIN CHAT TEMPLATES")
-            print(preprocess_function_training(example=train[0],
-                                               prompt_template=prompt_rationale,
-                                               tokenizer=tokenizer_train)['text']
-            )
-            print("="*20)
         
-        # dev is for mix and others the same
-        # why: because we only want label peformance to go up (not rationale gen)
+        train_tok = train.map(lambda x: atl_loss_tokenize(x, prompt=prompt,
+                                                            tokenizer=tokenizer_train), 
+                                remove_columns=train.column_names
+                                )
+        
         dev_train_tok = dev.map(lambda x: atl_loss_tokenize(x, prompt=prompt,
                                                                tokenizer=tokenizer_train), 
                                         remove_columns=train.column_names
@@ -603,12 +587,6 @@ def prepare_data(args: Namespace,
         print('\nDEV')
         atl_check_tokenize(example=dev_train_tok[0], tokenizer=tokenizer_train)
         print("="*20)
-
-    # if args.smoke_test:
-    #     train_tok = train_tok.select(range(96))
-    #     dev_train_tok = dev_train_tok.select(range(96))
-    #     dev_test_tok = dev_test_tok.select(range(32))
-    #     test_tok = test_tok.select(range(32))
 
     return train_tok, dev_train_tok, dev_test_tok, test_tok
 
@@ -671,7 +649,7 @@ def get_data_classifier(args: Namespace,
             ) -> tuple:
     
     def build_context(args: Namespace, example: dict) -> str:
-        if args.model_type == "cls":
+        if args.model_type == "clf":
             text = (f"Section: {example['section']}\n"
                     f"Previous Sentence: {example['previous_sentence']}\n"
                     f"Claim: {example['claim']}\n"
@@ -689,11 +667,18 @@ def get_data_classifier(args: Namespace,
     if args.model_type == "plm":
         SEP = f" {tokenizer_train.sep_token} "
 
-    if args.explanation == "none":
+    # select the right data dor
+    if len(args.lang) > 2:
+        data_dir = os.path.join(DATA_DIR, "ex")
+        print("="*20)
+        print("USING EXTERNAL DATA")
+        print("="*20)
+    else:
         data_dir = os.path.join(DATA_DIR, "main")
-    if args.explanation == "basic":
-        data_dir = os.path.join(DATA_DIR, "main")
-
+        print("="*20)
+        print("USING WIKIPEDIA DATA")
+        print("="*20)
+        
     train, dev, test = get_all_data_sets(args=args, data_path=data_dir)
         
     # Tokenize function expects a text field
@@ -758,7 +743,7 @@ def get_data(args: Namespace,
                            tokenizer_train,
                            tokenizer_test,
                            )
-    if args.model_type in ["cls", "plm"]:
+    if args.model_type in ["clf", "plm"]:
         return get_data_classifier(args,
                                    tokenizer_train,
                                    )

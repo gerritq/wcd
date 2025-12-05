@@ -103,20 +103,18 @@ def single_stage_training(args):
                     quantization=args.quantization,
     )
 
-    tokenizer_train = get_tokenizer(model_type=args.model_type, 
-                                    model_name=args.model_name,
+    tokenizer_train = get_tokenizer(args=args,
                                     inference=False
     )
 
-    tokenizer_test = get_tokenizer(model_type=args.model_type, 
-                                    model_name=args.model_name,
+    tokenizer_test = get_tokenizer(args=args,
                                     inference=True
     )
 
     # Just for generation
     if not slm.model.config.pad_token_id:
         slm.model.config.pad_token_id = tokenizer_test.pad_token_id
-
+         
     train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader = get_data(
         
         args=args, 
@@ -197,6 +195,7 @@ def main():
     parser.add_argument("--smoke_test", type=int, required=True)
     parser.add_argument("--training_size", type=int, required=True)
     parser.add_argument("--experiment", type=str, required=True)
+    parser.add_argument("--prompt_template", type=str, required=True)
 
     # HPs
     parser.add_argument("--epochs", type=int, required=True)
@@ -210,9 +209,9 @@ def main():
     parser.add_argument("--lang", type=str, default="")
     parser.add_argument("--run_dir", type=str, default="")
     parser.add_argument("--notes", type=str, default="")
-    parser.add_argument("--explanation", type=str, default="none")
     parser.add_argument("--train_log_step", type=int, default=20)
     parser.add_argument("--prompt_extension", type=str, default="")
+    parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
 
     # EXP4
@@ -225,8 +224,18 @@ def main():
     args = parser.parse_args()        
     
     # Checks
-    if args.model_type not in ['slm', 'cls', "plm"]:
+    if args.model_type not in ['slm', 'clf', "plm"]:
         raise ValueError(f"Unknown model type: {args.model_type}")
+    if args.prompt_template not in ["minimal", "instruct", "verbose"]:
+        raise ValueError(f"Unknown model type: {args.model_type}")
+
+    # need to reduce batch size with verbose prompts
+    if args.prompt_template == "verbose":
+        args.batch_size = 16
+        args.max_length = 768
+        print("="*20)
+        print("REDUCED BATCH SIZE TO {args.batch_size} AND INCREASED MAX LENGTH TO {args.max_length}")
+        print("="*20)
 
     assert (
         args.smoke_test in [0, 1]
@@ -244,11 +253,8 @@ def main():
     args.save_checkpoint = bool(args.save_checkpoint)
     args.from_checkpoint = bool(args.from_checkpoint)
 
-    # Create flag for whether eval needs moer tokens
-    args.evaluation_explanation_flag = True if args.explanation == "basic" else False
-
     # Select the HF model name
-    suffix = "_base" if args.model_type == "cls" else ""
+    suffix = "_base" if args.model_type == "clf" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
 
     # Select single run or two stage

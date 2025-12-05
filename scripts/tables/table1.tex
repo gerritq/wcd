@@ -1,0 +1,28 @@
+
+
+\begin{tabular}{lcccccccccccc}
+\hline
+\textbf{Model} $\downarrow$\ \textbf{Language} $\rightarrow$ & \textbf{en} & \textbf{nl} & \textbf{no} & \textbf{it} & \textbf{pt} & \textbf{ro} & \textbf{ru} & \textbf{uk} & \textbf{bg} & \textbf{vi} & \textbf{id} & \textbf{tr} \\
+\hline
+\rowcolor{lightgray}\multicolumn{13}{c}{\textbf{Decoder-based LLMs}} \\
+\hline
+GPT-4o-mini (0-s) & -- & -- & 0.511 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o-mini (0-s\&v) & -- & -- & 0.559 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o-mini (x-s) & -- & -- & 0.511 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o-mini (x-s\&v) & -- & -- & 0.551 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\hline
+\rowcolor{lightgray}\multicolumn{13}{c}{\textbf{Encoder-based PLMs}} \\
+\hline
+XLM-R-base & 0.875 & 0.618 & 0.609 & 0.686 & -- & 0.770 & 0.781 & 0.661 & 0.661 & 0.788 & 0.814 & 0.816 \\
+XLM-R-large & \underline{0.879} & 0.601 & 0.668 & 0.712 & 0.742 & 0.797 & \textbf{0.811} & \underline{0.717} & 0.676 & \underline{0.821} & \underline{0.837} & 0.843 \\
+mBert & 0.875 & \textbf{0.669} & 0.673 & \underline{0.740} & \underline{0.822} & 0.831 & \underline{0.790} & \textbf{0.725} & 0.720 & \textbf{0.851} & \textbf{0.846} & 0.858 \\
+mDeberta-base & 0.867 & 0.609 & 0.639 & 0.694 & 0.804 & 0.788 & 0.786 & 0.692 & 0.631 & 0.774 & 0.800 & 0.802 \\
+mDeberta-large & \textbf{0.887} & \underline{0.657} & 0.673 & \textbf{0.751} & \textbf{0.853} & 0.816 & 0.789 & 0.649 & 0.634 & -- & \underline{0.837} & 0.837 \\
+\hline
+\rowcolor{lightgray}\multicolumn{13}{c}{\textbf{Decoder-based SLMs}} \\
+\hline
+Llama3-8B (van) & -- & -- & 0.673 & -- & -- & 0.821 & -- & -- & 0.677 & -- & -- & 0.880 \\
+Llama3-8B (atl) & -- & -- & \textbf{0.757} & -- & -- & \underline{0.887} & -- & -- & \underline{0.803} & -- & -- & \underline{0.907} \\
+Llama3-8B (clf) & -- & -- & \underline{0.743} & -- & -- & \textbf{0.890} & -- & -- & \textbf{0.824} & -- & -- & \textbf{0.909} \\
+\hline
+\end{tabular}

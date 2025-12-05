@@ -16,30 +16,21 @@ nvidia-smi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # VARs
-MODEL_TYPE="plm" # classifier slm
-TRAINING_LANGS=("en" "ru")
+MODEL_TYPE="slm" # classifier slm
 TEST_LANG="bg"
+TRAINING_LANGS=("en")
 LANG="$TEST_LANG"
 ATL=1
 
-MODEL_NAME="mBert" # qwen3_06b llama3_8b qwen3_8b mBert
-CONTEXT=1
-TRAINING_SIZE_LIST=(5000)
+MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b mBert
+TRAINING_SIZE_LIST=(1000)
 SMOKE_TEST=0
 
+CONTEXT=1
 EXP="cl"
 QUANTIZATION=1
-NOTES=""
+PROMPT_TEMPLATE="instruct"
 
-# Explanation
-EXPLANATION="none"
-
-# HPs
-# EPOCHS=3
-# LR_LIST=(2e-4)
-# BATCH_LIST=(24)
-# GRAD_NORM_LIST=(0.4)
-# WEIGHT_DECAY=0.01
 
 if [ "$MODEL_TYPE" == "plm" ]; then
     # HPs PLMS (12 combos)
@@ -66,20 +57,19 @@ for TRAINING_SIZE in "${TRAINING_SIZE_LIST[@]}"; do
         uv run run.py \
           --model_type "$MODEL_TYPE" \
           --model_name "$MODEL_NAME" \
+          --prompt_template "$PROMPT_TEMPLATE" \
           --lang "$LANG" \
           --quantization "$QUANTIZATION" \
-          --explanation "$EXPLANATION" \
           --context "$CONTEXT" \
           --smoke_test "$SMOKE_TEST" \
           --training_size "$TRAINING_SIZE" \
-          --notes "$NOTES" \
           --epochs "$EPOCHS" \
           --learning_rate "$LR" \
           --batch_size "$BS" \
           --max_grad_norm "$GN" \
           --weight_decay "$WEIGHT_DECAY" \
           --atl "$ATL" \
-          --experimen "$EXP" \
+          --experiment "$EXP" \
           --training_langs "${TRAINING_LANGS[@]}" \
           --test_lang "$TEST_LANG"
 

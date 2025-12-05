@@ -120,7 +120,7 @@ class LM(ABC):
         # Model
         self.model = None
         self.bnb_config = BNB_CONFIG if self.quantization else None
-        self.lora_config = LORA_CONFIG_CLS if self.model_type == "cls" else LORA_CONFIG_LM
+        self.lora_config = LORA_CONFIG_CLS if self.model_type == "clf" else LORA_CONFIG_LM
         
 
     def build(self):
@@ -290,8 +290,8 @@ class SLMClassifier(LM):
         if self.quantization:
             base_model = prepare_model_for_kbit_training(base_model)
 
-        # Base cls model
-        base_cls_model = CustomGenericForSequenceClassification(
+        # Base clf model
+        base_clf_model = CustomGenericForSequenceClassification(
                                                             config=config,
                                                             base_model=base_model,
         )
@@ -300,9 +300,9 @@ class SLMClassifier(LM):
             print("="*20)
             print(f"Loading model from checkpoint {self.model_dir}")
             print("="*20)
-            # model from checkpoint: lora adapters and cls head!
+            # model from checkpoint: lora adapters and clf head!
             model = PeftModel.from_pretrained(
-                model=base_cls_model,
+                model=base_clf_model,
                 model_id=self.model_dir,
                 is_trainable=True,
             )
@@ -311,7 +311,7 @@ class SLMClassifier(LM):
 
             # print(param_names)
         else:
-            model = get_peft_model(base_cls_model, self.lora_config)
+            model = get_peft_model(base_clf_model, self.lora_config)
 
 
         model.gradient_checkpointing_enable()
@@ -360,7 +360,7 @@ class CustomClassificationHead(nn.Module):
 
 SLM_REGISTRY = {
     "slm": SLM,
-    "cls": SLMClassifier,
+    "clf": SLMClassifier,
     "plm": PLM,
 }
 
@@ -369,8 +369,8 @@ def build_slm(model_type: str,
                  quantization: bool = True,
                  model_dir: str = "",
                  from_checkpoint: bool = False,):
-    cls_ = SLM_REGISTRY.get(model_type)
-    return cls_(model_type=model_type,
+    clf_ = SLM_REGISTRY.get(model_type)
+    return clf_(model_type=model_type,
                  model_name=model_name, 
                  quantization=quantization,
                  model_dir=model_dir,

@@ -23,6 +23,7 @@ CONTEXT="$2"
 MODEL_TYPE="$3"
 ATL="$4"
 MODEL_NAME="$5"   # qwen3_06b llama3_8b qwen3_8b
+HP_SEARCH="${6:-1}" # default to run HP search
 
 echo "Running with:"
 echo "  LANG       = $LANG"
@@ -30,6 +31,7 @@ echo "  CONTEXT    = $CONTEXT"
 echo "  MODEL_TYPE = $MODEL_TYPE"
 echo "  ATL        = $ATL"
 echo "  MODEL_NAME = $MODEL_NAME"
+echo "  HP SEARCH = $HP_SEARCH"
 echo
 
 MAIN=1
@@ -37,7 +39,7 @@ TRAINING_SIZE=5000
 SMOKE_TEST=0
 
 EXPERIMENT="binary"
-
+PROMPT_TEMPLATE="instruct" # minimal instruct verbose
 
 # --------------------------------------------------------------------------------------------------
 # HP SELECTION
@@ -47,24 +49,28 @@ EXPERIMENT="binary"
 EPOCHS=3
 LR_LIST=(2e-4)
 BATCH_SIZE_LIST=(24)
-GRAD_NORM_LIST=(1)
+GRAD_NORM_LIST=(0.4)
 WEIGHT_DECAY=0.01
 
-if [ "$MODEL_TYPE" == "plm" ]; then
-    # HPs PLMS (12 combos)
-    EPOCHS=3
-    LR_LIST=(5e-5 1e-5 5e-6)
-    BATCH_SIZE_LIST=(16 32)    
-    GRAD_NORM_LIST=(1)
-    WEIGHT_DECAY=0.01
-else
-    # HPs SLM (9 combos)
-    EPOCHS=3
-    LR_LIST=(5e-4 2e-4 5e-5)
-    BATCH_SIZE_LIST=(24)
-    GRAD_NORM_LIST=(0.4 0.6 0.8)
-    WEIGHT_DECAY=0.01
+
+if [ "$HP_SEARCH" -eq 1 ]; then
+    if [ "$MODEL_TYPE" = "plm" ]; then
+        # PLM HP search (12 combos)
+        EPOCHS=3
+        LR_LIST=(5e-5 1e-5 5e-6)
+        BATCH_SIZE_LIST=(16 32)
+        GRAD_NORM_LIST=(1)
+        WEIGHT_DECAY=0.01
+    else
+        # SLM HP search (9 combos)
+        EPOCHS=3
+        LR_LIST=(5e-4 2e-4 5e-5)
+        BATCH_SIZE_LIST=(24)
+        GRAD_NORM_LIST=(0.4 0.6 0.8)
+        WEIGHT_DECAY=0.01
+    fi
 fi
+
 
 # --------------------------------------------------------------------------------------------------
 # MODEL DIR
@@ -97,6 +103,7 @@ for BS in "${BATCH_SIZE_LIST[@]}"; do
         --experiment "$EXPERIMENT" \
         --model_type "$MODEL_TYPE" \
         --model_name "$MODEL_NAME" \
+        --prompt_template "$PROMPT_TEMPLATE" \
         --lang "$LANG" \
         --context "$CONTEXT" \
         --atl "$ATL" \

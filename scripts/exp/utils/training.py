@@ -136,7 +136,6 @@ def train(args: Namespace,
         metrics = evaluate_wrapper(
                     model_type=args.model_type,
                     model=model,
-                    explanation_flag=args.evaluation_explanation_flag,
                     tokenizer_test=tokenizer_test,
                     dataloader=dev_test_dataloader
                     )
@@ -148,7 +147,6 @@ def train(args: Namespace,
         metrics = evaluate_wrapper(
                     model_type=args.model_type,
                     model=model,
-                    explanation_flag=args.evaluation_explanation_flag,
                     tokenizer_test=tokenizer_test,
                     dataloader=test_dataloader
                     )
@@ -159,7 +157,6 @@ def train(args: Namespace,
     return train_loss, dev_loss, dev_metrics, test_metrics, duration
 
 def evaluate_slm(model: Module, 
-                 explanation_flag: bool,
                  tokenizer_test,
                  dataloader: torch.utils.data.DataLoader
                  ) -> dict[str, float]:
@@ -182,7 +179,7 @@ def evaluate_slm(model: Module,
             generated_ids = model.generate(
                 input_ids=input_ids,
                 attention_mask=attn_mask,
-                max_new_tokens=128 if explanation_flag else 24,
+                max_new_tokens=24,
                 )
         
         # Get only newly generated ids
@@ -310,17 +307,15 @@ def evaluate_classification(model: torch.nn.Module,
 
 def evaluate_wrapper(model_type: str,
                         model: Module,
-                        explanation_flag: bool,
                         tokenizer_test,
                         dataloader: DataLoader) -> float:
     """Wrapper for test set evaluation"""
-    if model_type == "cls" or model_type == "plm":
+    if model_type == "clf" or model_type == "plm":
         metrics = evaluate_classification(model=model, 
                                           dataloader=dataloader)
         return metrics
     if model_type == "slm":
         metrics = evaluate_slm(model=model, 
-                              explanation_flag=explanation_flag,
                               tokenizer_test=tokenizer_test,
                               dataloader=dataloader)
         return metrics

@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=e1-atl-it-c1
+#SBATCH --job-name=e1-clf-ro-800
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=10:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
@@ -21,14 +21,16 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # --------------------------------------------------------------------------------------------------
 
 # VARs
-MAIN=0
-MODEL_TYPE="cls" # classifier slm plm cls
-LANG="en"
-ATL=1
+MAIN=1
+HP_SEARCH=0
+MODEL_TYPE="clf" # clf slm plm clf
+LANG="ro" # try nl_ct24
+ATL=0
 CONTEXT=1
+PROMPT_TEMPLATE="instruct" # minimal instruct verbose
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b mBert
-TRAINING_SIZE=5000
+TRAINING_SIZE=800
 SMOKE_TEST=0
 
 EXPERIMENT="binary"
@@ -37,29 +39,32 @@ EXPERIMENT="binary"
 # HP SELECTION
 # --------------------------------------------------------------------------------------------------
 
-# HPs (single)
-EPOCHS=3
-LR_LIST=(2e-4)
-BATCH_SIZE_LIST=(24)
-GRAD_NORM_LIST=(1)
-WEIGHT_DECAY=0.01
-
-if [ "$MODEL_TYPE" == "plm" ]; then
-    # HPs PLMS (12 combos)
+# Single run
+if [ "$HP_SEARCH" -eq 0 ]; then
+    
     EPOCHS=3
-    LR_LIST=(5e-5 1e-5 5e-6)
-    BATCH_SIZE_LIST=(16 32)    
+    LR_LIST=(2e-4)
+    BATCH_SIZE_LIST=(24)
     GRAD_NORM_LIST=(1)
     WEIGHT_DECAY=0.01
+# HP Search, branching for plm and slm
 else
-    # HPs SLM (9 combos)
-    EPOCHS=3
-    LR_LIST=(5e-4 2e-4 5e-5)
-    BATCH_SIZE_LIST=(24)
-    GRAD_NORM_LIST=(0.4 0.6 0.8)
-    WEIGHT_DECAY=0.01
+    if [ "$MODEL_TYPE" = "plm" ]; then
+        # HP search for PLMs
+        EPOCHS=3
+        LR_LIST=(5e-5 1e-5 5e-6)
+        BATCH_SIZE_LIST=(16 32)
+        GRAD_NORM_LIST=(1)
+        WEIGHT_DECAY=0.01
+    else
+        # HP search for SLMs
+        EPOCHS=3
+        LR_LIST=(5e-4 2e-4 5e-5)
+        BATCH_SIZE_LIST=(24)
+        GRAD_NORM_LIST=(0.4 0.6 0.8)
+        WEIGHT_DECAY=0.01
+    fi
 fi
-    
     
 
 # --------------------------------------------------------------------------------------------------
@@ -90,6 +95,7 @@ for BS in "${BATCH_SIZE_LIST[@]}"; do
         --experiment "$EXPERIMENT" \
         --model_type "$MODEL_TYPE" \
         --model_name "$MODEL_NAME" \
+        --prompt_template "$PROMPT_TEMPLATE" \
         --lang "$LANG" \
         --context "$CONTEXT" \
         --atl "$ATL" \

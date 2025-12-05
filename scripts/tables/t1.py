@@ -26,7 +26,7 @@ MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
 run_re = re.compile(r"run_\w+")
 meta_re = re.compile(r"meta_\d+")
 
-LANGS = ["en","nl","no","it","pt","ro","ru","uk","bg","id", "vi", "tr"]
+LANGS = ["en","nl","no","it","pt","ro","ru","uk","bg", "vi", "id", "tr"]
 
 def load_metrics(path):
     """"Load a sinlge meta_file"""
@@ -60,17 +60,26 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                     continue
 
                 meta = load_metrics(meta_path)
-
+                print(meta_path)
                 # filter by context
                 if meta["context"] != configs['context']:
                     print(f"Skipping due to context mismatch: {meta_path}")
                     continue
-                    
-                print(meta_path)
+
+                # filter by prompt_template
+                if ("prompt_template" in meta and meta["prompt_template"] != configs['prompt_template']):
+                    print(f"Skipping due to prompt template mismatch: {meta_path}")
+                    continue
+
+                # filter by training_size
+                if (meta["model_type"] != "icl" and meta["training_size"] != configs['training_size']):
+                    print(f"Skipping due to training size mismatch {meta['training_size']}: {meta_path}")
+                    continue
+
                 # variant generation
                 variant = ""
                 model_name = MODEL_DISPLAY_NAMES[meta["model_name"]]
-                if meta["model_type"] == "cls":
+                if meta["model_type"] in ["cls", "clf", "classifier"]: # we use inconsistent names
                     variant = "(clf)"
                 if meta["model_type"] == "slm" and meta["atl"]  == True:
                     variant = "(atl)"
@@ -88,13 +97,15 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                     if meta['shots'] == False and meta["verbose"]  == False:
                         variant = "(0-s)"
                 
+
+
                 if variant != "":
                     model_name = f"{model_name} {variant}"
 
                 # panel generation
                 if meta["model_type"] == "icl":
                     panel = "LLMs"
-                if meta["model_type"] in ["slm", "cls"]:
+                if meta["model_type"] in ["slm", "cls", "clf", "classifier"]:
                     panel = "SLMs"
                 if meta["model_type"] in ["plm"]:
                     panel = "PLMs"
@@ -116,7 +127,7 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                     dev_metrics = meta.get("dev_metrics", [])
                     test_metrics = meta.get("test_metrics", [])
 
-                    count[(model_name, meta['lang'], panel)] += 1
+                    count[(model_name, meta['lang'], panel, os.path.dirname(meta_path))] += 1
 
                     # go over epochs
                     for dev_entry in dev_metrics:
@@ -152,6 +163,10 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     print("MODEL COUNT")
     for k,v in count.items():
         print(f"{k}: {v}") 
+        if k[0][1] == "PLMs" and v != 6:
+            print("CHECK ABOVE")
+        if k[0][1] == "SLMs" and v != 9:
+            print("CHECK ABOVE")
     print("="*20)
 
     panel_order = ["LLMs", "PLMs", "SLMs"]
@@ -185,7 +200,8 @@ def latex_table(rows, context):
     # print LaTeX table
     table = "\n\n"
     colspec = "l" + "c" * len(LANGS)
-    header = "Model $\\downarrow$\\ Language $\\rightarrow$  & " + " & ".join(LANGS) + " \\\\"
+    
+    header = "\\textbf{Model} $\\downarrow$\\ \\textbf{Language} $\\rightarrow$ & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + " \\\\"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += "\\hline\n"
@@ -223,7 +239,7 @@ def latex_table(rows, context):
 
         if prev is None and panel == "LLMs":
                 # table += "\\hline\n"
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based Large Language Models}}}} \\\\\n"
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based LLMs}}}} \\\\\n"
                 table += "\\hline\n"
         if prev and prev != panel:
             if panel == "PLMs":
@@ -232,7 +248,7 @@ def latex_table(rows, context):
                 table += "\\hline\n"
             elif panel == "SLMs":
                 table += "\\hline\n"    
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based Small Language Models}}}} \\\\\n"   
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based SLMs}}}} \\\\\n"   
                 table += "\\hline\n"
         
         table += f"{name} & " + " & ".join(cells) + " \\\\\n"
@@ -243,7 +259,7 @@ def latex_table(rows, context):
     table += "\\end{tabular}\n"
 
     # Save to file
-    with open(f"table1_test.tex", "w", encoding="utf-8") as f:
+    with open(f"table1.tex", "w", encoding="utf-8") as f:
         f.write(table)
 
     print(table)
@@ -260,7 +276,8 @@ def main():
 
     configs: dict = {"context": True,
                      "metric": "accuracy", # accuracy or f1
-                     }
+                     "prompt_template": "instruct",
+                     "training_size": 5000}
 
     all_models = load_all_models(configs=configs, path=SLM_DIR)
     latex_table(all_models, configs["context"])

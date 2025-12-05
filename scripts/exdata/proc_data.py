@@ -8,11 +8,6 @@ from collections import defaultdict
 SEED = 42
 random.seed(SEED)
 
-LANG_MAP = {'english': 'en',
-            'dutch': 'nl',
-            'bulgarian': 'nl',
-            'arabic': 'ar'}
-
 BASE_DIR = os.getenv("BASE_WCD", ".")
 IN_DIR = os.path.join(BASE_DIR, "data/raw")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets")
@@ -37,6 +32,11 @@ def prepare_data(data_name: str, lang: str) -> list:
     
     for k, v in out.items():
         random.shuffle(v)
+        pos = [x for x in v if x['label'] == 1][:5000]
+        neg = [x for x in v if x['label'] == 0][:5000]
+        downsampled = pos + neg
+        random.shuffle(downsampled)
+        out[k] = downsampled
 
     ds = DatasetDict({
         "train": Dataset.from_list(out['train']),
@@ -44,13 +44,13 @@ def prepare_data(data_name: str, lang: str) -> list:
         "test": Dataset.from_list(out['test']),
     })
 
-    out_dir = os.path.join(OUT_DIR, "ex", f"{LANG_MAP[lang]}_{data_name}")
+    out_dir = os.path.join(OUT_DIR, "ex", f"{lang}_{data_name}")
     ds.save_to_disk(out_dir)
 
 def main():
 
-    data = {"ct24": ["english", 'dutch', "arabic"],
-            "nlp4if": ["english", 'bulgarian', "arabic"]
+    data = {"ct24": ["en", 'nl', "ar"],
+            "nlp4if": ["en", 'bg', "ar"]
             }
     
     for data_name, languages in data.items():
