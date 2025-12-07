@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=e1-clf-ro-800
+#SBATCH --job-name=e1-clf-no-800
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=01:00:00
@@ -24,7 +24,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 MAIN=1
 HP_SEARCH=0
 MODEL_TYPE="clf" # clf slm plm clf
-LANG="ro" # try nl_ct24
+LANG="no" # try nl_ct24
 ATL=0
 CONTEXT=1
 PROMPT_TEMPLATE="instruct" # minimal instruct verbose

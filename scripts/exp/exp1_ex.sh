@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+source ~/.bashrc
+cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
+
+
 LANGS=("en_ct24" "ar_ct24" "nl_ct24" "en_nlp4if" "ar_nlp4if" "bg_nlp4if")
 # LANGS=("en_ct24" "ar_ct24" "nl_ct24" "ar_nlp4if" "bg_nlp4if")
 MODEL_TYPES=("slm" "clf") # slm clf

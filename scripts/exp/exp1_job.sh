@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040,erc-hpc-comp050
 
 # comp050 slow
 # comp039 has error
@@ -18,12 +18,16 @@ nvidia-smi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-LANG="$1"
-CONTEXT="$2"
-MODEL_TYPE="$3"
-ATL="$4"
-MODEL_NAME="$5"   # qwen3_06b llama3_8b qwen3_8b
-HP_SEARCH="${6:-1}" # default to run HP search
+
+LANG="${LANG}"
+CONTEXT="${CONTEXT}"
+MODEL_TYPE="${MODEL_TYPE}"
+ATL="${ATL}"
+MODEL_NAME="${MODEL_NAME}"
+HP_SEARCH="${HP_SEARCH}"
+BATCH_SIZE="${BATCH_SIZE:-24}"
+PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
+TRAINING_SIZE="${TRAINING_SIZE:-5000}"
 
 echo "Running with:"
 echo "  LANG       = $LANG"
@@ -32,14 +36,17 @@ echo "  MODEL_TYPE = $MODEL_TYPE"
 echo "  ATL        = $ATL"
 echo "  MODEL_NAME = $MODEL_NAME"
 echo "  HP SEARCH = $HP_SEARCH"
+echo "  BATCH_SIZE = $BATCH_SIZE"
+echo "  PROMPT_TEMPLATE = $PROMPT_TEMPLATE"
+echo "  TRAINING_SIZE = $TRAINING_SIZE"
 echo
 
+# VARS
+EXPERIMENT="binary"
 MAIN=1
-TRAINING_SIZE=5000
 SMOKE_TEST=0
 
-EXPERIMENT="binary"
-PROMPT_TEMPLATE="instruct" # minimal instruct verbose
+
 
 # --------------------------------------------------------------------------------------------------
 # HP SELECTION
@@ -48,7 +55,7 @@ PROMPT_TEMPLATE="instruct" # minimal instruct verbose
 # HPs (single)
 EPOCHS=3
 LR_LIST=(2e-4)
-BATCH_SIZE_LIST=(24)
+BATCH_SIZE_LIST=("$BATCH_SIZE")
 GRAD_NORM_LIST=(0.4)
 WEIGHT_DECAY=0.01
 

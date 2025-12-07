@@ -1,23 +1,114 @@
 import os
 from pdb import run
-import re
+
 import json
 import glob
 from collections import defaultdict
-import sys
 import matplotlib.pyplot as plt
 import argparse
+from pathlib import Path
 
+# ----------------------------------------------------------------------
+# Configs
+# ----------------------------------------------------------------------
 BASE_DIR = os.getenv("BASE_WCD")
+EXP1_DIR = os.path.join(BASE_DIR, "data/exp1")
 EXP2_DIR = os.path.join(BASE_DIR, "data/exp2")
 
-LANG_METRICS_MAP = {"bg": {"mono": 0.80, "size": 0.65},}
+LAST_EPOCH = True
 
+def collect_monoliongual_metrics(configs: dict,) -> dict:
+    lang_dir = os.path.join(EXP1_DIR, configs["test_lang"])
+    # get all meta files
+    all_lang_runs = [f for f in os.listdir(lang_dir)
+                      if os.path.isdir(os.path.join(lang_dir, f))]
+    evals = []
+    for run_dir in all_lang_runs:
+        meta_paths = glob.glob(os.path.join(lang_dir, run_dir, "meta_*.json"))
+        
+        # skipt those; as we only look for one meta per run
+        if len(meta_paths) == 0 or len(meta_paths) > 1:
+            continue
+        
+        meta = load_meta(meta_paths[0])
+        
+        if "training_size" not in meta:
+            continue
+
+        if meta['training_size'] in [200, 400, 600, 800] and meta['model_type'] in configs['model_type']:            
+            
+            if LAST_EPOCH:
+                evals.append((meta['training_size'],
+                              meta['dev_metrics'][-1]['metrics']['accuracy'],
+                              meta['test_metrics'][-1]['metrics']['accuracy'],))
+            else:
+                best_epoch = find_best_epoch(meta, metric="accuracy")
+                evals.append((meta['training_size'],
+                              best_epoch['dev_metric'],
+                              best_epoch['test_metric'],))
+            
+    evals = sorted(evals, key=lambda x: x[0])
+    out = {"training_langs": [configs["test_lang"]], "evals": evals, "run_dir": lang_dir}
+    print("="*20)
+    print("MONOLINGUAL EVALS")
+    print(out)
+    print("="*20)
+    return out
+
+def collect_best_monolingual_baseline(configs: dict,) -> dict:
+    lang_dir = os.path.join(EXP1_DIR, configs["test_lang"])
+    # get all meta files
+    all_lang_runs = [f for f in os.listdir(lang_dir)
+                      if os.path.isdir(os.path.join(lang_dir, f))]
+    
+    best_acc = 0.0
+    for run_dir in all_lang_runs:
+        meta_paths = glob.glob(os.path.join(lang_dir, run_dir, "meta_*.json"))
+        for meta_path in meta_paths:
+            meta = load_meta(meta_path)
+
+            if meta['model_type'] in configs['model_type']:
+                if meta['training_size'] == 5000: 
+                    meta = load_meta(meta_path)
+                    best_epoch = find_best_epoch(meta, metric="accuracy")
+                    test_acc = best_epoch['test_metric']
+                    if test_acc > best_acc:
+                        best_acc = test_acc
+    configs['mono_baseline'] = best_acc
+    return configs
 
 def load_meta(meta_path: str):
     with open(meta_path, "r") as f:
         meta = json.load(f)
     return meta
+
+def find_best_epoch(meta: dict, metric: str) -> dict:
+    best_epoch = None
+    best_dev_metric = float("-inf")
+
+    dev_metrics = meta.get("dev_metrics", [])
+    test_metrics = meta.get("test_metrics", [])
+
+    for dev_entry in dev_metrics:
+        epoch = dev_entry["epoch"]
+        dev_metric = dev_entry["metrics"][metric]
+
+        if dev_metric > best_dev_metric:
+            test_entry = next(
+                (t for t in test_metrics if t["epoch"] == epoch),
+                None
+            )
+            if test_entry is None:
+                continue
+
+            best_dev_metric = dev_metric
+            best_epoch = {
+                "epoch": epoch,
+                "dev_metric": dev_metric,
+                "test_metric": test_entry["metrics"][metric],
+            }
+
+    return best_epoch
 
 def get_metas(run_dict: dict) -> list[tuple[int, float, float]]:
 
@@ -36,21 +127,13 @@ def get_metas(run_dict: dict) -> list[tuple[int, float, float]]:
         else:
             training_size = meta['training_size']
 
-        best_dev = -1.0
-        best_dev_epoch = None
-        for x in meta['dev_metrics']:
-            dev_acc = x['metrics']['accuracy']
-            if dev_acc > best_dev:
-                best_dev = dev_acc
-                best_dev_epoch = x['epoch']
-
-        test_acc = None
-        for x in meta['test_metrics']:
-            if x['epoch'] == best_dev_epoch:
-                test_acc = x['metrics']['accuracy']
-                break
-
-        evals.append((training_size, best_dev, test_acc))
+        if LAST_EPOCH:
+            best_dev = meta['dev_metrics'][-1]['metrics']['accuracy']
+            test_acc = meta['test_metrics'][-1]['metrics']['accuracy']
+            evals.append((training_size, best_dev, test_acc))
+        else:
+            best_epoch = find_best_epoch(meta, metric="accuracy")
+            evals.append((training_size, best_epoch['dev_metric'], best_epoch['test_metric']))
     
     run_dict['evals'] = evals
     return run_dict
@@ -59,7 +142,8 @@ def plot_2_stage_ft(all_evals: list, configs: dict):
     """Plot training size vs dev/test accuracy for all runs."""
     
     title = f"Test Language: {configs['test_lang']}"
-    out_path = os.path.join("plots", f"exp2_{configs['test_lang']}.png")
+    model = "slm" if "slm" in configs['model_type'] else "clf"
+    out_path = os.path.join("plots", f"exp2_{configs['test_lang']}_{model}.png")
     plt.figure()
     
     for run_dict in all_evals:
@@ -71,18 +155,18 @@ def plot_2_stage_ft(all_evals: list, configs: dict):
         plt.plot(xs, ys, marker="o", label="1st-stage Training: " + ", ".join(training_langs))
     
     plt.axhline(
-        y=LANG_METRICS_MAP[configs['test_lang']]['mono'],
-        color='black',
+        y=configs['mono_baseline'],
+        color='gray',
         linestyle='--',
         label='Monolingual Baseline',
     )
 
-    plt.axhline(
-        y=LANG_METRICS_MAP[configs['test_lang']]['size'],
-        color='grey',
-        linestyle='--',
-        label=f"800-Sample {configs['test_lang']} Baseline",
-    )
+    # plt.axhline(
+    #     y=configs['size_baseline'],
+    #     color='grey',
+    #     linestyle='--',
+    #     label=f"800-Sample {configs['test_lang']} Baseline",
+    # )
     
     plt.xticks([0, 200, 400, 600, 800])
     plt.title(title)
@@ -134,35 +218,63 @@ def select_runs(configs: dict) -> list[str]:
             meta_1 = load_meta(meta_1_path)
             
             # Skip if not fitting configs
-            if meta_1['model_type'] != configs["model_type"]:
+            if meta_1['model_type'] not in configs["model_type"]:
                 continue
             if meta_1['training_langs'] not in configs["training_langs"]:
                 continue
+            if ("atl" in configs and meta_1['atl'] != configs['atl']):
+                continue
+
 
             select_runs.append({"run_dir": run_dir,
                                 "training_langs": meta_1['training_langs'],})
     return select_runs
 
 def main():
-    configs = {"test_lang": "bg",
-               "training_langs": [["ru"], ["en", "ru"]],
-               "model_type": "slm",}
+    configs = [{"test_lang": "bg",
+               "training_langs": [["en"], ["en", "ru"], ["ru"]],
+               "model_type": ["clf", "classifier", "cls"]},
+              {"test_lang": "no",
+               "training_langs": [["en"], ["en", "nl"], ["nl"]],
+               "model_type": ["clf", "classifier", "cls"]},
+               {"test_lang": "ro",
+               "training_langs": [["en"], ["en", "it"], ['it']],
+               "model_type": ["clf", "classifier", "cls"]},]
+
+    configs = [{"test_lang": "bg",
+               "training_langs": [["en"], ["en", "ru"], ["ru"]],
+               "model_type": ["slm"],
+               "atl": True},
+              {"test_lang": "no",
+               "training_langs": [["en"], ["en", "nl"], ["nl"]],
+               "model_type": ["slm"],
+               "atl": True},
+               {"test_lang": "ro",
+               "training_langs": [["en"], ["en", "it"], ['it']],
+               "model_type": ["slm"],
+               "atl": True},]
     
-    selected_runs = select_runs(configs=configs)
-    print("="*20)
-    print(f"Selected {len(selected_runs)} runs:")
-    for run_dict in selected_runs:
-        print(run_dict["run_dir"])
-    print("="*20)
-    all_evals = []
-    for run_dict in selected_runs:
-        evals = get_metas(run_dict=run_dict)
-        print(evals)
-        all_evals.append(evals)
-    print(all_evals)
-    plot_2_stage_ft(all_evals=all_evals, configs=configs)
+    for config in configs:
+        # collec monolignual metrics to get baselines
+        config = collect_best_monolingual_baseline(config)
+        # collect monoligual model over training sizes
+        mono_model = collect_monoliongual_metrics(config)
+        print(config)
+        selected_runs = select_runs(configs=config)
+        print("="*20)
+        print(f"Selected {len(selected_runs)} runs:")
+        for run_dict in selected_runs:
+            print(run_dict["run_dir"])
+        print("="*20)
+        all_evals = []
+        for run_dict in selected_runs:
+            evals = get_metas(run_dict=run_dict)
+            print(evals)
+            all_evals.append(evals)
+        print(all_evals)
+        all_evals.append(mono_model)
+        plot_2_stage_ft(all_evals=all_evals, configs=config)
 
 
 if __name__ == "__main__":
     main()
-

@@ -207,7 +207,7 @@ def main():
     table = []
     table.append("\\begin{tabular}{l ccccc cccc cccc c}")
     
-    table.append(" & \\multicolumn{4}{c}{\\textbf{Language Statistics}} & \\multicolumn{4}{c}{\\textbf{Citation Needed (1)}} & \\multicolumn{4}{c}{\\textbf{No Citation Needed (0)}} \\\\")
+    table.append(" & \\multicolumn{4}{c}{\\textbf{Language Statistics}} & \\multicolumn{4}{c}{\\textbf{Citation Needed (0)}} & \\multicolumn{4}{c}{\\textbf{No Citation Needed (1)}} \\\\")
     table.append("\\cmidrule(lr){2-5}\\cmidrule(l){6-9}\\cmidrule(l){10-13}")
     table.append(" & \\textbf{\\#Articles} & \\textbf{\\#FA Articles} & \\textbf{Language Group} & \\textbf{Script} & \\textbf{\\#Claims} & \\textbf{Avg Len} & \\textbf{Numeric (\\%)} & \\textbf{PROPN (\\%)} & \\textbf{\\#Claims} & \\textbf{Avg Len} & \\textbf{Numeric (\\%)} & \\textbf{PROPN (\\%)} & \\textbf{Topic Sim.} \\\\")    
     table.append("\\midrule")

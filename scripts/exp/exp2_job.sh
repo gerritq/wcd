@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040,erc-hpc-comp050
 # comp050 slow
 # comp039 has error
 
@@ -19,19 +19,19 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # -------------------------------------------------------------------
 # Arguments
 # -------------------------------------------------------------------
-TEST_LANG="$1"
-RAW_TRAINING_LANGS="$2" # this is space separated!!
-MODEL_TYPE="$3"
-ATL="$4"
-MODEL_NAME="$5"
-TRAINING_SIZE="$6"
+TEST_LANG="${TEST_LANG}"
+RAW_TRAINING_LANGS="${TRAINING_LANGS}"
+MODEL_TYPE="${MODEL_TYPE}"
+ATL="${ATL}"
+MODEL_NAME="${MODEL_NAME}"
+TRAINING_SIZE="${TRAINING_SIZE}"
 
 # this is to make an array from space sep. string
-read -r -a TRAINING_LANGS <<< "$RAW_TRAINING_LANGS"
+IFS='+' read -r -a TRAINING_LANG_ARR <<< "$TRAINING_LANGS"
 
 echo "Running with:"
 echo "  TEST_LANG      = $TEST_LANG"
-echo "  TRAINING_LANGS = ${TRAINING_LANGS[*]}"
+echo "  TRAINING_LANGS = ${TRAINING_LANG_ARR[*]} (RAW: ${TRAINING_LANGS[*]})"
 echo "  MODEL_TYPE     = $MODEL_TYPE"
 echo "  ATL            = $ATL"
 echo "  MODEL_NAME     = $MODEL_NAME"
@@ -88,7 +88,7 @@ for LR in "${LR_LIST[@]}"; do
         --weight_decay "$WEIGHT_DECAY" \
         --atl "$ATL" \
         --experiment "$EXP" \
-        --training_langs "${TRAINING_LANGS[@]}" \
+        --training_langs "${TRAINING_LANG_ARR[@]}" \
         --test_lang "$TEST_LANG"
 
     done

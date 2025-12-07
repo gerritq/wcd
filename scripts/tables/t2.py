@@ -45,7 +45,7 @@ def load_all_models(configs: dict) -> dict[str, dict]:
                 # variant generation
                 variant = ""
                 model_name = MODEL_DISPLAY_NAMES[meta["model_name"]]
-                if meta["model_type"] == "cls":
+                if meta["model_type"] in ["cls", "clf", "classifier"]:
                     variant = "(clf)"
                 if meta["model_type"] == "slm" and meta["atl"]  == True:
                     variant = "(atl)"
@@ -118,7 +118,22 @@ def load_all_models(configs: dict) -> dict[str, dict]:
         print(f"{k}: {v}") 
     print("="*20)
 
-    sorted_rows = dict(sorted(rows.items(), key=lambda x: x[0]))
+    def sort_key_model_name(model_name: str):
+        # Expect names like "LLaMA-3 (van)" or "Qwen (atl)"
+        parts = model_name.rsplit(" ", 1)
+        if len(parts) == 2 and parts[1].startswith("(") and parts[1].endswith(")"):
+            base = parts[0]
+            variant = parts[1]
+        else:
+            base = model_name
+            variant = ""
+
+        variant_order = {"(van)": 0, "(atl)": 1, "(clf)": 2}
+        return (base, variant_order.get(variant, 99))
+
+    # replace your sort line with:
+    sorted_rows = dict(sorted(rows.items(), key=lambda x: sort_key_model_name(x[0])))
+
     return sorted_rows
 
 def latex_table(rows: dict[str, dict], config: dict) -> str:
@@ -190,18 +205,19 @@ def main():
     for config in configs:
         config['metric'] = 'f1'
         rows = load_all_models(config)
-
-        # add best f1
-        rows["Best submission"] = {}
-        for lang in config['langs']:
-            rows["Best submission"][lang] = config['best_f1'][lang]
-
+        print(rows)
         
-        print(f"Rows for {config['title']}:\n{rows}")
+        # add best f1
+        final_rows = {"Best submission": {}}
+        for lang in config['langs']:
+            final_rows["Best submission"][lang] = config['best_f1'][lang]
+
+        final_rows.update(rows)
+        
+        print(f"Rows for {config['title']}:\n{final_rows}")
 
         # sort rows by model name
-        rows = dict(sorted(rows.items(), key=lambda x: x[0]))
-        table = latex_table(rows, config)
+        table = latex_table(final_rows, config)
 
 if __name__ == "__main__":
     main()

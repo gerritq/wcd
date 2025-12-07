@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+source ~/.bashrc
+cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
+
+
+
 LANGS=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id" "vi" "tr")
 CONTEXTS=(1)
 MODEL_TYPES=("plm")

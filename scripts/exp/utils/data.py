@@ -103,6 +103,9 @@ def get_multilingual_data_sets(args: Namespace,
              train_lang = resample_data(args=args, ds=train_lang)
         train.extend(train_lang)
     
+    # mix langs
+    random.shuffle(train)
+
     print("="*20)
     print("MULTILINGUAL TRAINING DATA")
     print("N:", len(train))
