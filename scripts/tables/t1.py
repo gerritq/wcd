@@ -197,11 +197,20 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     return sorted_rows
 
 def latex_table(rows, context):
+
+    averages = {}
+    for (name, panel), metrics in rows.items():
+        vals = [metrics[l] for l in LANGS if l in metrics.keys() and metrics[l] is not None]
+        avg = sum(vals) / len(vals) if vals else None
+        averages[(name, panel)] = avg
+    highest_avg = max(averages.values())
+    second_highest_avg = sorted(averages.values(), reverse=True)[1]
+
     # print LaTeX table
     table = "\n\n"
-    colspec = "l" + "c" * len(LANGS)
+    colspec = "l" + "c" * (len(LANGS) + 1)
     
-    header = "\\textbf{Model} $\\downarrow$\\ \\textbf{Language} $\\rightarrow$ & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + " \\\\"
+    header = "\\textbf{Model} $\\downarrow$\\ \\textbf{Language} $\\rightarrow$ & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + " & \\textbf{Avg}" +  " \\\\"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += "\\hline\n"
@@ -237,18 +246,27 @@ def latex_table(rows, context):
             else:
                 cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
 
+        # average
+        avg = averages[(name, panel)]
+        if isinstance(avg, (int, float)) and avg == highest_avg:
+            cells.append(f"\\textbf{{{avg:.3f}}}")
+        elif isinstance(avg, (int, float)) and avg == second_highest_avg:
+            cells.append(f"\\underline{{{avg:.3f}}}")
+        else:
+            cells.append(f"{avg:.3f}" if isinstance(avg, (int, float)) else "--")   
+
         if prev is None and panel == "LLMs":
                 # table += "\\hline\n"
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based LLMs}}}} \\\\\n"
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+2}}}{{c}}{{\\textbf{{Decoder-based LLMs}}}} \\\\\n"
                 table += "\\hline\n"
         if prev and prev != panel:
             if panel == "PLMs":
                 table += "\\hline\n"
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Encoder-based PLMs}}}} \\\\\n"
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+2}}}{{c}}{{\\textbf{{Encoder-based PLMs}}}} \\\\\n"
                 table += "\\hline\n"
             elif panel == "SLMs":
                 table += "\\hline\n"    
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+1}}}{{c}}{{\\textbf{{Decoder-based SLMs}}}} \\\\\n"   
+                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANGS)+2}}}{{c}}{{\\textbf{{Decoder-based SLMs}}}} \\\\\n"   
                 table += "\\hline\n"
         
         table += f"{name} & " + " & ".join(cells) + " \\\\\n"

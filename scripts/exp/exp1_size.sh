@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-LANGS=("no" "ro" "bg")
+LANGS=("id" "vi" "tr")
 
 MODEL_TYPES=("slm") # slm clf
 MODEL_NAMES=("llama3_8b") # "qwen3_8b"

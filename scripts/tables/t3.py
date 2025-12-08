@@ -124,11 +124,21 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     return sorted_rows
 
 def latex_table(rows):
+
+    averages = {}
+    for (panel, prompt), metrics in rows.items():
+        vals = [v for v in metrics.values() if isinstance(v, (int, float))]
+        avg = sum(vals) / len(vals) if vals else 0.0
+        averages[(panel, prompt)] = avg
+
+    highest_average_prompt = sorted(averages.items(), key=lambda x: x[1], reverse=True)[0][0]
+    second_highest_average_prompt = sorted(averages.items(), key=lambda x: x[1], reverse=True)[1][0]
+
     # print LaTeX table
     table = "\n\n"
-    colspec = "ll" + "c" * len(LANGS)
+    colspec = "ll" + "c" * (len(LANGS) + 1)
     
-    header = "\\textbf{Loss} & \\textbf{Prompt} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + " \\\\"
+    header = "\\textbf{Loss} & \\textbf{Prompt} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + "& \\textbf{Avg}" + " \\\\"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += "\\hline\n"
@@ -164,6 +174,15 @@ def latex_table(rows):
             else:
                 cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
 
+        avg = averages[(panel, prompt)]
+        if (panel, prompt) == highest_average_prompt:
+            avg_cell = f"\\textbf{{{avg:.3f}}}"
+        elif (panel, prompt) == second_highest_average_prompt:
+            avg_cell = f"\\underline{{{avg:.3f}}}"
+        else:
+            avg_cell = f"{avg:.3f}"
+        cells.append(avg_cell)
+        
         if prev is None and panel == "VAN" and prompt == "minimal":
             table += f"\\multirow{{3}}{{*}}{{Full Token Loss}} & " + f" {prompt} & " + " & ".join(cells) + " \\\\\n"
         elif prev and prev != panel and panel == "ATL" and prompt == "minimal":

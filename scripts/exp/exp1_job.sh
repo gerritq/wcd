@@ -56,7 +56,7 @@ SMOKE_TEST=0
 EPOCHS=3
 LR_LIST=(2e-4)
 BATCH_SIZE_LIST=("$BATCH_SIZE")
-GRAD_NORM_LIST=(0.4)
+GRAD_NORM_LIST=(1)
 WEIGHT_DECAY=0.01
 
 
@@ -121,6 +121,7 @@ for BS in "${BATCH_SIZE_LIST[@]}"; do
         --learning_rate "$LR" \
         --batch_size "$BS" \
         --max_grad_norm "$GN" \
+        --notes "testing 1 grad norm" \
         --weight_decay "$WEIGHT_DECAY"
         
     done

@@ -15,6 +15,7 @@ IN_DIR = os.path.join(BASE_DIR, "data/sents")
 OUT_DIR = os.path.join(BASE_DIR, "data/out/tables")
 os.makedirs(OUT_DIR, exist_ok=True)
 
+metric = "cosine"
 
 """
 - add script, language family and group
@@ -78,7 +79,7 @@ LANG_GROUPS = {
 LANG_MAP = {
     "en": "en", 
     "nl": "nl", 
-    "no": "nb", 
+    "no": "no", 
     "it": "it", 
     "pt": "pt", 
     "ro": "ro",
@@ -105,8 +106,41 @@ def load_data(lang: str):
 
     return data
         
+def cosine_similarity_fa_between_labels(data: list[dict]) -> float:
+    """Cosine similarity between topic distributions of label=1 vs label=0."""
+    def clean_topic(x):
+        if not x:
+            return None
+        return x.split(".")[-1].replace("*", "").strip().lower()
 
-def js_distance_fa_between_labels(data: list[dict]) -> float:
+    pos = Counter(
+        clean_topic(x["topic"])
+        for x in data
+        if x["topic"] and x["source"] == "fa" and int(x["label"]) == 1
+    )
+    neg = Counter(
+        clean_topic(x["topic"])
+        for x in data
+        if x["topic"] and x["source"] == "fa" and int(x["label"]) == 0
+    )
+
+    all_topics = sorted(set(pos + neg))
+
+    pos_p = np.array([pos.get(t, 0) for t in all_topics], dtype=float)
+    neg_q = np.array([neg.get(t, 0) for t in all_topics], dtype=float)
+
+    if pos_p.sum() == 0 or neg_q.sum() == 0:
+        return 0.0
+
+    # normalise to distributions (not strictly necessary for cosine, but fine)
+    pos_p = pos_p / pos_p.sum()
+    neg_q = neg_q / neg_q.sum()
+
+    num = float(np.dot(pos_p, neg_q))
+    den = float(np.linalg.norm(pos_p) * np.linalg.norm(neg_q)) + 1e-12
+    return num / den
+
+def topic_sim_fa_between_labels(data: list[dict]) -> float:
     """gets the js distance between fa and random topics
     to do: may use different topic levels. Currently we are on the lowest with 64 unique topics
     """
@@ -202,7 +236,12 @@ def main():
         else:
             nlp = None
         lang_stats[lang] = compute_stats(data, nlp, nlp_bool)
-        topic_stats[lang] = js_distance_fa_between_labels(data)
+        if metric == "js":
+            topic_stats[lang] = topic_sim_fa_between_labels(data)
+        elif metric == "cosine":
+            topic_stats[lang] = cosine_similarity_fa_between_labels(data)
+        else:
+            raise ValueError(f"Unknown metric: {metric}")
 
     table = []
     table.append("\\begin{tabular}{l ccccc cccc cccc c}")
@@ -220,13 +259,13 @@ def main():
         script = LANG_SCRIPTS[lang]
         fa0 = get_cell(sdict, "fa", 0)
         fa1 = get_cell(sdict, "fa", 1)
-        js_distance = topic_stats[lang]
+        topic_sim = topic_stats[lang]
 
         row = (
             f"{lang} & "
             f"\\multicolumn{{1}}{{|c}}{{{n_articles:,}}} & {fa_articles:,} & {lang_group} & {script} & "
             f"\\multicolumn{{1}}{{|c}}{{{fa0[0]:,}}} & {fa0[1]:.1f} & {fa0[2]:.1f} & \\multicolumn{{1}}{{c|}}{{{fa0[3]:.1f}}} & "
-            f"{fa1[0]:,} & {fa1[1]:.1f} & {fa1[2]:.1f} & \\multicolumn{{1}}{{c|}}{{{fa1[3]:.1f}}} & \\multicolumn{{1}}{{c|}}{{{js_distance:.2f}}} \\\\ "
+            f"{fa1[0]:,} & {fa1[1]:.1f} & {fa1[2]:.1f} & \\multicolumn{{1}}{{c|}}{{{fa1[3]:.1f}}} & \\multicolumn{{1}}{{c|}}{{{topic_sim:.2f}}} \\\\ "
         )
         table.append(row)
 

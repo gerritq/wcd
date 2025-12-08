@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=e1-clf-no-800
+#SBATCH --job-name=e1-clf-grad_norm1-tr
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=01:00:00
@@ -21,16 +21,16 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # --------------------------------------------------------------------------------------------------
 
 # VARs
-MAIN=1
+MAIN=0
 HP_SEARCH=0
 MODEL_TYPE="clf" # clf slm plm clf
-LANG="no" # try nl_ct24
+LANG="tr" # try nl_ct24
 ATL=0
 CONTEXT=1
 PROMPT_TEMPLATE="instruct" # minimal instruct verbose
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b mBert
-TRAINING_SIZE=800
+TRAINING_SIZE=5000
 SMOKE_TEST=0
 
 EXPERIMENT="binary"

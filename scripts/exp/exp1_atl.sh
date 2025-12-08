@@ -5,7 +5,8 @@ set -euo pipefail
 # cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 
-LANGS=("nl" "no" "it" "ro" "ru" "uk" "id" "vi" "tr")
+# LANGS=("nl" "no" "it" "ro" "ru" "uk" "id" "vi" "tr")
+LANGS=("en" "ru" "uk")
 MODEL_TYPES=("slm")
 ATLS=(0 1)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b"
