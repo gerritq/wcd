@@ -32,7 +32,7 @@ MODEL_NAME="llama3_8b"
 ATL_VALUES=(1)
 TRAINING_SIZES=(5000) # this is the size per LANG!!!!!!
 
-TIME="02:00:00"
+TIME="02:30:00"
 
 for test_lang in "${TEST_LANGS[@]}"; do
   for training_langs in "${TRAINING_LANG_SETS[@]}"; do

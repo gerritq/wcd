@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=e1-clf-grad_norm1-tr
+#SBATCH --job-name=e1-clf-hp-search-nl
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=10:00:00
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040,erc-hpc-comp050
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034
 
 # comp050 slow
 # comp039 has error
@@ -21,13 +21,13 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # --------------------------------------------------------------------------------------------------
 
 # VARs
-MAIN=0
-HP_SEARCH=0
+MAIN=1
+HP_SEARCH=1
 MODEL_TYPE="clf" # clf slm plm clf
-LANG="tr" # try nl_ct24
-ATL=0
+LANG="nl" # try nl_ct24
+ATL=1
 CONTEXT=1
-PROMPT_TEMPLATE="instruct" # minimal instruct verbose
+PROMPT_TEMPLATE="minimal" # minimal instruct verbose
 
 MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b mBert
 TRAINING_SIZE=5000
@@ -44,8 +44,8 @@ if [ "$HP_SEARCH" -eq 0 ]; then
     
     EPOCHS=3
     LR_LIST=(2e-4)
-    BATCH_SIZE_LIST=(24)
-    GRAD_NORM_LIST=(1)
+    BATCH_SIZE_LIST=(16)
+    GRAD_NORM_LIST=(0.4)
     WEIGHT_DECAY=0.01
 # HP Search, branching for plm and slm
 else
@@ -60,8 +60,8 @@ else
         # HP search for SLMs
         EPOCHS=3
         LR_LIST=(5e-4 2e-4 5e-5)
-        BATCH_SIZE_LIST=(24)
-        GRAD_NORM_LIST=(0.4 0.6 0.8)
+        BATCH_SIZE_LIST=(16)
+        GRAD_NORM_LIST=(0.4 0.6 1)
         WEIGHT_DECAY=0.01
     fi
 fi

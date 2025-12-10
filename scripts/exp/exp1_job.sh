@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040,erc-hpc-comp050
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040
 
 # comp050 slow
 # comp039 has error
@@ -22,10 +22,10 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 LANG="${LANG}"
 CONTEXT="${CONTEXT}"
 MODEL_TYPE="${MODEL_TYPE}"
-ATL="${ATL}"
 MODEL_NAME="${MODEL_NAME}"
 HP_SEARCH="${HP_SEARCH}"
-BATCH_SIZE="${BATCH_SIZE:-24}"
+ATL="${ATL:-0}" # default 0 for clf and plm
+BATCH_SIZE="${BATCH_SIZE:-16}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
 TRAINING_SIZE="${TRAINING_SIZE:-5000}"
 
@@ -72,8 +72,8 @@ if [ "$HP_SEARCH" -eq 1 ]; then
         # SLM HP search (9 combos)
         EPOCHS=3
         LR_LIST=(5e-4 2e-4 5e-5)
-        BATCH_SIZE_LIST=(24)
-        GRAD_NORM_LIST=(0.4 0.6 0.8)
+        BATCH_SIZE_LIST=(16)
+        GRAD_NORM_LIST=(0.4 0.7 1)
         WEIGHT_DECAY=0.01
     fi
 fi

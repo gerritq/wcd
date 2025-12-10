@@ -6,7 +6,7 @@ set -euo pipefail
 
 
 # LANGS=("nl" "no" "it" "ro" "ru" "uk" "id" "vi" "tr")
-LANGS=("en" "ru" "uk")
+LANGS=("ru" "uk" "id" "vi" "tr")
 MODEL_TYPES=("slm")
 ATLS=(0 1)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b"
@@ -28,13 +28,21 @@ for lang in "${LANGS[@]}"; do
             continue
           fi
 
-          # select time
+          # default time based on prompt template
           if [[ "$ptemp" == "verbose" ]]; then
-            TIME="02:30:00"
+              TIME="02:30:00"
           else
-            TIME="01:30:00"
+              TIME="01:30:00"
           fi
 
+          # override if doing HP search
+          if [[ "$HP_SEARCH" -eq 1 ]]; then
+              if [[ "$ptemp" == "verbose" ]]; then
+                  TIME="15:30:00"
+              else
+                  TIME="10:30:00"
+              fi
+          fi
           job_name="e1-${mtype}-${lang}-atl${atl}-${mname}-${ptemp}"
 
           echo "Submitting: $job_name (time=$TIME)"

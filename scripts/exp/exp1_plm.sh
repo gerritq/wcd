@@ -9,28 +9,25 @@ cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 LANGS=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id" "vi" "tr")
 CONTEXTS=(1)
 MODEL_TYPES=("plm")
-MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l" "mDeberta-b" "mDeberta-l") # "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l"
-atl=0   # ATL has no effect for PLMs
+MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l") # "mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l"
+HP_SEARCH=1
 
-TIME="02:00:00"
+TIME="00:30:00"
 
 for lang in "${LANGS[@]}"; do
-  for ctx in "${CONTEXTS[@]}"; do
+  for context in "${CONTEXTS[@]}"; do
     for mtype in "${MODEL_TYPES[@]}"; do
       for mname in "${MODEL_NAMES[@]}"; do
 
-        job_name="e1-${mtype}-${lang}-c${ctx}-${mname}"
+        job_name="e1-${mtype}-${lang}-c${context}-${mname}-HP${HP_SEARCH}"
 
         echo "Submitting: $job_name (time=$TIME)"
 
-        sbatch --job-name="$job_name" \
-               --time="$TIME" \
-               exp1_job.sh \
-               "$lang" \
-               "$ctx" \
-               "$mtype" \
-               "$atl" \
-               "$mname"
+        sbatch \
+          --job-name="$job_name" \
+          --time="$TIME" \
+          --export=ALL,LANG="$lang",CONTEXT="$context",MODEL_TYPE="$mtype",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH" \
+          exp1_job.sh
 
       done
     done

@@ -16,7 +16,7 @@ NON_MONO_MARKERS = cycle(["s", "^", "v", "D", "P", "X", "*"])
 # Configs
 # ----------------------------------------------------------------------
 BASE_DIR = os.getenv("BASE_WCD")
-EXP1_DIR = os.path.join(BASE_DIR, "data/exp1")
+EXP1_DIR = os.path.join(BASE_DIR, "data/exp1_old2")
 EXP2_DIR = os.path.join(BASE_DIR, "data/exp2")
 
 LAST_EPOCH = True

@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp040,erc-hpc-comp050
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034
 # comp050 slow
 # comp039 has error
 
@@ -61,8 +61,8 @@ else
     # HPs SLMs
     EPOCHS=3
     LR_LIST=(2e-4)
-    BATCH_SIZE_LIST=(24)
-    GRAD_NORM_LIST=(0.4)
+    BATCH_SIZE_LIST=(16)
+    GRAD_NORM_LIST=(1)
     WEIGHT_DECAY=0.01
 fi
 
