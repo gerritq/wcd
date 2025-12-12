@@ -21,16 +21,16 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # --------------------------------------------------------------------------------------------------
 
 # VARs
-MAIN=1
-HP_SEARCH=1
+MAIN=0
+HP_SEARCH=0
 MODEL_TYPE="clf" # clf slm plm clf
-LANG="nl" # try nl_ct24
+LANG="it" # try nl_ct24
 ATL=1
 CONTEXT=1
 PROMPT_TEMPLATE="minimal" # minimal instruct verbose
 
-MODEL_NAME="llama3_8b" # qwen3_06b llama3_8b qwen3_8b mBert
-TRAINING_SIZE=5000
+MODEL_NAME="qwen3_06b" # qwen3_06b llama3_8b qwen3_8b mBert
+TRAINING_SIZE=2000
 SMOKE_TEST=0
 
 EXPERIMENT="binary"
@@ -42,10 +42,10 @@ EXPERIMENT="binary"
 # Single run
 if [ "$HP_SEARCH" -eq 0 ]; then
     
-    EPOCHS=3
+    EPOCHS=1
     LR_LIST=(2e-4)
     BATCH_SIZE_LIST=(16)
-    GRAD_NORM_LIST=(0.4)
+    GRAD_NORM_LIST=(1)
     WEIGHT_DECAY=0.01
 # HP Search, branching for plm and slm
 else

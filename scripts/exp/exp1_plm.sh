@@ -1,15 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-source ~/.bashrc
-cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
-
-
-LANGS=("en" "nl" "no" "it" "pt" "ro" "ru" "uk" "bg" "id" "vi" "tr")
+# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az")
+LANGS=("de" "uz" "sq" "mk" "hy" "az")
 CONTEXTS=(1)
 MODEL_TYPES=("plm")
-MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l") # "mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l"
+MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l") # "mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l"
 HP_SEARCH=1
 
 TIME="00:30:00"

@@ -17,12 +17,8 @@ MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
                       "meta-llama/Llama-3.1-8B-Instruct": "Llama3-8B", # same for cls and slm
                        "Qwen/Qwen3-8B-Base": "Qwen3-8B",
                        "Qwen/Qwen3-8B": "Qwen3-8B",
-                       "microsoft/mdeberta-v3-base": "mDeberta-base",
-                       "microsoft/deberta-v3-large": "mDeberta-large",
-                       "google-bert/bert-base-multilingual-uncased": "mBert",
-                       "FacebookAI/xlm-roberta-base": "XLM-R-base",
-                       "FacebookAI/xlm-roberta-large": "XLM-R-large",
-                       "openai/gpt-4o-mini": "GPT-4o-mini"
+                       "Qwen/Qwen3-8B": "Qwen3-8B",
+                       "CohereLabs/aya-expanse-8b": "Aya-8b",
                         }
 
 run_re = re.compile(r"run_\w+")
@@ -58,13 +54,13 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
             # skip if more than one meta file
             meta_files = [f for f in run_dir.iterdir() if f.is_file()]
             if len(meta_files) > 1 or len(meta_files) == 0:
-                print(f"Multiple files found: {run_dir}")
+                # print(f"Multiple files found: {run_dir}")
                 continue
 
             #iteratre over all met files
             
             if not (meta_files[0].is_file()):
-                print(f"Skipping non-meta-file: {meta_files[0]}")
+                # print(f"Skipping non-meta-file: {meta_files[0]}")
                 continue
 
             meta = load_metrics(meta_files[0])
@@ -72,14 +68,12 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
             
             # FILTERS
             if (meta["model_type"] in ['icl', 'plm']):
-                print(f"Skipping due to model type mismatch: {meta['model_type']}")
+                # print(f"Skipping due to model type mismatch: {meta['model_type']}")
                 continue
 
-            if (meta["batch_size"] != configs['batch_size']):
-                print(f"Skipping due to context batch_size mismatch: {meta_files[0]}")
+            if (meta["prompt_template"] != configs['prompt_template']):
+                # print(f"Skipping due to prompt template mismatch: {meta['prompt_template']}")
                 continue
-
-            # variant generation
 
             # panel generation
             if meta["atl"] == True:
@@ -87,7 +81,7 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
             else:
                 panel = "VAN"
         
-            count[(meta['prompt_template'], meta['lang'], os.path.dirname(meta_files[0]))] += 1
+            count[(meta['model_name'], meta['lang'], os.path.dirname(meta_files[0]))] += 1
 
             best_run = {
                         "model_name": meta["model_name"],
@@ -97,49 +91,51 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                         "test_metric": meta["test_metrics"][-1]["metrics"][configs['metric']],
                                     }
             
-            rows[(panel, meta["prompt_template"])][meta["lang"]] = best_run["test_metric"]
+            rows[(panel, meta["model_name"])][meta["lang"]] = best_run["test_metric"]
+    
+    
+    # sort reverse rows by panel and model name
+    rows = dict(sorted(rows.items(), key=lambda x: (x[0][0], x[0][1]), reverse=True))
     
     print("="*20)
-    print("MODEL COUNT")
+    print("COLLECTED MODELS COUNT")
     for k,v in count.items():
         print(f"{k}: {v}") 
+        print()
     print("="*20)
-    print(rows)
+    print("FINAL ROWS")
+    for k,v in rows.items():
+        print(f"{k}: {v}") 
+        print()
     print("="*20)
-    panel_order = ["VAN", "ATL"]
-    sorted_rows = {}
 
-    for panel in panel_order:
-        panel_rows = {k: v for k, v in rows.items() if k[0] == panel}
 
-        def slm_sort_key(model_key):
-            # get the name
-            order = {"minimal": 0, "instruct": 1, "verbose": 2}
-            return (order.get(model_key, 999), model_key)
 
-        panel_sorted = dict(sorted(panel_rows.items(),
-                                key=lambda x: slm_sort_key(x[0][1])))
-
-        sorted_rows.update(panel_sorted)
-
-    return sorted_rows
+    return rows
 
 def latex_table(rows):
 
-    averages = {}
-    for (panel, prompt), metrics in rows.items():
+    # unique models
+    models = set()
+    for (panel, model_name) in rows.keys():
+        models.add(model_name)
+    n_unique_models = len(models)
+
+    # compute average model performance
+    averages = {} 
+    for (panel, model_name), metrics in rows.items():
         vals = [v for v in metrics.values() if isinstance(v, (int, float))]
         avg = sum(vals) / len(vals) if vals else 0.0
-        averages[(panel, prompt)] = avg
+        averages[(panel, model_name)] = avg
 
-    highest_average_prompt = sorted(averages.items(), key=lambda x: x[1], reverse=True)[0][0]
-    second_highest_average_prompt = sorted(averages.items(), key=lambda x: x[1], reverse=True)[1][0]
+    highest_average_model = sorted(averages.items(), key=lambda x: x[1], reverse=True)[0][0]
+    second_highest_average_model = sorted(averages.items(), key=lambda x: x[1], reverse=True)[1][0]
 
     # print LaTeX table
     table = "\n\n"
     colspec = "ll" + "c" * (len(LANGS) + 1)
     
-    header = "\\textbf{Loss} & \\textbf{Prompt} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + "& \\textbf{Avg}" + " \\\\"
+    header = "\\textbf{Loss} & \\textbf{Model} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + "& \\textbf{Avg}" + " \\\\"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += "\\hline\n"
@@ -149,7 +145,7 @@ def latex_table(rows):
     lang_max = {l: float("-inf") for l in LANGS}
     lang_second_max = {l: float("-inf") for l in LANGS}
 
-    for (_, panel), metrics in rows.items():
+    for (panel, model_name), metrics in rows.items():
         for lang, v in metrics.items():
             if v is None:
                 continue
@@ -161,7 +157,7 @@ def latex_table(rows):
                 lang_second_max[lang] = v
     
     prev=None
-    for (panel, prompt), metrics in rows.items():
+    for (panel, model_name), metrics in rows.items():
         cells = []
         for l in LANGS:
             if l not in metrics.keys():
@@ -175,32 +171,28 @@ def latex_table(rows):
             else:
                 cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
 
-        avg = averages[(panel, prompt)]
-        if (panel, prompt) == highest_average_prompt:
+        avg = averages[(panel, model_name)]
+        if (panel, model_name) == highest_average_model:
             avg_cell = f"\\textbf{{{avg:.3f}}}"
-        elif (panel, prompt) == second_highest_average_prompt:
+        elif (panel, model_name) == second_highest_average_model:
             avg_cell = f"\\underline{{{avg:.3f}}}"
         else:
             avg_cell = f"{avg:.3f}"
         cells.append(avg_cell)
         
-        if prev is None and panel == "VAN" and prompt == "minimal":
-            table += f"\\multirow{{3}}{{*}}{{Full Token Loss}} & " + f" {prompt} & " + " & ".join(cells) + " \\\\\n"
-        elif prev and prev != panel and panel == "ATL" and prompt == "minimal":
+        if prev is None and panel == "VAN":
+            table += f"\\multirow{{{n_unique_models}}}{{*}}{{FTL}} & " + f" {MODEL_DISPLAY_NAMES[model_name]} & " + " & ".join(cells) + " \\\\\n"
+        elif prev and prev != panel and panel == "ATL":
             table += "\\hline\n"
-            table += f"\\multirow{{3}}{{*}}{{Assistant Token Loss}} & " + f" {prompt} & " + " & ".join(cells) + " \\\\\n"
+            table += f"\\multirow{{{n_unique_models}}}{{*}}{{TOL}} & " + f" {MODEL_DISPLAY_NAMES[model_name]} & " + " & ".join(cells) + " \\\\\n"
         else:
-            table += f" & " + f"{prompt} & "+ " & ".join(cells) + " \\\\\n"
+            table += f" & " + f"{MODEL_DISPLAY_NAMES[model_name]} & "+ " & ".join(cells) + " \\\\\n"
             
             
         prev = panel
 
     table += "\\hline\n"
     table += "\\end{tabular}\n"
-
-    # Save to file
-    with open(f"table1.tex", "w", encoding="utf-8") as f:
-        f.write(table)
 
     print(table)
 
@@ -215,10 +207,9 @@ def merge_defaultdicts(d,d1):
 def main():
 
     configs: dict = {"context": True,
-                     "metric": "f1", # accuracy or f1
-                     "prompt_template": "instruct",
-                     "training_size": 5000,
-                     "batch_size": 16,
+                     "metric": "accuracy", # accuracy or f1
+                     "prompt_template": "minimal",
+                     "model_type": "slm",
                      }
 
     all_models = load_all_models(configs=configs, path=SLM_DIR)

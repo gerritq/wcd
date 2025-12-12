@@ -37,12 +37,28 @@ PROMPT_LANGUAGE_MAP = {"en": "English",
                        "id": "Indonesian",
                        "vi": "Vietnamese",
                        "tr": "Turkish",
-                       "ar": "Arabic" # for the nlp4if data
+                       "ar": "Arabic", # for the nlp4if data
+                       "mk": "Macedonian",
+                        "hy": "Armenian",
+                        "sq": "Albanian",
+                        "az": "Azerbaijani",
+                        "sr": "Serbian"
                         }
 
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets")
 MODEL_DIR = os.path.join(BASE_DIR, "data/exp2")
+
+def label_distribution(ds: Dataset) -> Dict[int, int]:
+    """
+    Get label counts for a ds.
+    """
+    counts = {0: 0, 1: 0}
+    for x in ds:
+        label = int(x["label"])
+        counts[label] += 1
+    return counts
+
 
 def filter_long_context_examples(example: dict) -> bool:
     max_chars = 1000
@@ -162,13 +178,19 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
         print(f"Test removed:  {test_removed}")
         print("="*20)
 
+        distributions = {
+            "train": label_distribution(ds["train"]),
+            "dev":   label_distribution(ds["dev"]),
+            "test":  label_distribution(ds["test"]),
+        }
+        
         if args.smoke_test:
             print("="*20)
             print("SMOKE _TEST")
             print("="*20)
             return ds["train"].select(range(96)), ds["dev"].select(range(32)), ds["test"].select(range(32))
     
-    return ds["train"], ds["dev"], ds["test"]
+    return ds["train"], ds["dev"], ds["test"], distributions
 
 def resample_data(args: Namespace, ds: Dataset) -> Dataset:
     """
@@ -193,18 +215,13 @@ def resample_data(args: Namespace, ds: Dataset) -> Dataset:
             pos_count += 1
         else:
             neg_count += 1
-    
-    if len(args.lang) > 2:
-        # Do not need balanced data for the external data
-        print("="*20)
-        print("DATA BALANCE FOR {args.lang}")
-        print(f"LABEL=1 {pos_count}")
-        print(f"LABEL=1 {neg_count}")
-        print("="*20)
-    else:
-        assert pos_count == neg_count, "Dataset unbalanced after resampling."
-        
 
+    print("="*20)
+    print(f"DATA BALANCE FOR {args.lang}")
+    print(f"LABEL=1 {pos_count}")
+    print(f"LABEL=0 {neg_count}")
+    print("="*20)
+        
     return Dataset.from_list(combined)
 
 # --------------------------------------------------------------------------------------------------
@@ -502,7 +519,7 @@ def prepare_data(args: Namespace,
                     )
 
     # Get all data
-    train, dev, test = get_all_data_sets(args=args, data_path=data_dir)
+    train, dev, test, label_dist = get_all_data_sets(args=args, data_path=data_dir)
 
     if not args.atl:
         train_chat = ds_apply_chat_templates(ds=train, 
@@ -591,14 +608,14 @@ def prepare_data(args: Namespace,
         atl_check_tokenize(example=dev_train_tok[0], tokenizer=tokenizer_train)
         print("="*20)
 
-    return train_tok, dev_train_tok, dev_test_tok, test_tok
+    return train_tok, dev_train_tok, dev_test_tok, test_tok, label_dist
 
 def get_data_lm(args: Namespace,
              tokenizer_train,
              tokenizer_test,
             ) -> tuple:
 
-    train, dev_train, dev_test, test = prepare_data(args=args,
+    train, dev_train, dev_test, test, label_dist = prepare_data(args=args,
                                                     tokenizer_train=tokenizer_train,
                                                     tokenizer_test=tokenizer_test,
                                                     )
@@ -628,7 +645,7 @@ def get_data_lm(args: Namespace,
         collate_fn=init_eval_collate_fn(tokenizer_test),
     )
 
-    return train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader
+    return train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader, label_dist
 
 def tokenize_fn_classification(example: Dict, 
                               tokenizer: PreTrainedTokenizerBase
@@ -682,7 +699,7 @@ def get_data_classifier(args: Namespace,
         print("USING WIKIPEDIA DATA")
         print("="*20)
         
-    train, dev, test = get_all_data_sets(args=args, data_path=data_dir)
+    train, dev, test, label_dist = get_all_data_sets(args=args, data_path=data_dir)
         
     # Tokenize function expects a text field
     if args.context:
@@ -731,7 +748,7 @@ def get_data_classifier(args: Namespace,
         collate_fn=init_collate_classification_fn(tokenizer_train),
     )
     # return dev twice to match the return of lm
-    return train_dataloader, dev_dataloader, dev_dataloader, test_dataloader
+    return train_dataloader, dev_dataloader, dev_dataloader, test_dataloader, label_dist
 
 
 def get_data(args: Namespace,

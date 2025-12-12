@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-LANGS=("ru" "uk" "id" "vi" "tr")
+LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az")
 MODEL_TYPES=("clf")
-MODEL_NAMES=("llama3_8b")
+MODEL_NAMES=("qwen3_8b" "aya_8b") #  llama_8b
 
 CONTEXT=1
 HP_SEARCH=0

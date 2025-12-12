@@ -23,7 +23,7 @@ EX1 = os.path.join(BASE_DIR, "data/exp1")
 EX2 = os.path.join(BASE_DIR, "data/exp2")
 
 # CL_TRAINING_SIZES = [200, 400, 600, 800]
-CL_TRAINING_SIZES = [200, 400, 600, 800]
+CL_TRAINING_SIZES = [50, 100, 200, 400, 600, 800]
 
 def get_save_path(args):
     if args.smoke_test:
@@ -115,8 +115,7 @@ def single_stage_training(args):
     if not slm.model.config.pad_token_id:
         slm.model.config.pad_token_id = tokenizer_test.pad_token_id
          
-    train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader = get_data(
-        
+    train_dataloader, dev_train_dataloader, dev_test_dataloader, test_dataloader, label_dist = get_data(
         args=args, 
         tokenizer_train=tokenizer_train,
         tokenizer_test=tokenizer_test, 
@@ -131,7 +130,7 @@ def single_stage_training(args):
                                                         test_dataloader=test_dataloader
     )
     
-    meta['training_size_check'] = len(train_dataloader.dataset)
+    meta['label_dist'] = label_dist
     meta['date'] = datetime.now().isoformat()
     meta['duration'] = duration
     meta['max_memory'] =  torch.cuda.max_memory_allocated() / (1024 ** 3)

@@ -1,18 +1,11 @@
 
 
-\begin{tabular}{lccccccccccccc}
+\begin{tabular}{llccccccccccccccccc}
 \hline
-\textbf{Model} $\downarrow$\ \textbf{Language} $\rightarrow$ & \textbf{en} & \textbf{nl} & \textbf{no} & \textbf{it} & \textbf{pt} & \textbf{ro} & \textbf{ru} & \textbf{uk} & \textbf{bg} & \textbf{vi} & \textbf{id} & \textbf{tr} & \textbf{Avg} \\
+\textbf{Loss} & \textbf{Model} & \textbf{en} & \textbf{nl} & \textbf{no} & \textbf{it} & \textbf{pt} & \textbf{ro} & \textbf{ru} & \textbf{uk} & \textbf{bg} & \textbf{vi} & \textbf{id} & \textbf{tr} & \textbf{sq} & \textbf{hy} & \textbf{mk} & \textbf{az}& \textbf{Avg} \\
 \hline
-XLM-R-base & -- & -- & -- & -- & -- & -- & -- & -- & 0.495 & \underline{0.646} & -- & \textbf{0.695} & 0.612 \\
-XLM-R-large & -- & -- & \textbf{0.640} & -- & -- & \underline{0.650} & -- & -- & \underline{0.527} & -- & -- & \underline{0.667} & 0.621 \\
-mBert & -- & -- & -- & -- & -- & \textbf{0.655} & -- & \underline{0.631} & \textbf{0.560} & -- & -- & \underline{0.667} & 0.628 \\
-mDeberta-base & -- & -- & -- & -- & -- & -- & -- & -- & 0.500 & -- & -- & -- & 0.500 \\
-mDeberta-large & \textbf{0.892} & -- & -- & -- & -- & -- & -- & \textbf{0.681} & -- & \textbf{0.701} & -- & -- & \textbf{0.758} \\
+\multirow{1}{*}{FTL} &  Llama3-8B & \textbf{0.898} & \underline{0.594} & \textbf{0.648} & \underline{0.703} & \underline{0.783} & \textbf{0.789} & \underline{0.793} & \underline{0.673} & \textbf{0.668} & \underline{0.808} & \textbf{0.764} & \underline{0.763} & -- & -- & -- & -- & \underline{0.740} \\
 \hline
-\rowcolor{lightgray}\multicolumn{14}{c}{\textbf{Decoder-based SLMs}} \\
-\hline
-Llama3-8B (van) & -- & \textbf{0.623} & -- & \underline{0.650} & -- & -- & -- & -- & -- & -- & -- & -- & 0.636 \\
-Llama3-8B (atl) & -- & \underline{0.560} & -- & \textbf{0.666} & -- & -- & -- & -- & -- & -- & \textbf{0.725} & -- & \underline{0.650} \\
+\multirow{1}{*}{TOL} &  Llama3-8B & \underline{0.892} & \textbf{0.625} & -- & \textbf{0.733} & \textbf{0.796} & \underline{0.775} & \textbf{0.795} & \textbf{0.708} & \underline{0.668} & \textbf{0.822} & \underline{0.754} & \textbf{0.765} & -- & -- & -- & -- & \textbf{0.757} \\
 \hline
 \end{tabular}

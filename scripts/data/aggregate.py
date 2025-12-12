@@ -10,6 +10,8 @@ INFO_FILE = os.path.join(BASE_DIR, "data/info/aggregate_drop.jsonl")
 
 MAIN_PAGES = {
     "en": "Main_Page",                  # English
+    "de": "Wikipedia:Hauptseite",
+    "zh": "首页",
     "nl": "Hoofdpagina",                # Dutch
     "no": "Forside",                    # Norwegian (Bokmål default)
     "it": "Pagina_principale",          # Italian
@@ -17,10 +19,17 @@ MAIN_PAGES = {
     "ro": "Pagina_principală",          # Rsomanian
     "ru": "Заглавная_страница",         # Russian
     "uk": "Головна_сторінка",           # Ukrainian
+    "sr": "Главна_страна",
     "bg": "Начална_страница",           # Bulgarian
-    "id": "Halaman_Utama",           # Indonesian
     "vi": "Trang_Chính",           # Vietnamese
+    "id": "Halaman_Utama",           # Indonesian
     "tr": "Anasayfa",           # Turkish
+    "uz": "Bosh_Sahifa",
+    "sq": "Faqja_kryesore",
+    "az": "Ana_səhifə",
+    "mk": "Главна_страница",
+    "hy": "Գլխավոր_էջ",
+    "th": "หน้าหลัก"
     }
 
 # For ID, lots of FA/good article pages are discussion (Pembicaraan) pages
@@ -35,13 +44,15 @@ REMOVE_PREFIX = ["Pembicaraan:"]
 PREFIX = ["Pembicaraan:"]
 DROP_PAGES = ["Wikipedia", "Templat", "Template", "Kategori", "Category", "Categorie:Wikipedia", 
               "Categoria", "Categorie", "Категория", "Категорія", "Уикипедия", "Шаблон", 
-              "Потребител", "Thể_loại"]
+              "Потребител", "Thể_loại", "Категорија", "Kateqoriya", "Kategoria"]
 
 
 def main():
     
     languages  = [
         "en",  # English
+        "de",
+        "zh",
         "nl",  # Dutch
         "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
         "it",  # Italian
@@ -49,27 +60,36 @@ def main():
         "ro",  # Romanian
         "ru",  # Russian
         "uk",  # Ukrainian
+        "sr",  # Bulgarian
         "bg",  # Bulgarian
-        "id",
         "vi",
-        "tr"
+        "id",
+        "tr",
+        "uz",
+        "sq",
+        "az",
+        "mk",
+        "hy",
+        "th"
     ]
 
     skip_titles = defaultdict(list)
 
     for lang in languages:
-        if lang not in ['tr', 'id']:
-            all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
-                + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
-            #   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
-            #     + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*")) \
-                    # + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*"))
+        # these langs have enough fa articles and dutch has no good articles
+        if lang in ['en', 'ru', "nl", "de", "zh"]:
+            all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*"))
         else:
             all_files = glob.glob(os.path.join(INPUT_PATH, f"{lang}_fa*")) \
-                + glob.glob(os.path.join(INPUT_PATH, f"{lang}_random*")) \
-                   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*"))
+                   + glob.glob(os.path.join(INPUT_PATH, f"{lang}_good*")) \
+                    + glob.glob(os.path.join(INPUT_PATH, f"{lang}_quality*")) # for uzb only
             
-        print(all_files)
+        
+        print("")
+        print("="*20)
+        print("Language:", lang)
+        print("="*20)
+        # print(all_files)
 
         all_titles = []
         unique_titles = set()
@@ -78,14 +98,16 @@ def main():
                 data = [json.loads(line) for line in f]
 
             filename = os.path.splitext(os.path.basename(file))[0]
-            print(filename)
+            # print(filename)
 
             if filename.endswith("views"):
                 source = "views"
             elif filename.endswith("fa"):
                 source = "fa"
-            elif filename.endswith("good"):
+            elif filename.endswith("good"): # for uz
                 source = "good"
+            elif filename.endswith("quality"): # for uz
+                source = "quality"
             elif filename.endswith("random"):
                 source = "random"
             else:
@@ -120,6 +142,11 @@ def main():
                     unique_titles.add(title)
             
         OUTPUT_FILE = os.path.join(OUT_PATH, f"{lang}_all.jsonl")
+        print("Len of all titles:", len(all_titles))
+        print("N fa:", len([x for x in all_titles if x['source'] == 'fa']))
+        print("N good:", len([x for x in all_titles if x['source'] == 'good']))
+        # This is uz only
+        print("N quality:", len([x for x in all_titles if x['source'] == 'quality']))
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             for entry in all_titles:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")

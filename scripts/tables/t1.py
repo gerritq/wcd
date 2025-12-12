@@ -15,6 +15,8 @@ SLM_DIR = os.path.join(BASE_DIR, "data/exp1")
 MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
                       "meta-llama/Llama-3.1-8B-Instruct": "Llama3-8B", # same for cls and slm
                        "Qwen/Qwen3-8B-Base": "Qwen3-8B",
+                       "Qwen/Qwen3-8B": "Qwen3-8B",
+                       "CohereLabs/aya-expanse-8b": "Aya-8b",
                        "microsoft/mdeberta-v3-base": "mDeberta-base",
                        "microsoft/deberta-v3-large": "mDeberta-large",
                        "google-bert/bert-base-multilingual-uncased": "mBert",
@@ -26,7 +28,8 @@ MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
 run_re = re.compile(r"run_\w+")
 meta_re = re.compile(r"meta_\d+")
 
-LANGS = ["en","nl","no","it","pt","ro","ru","uk","bg", "vi", "id", "tr"]
+
+LANGS = ["en", "nl", "no", "it", "pt", "ro", "ru", "uk", "bg", "vi", "id", "tr", "sq", "hy", "mk", "az"]
 
 def load_metrics(path):
     """"Load a sinlge meta_file"""

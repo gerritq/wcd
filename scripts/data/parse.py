@@ -99,9 +99,18 @@ def main():
                         "ru": "[источник?]",
                         "uk": None,
                         "bg": None,
+                        "sr": "[Činjenica-lat]",
                         "id": "[butuh rujukan]",
                         "vi": "[cần dẫn nguồn]",
                         "tr": "[kaynak belirtilmeli]",
+                        "sq": "[nevojitet citimi]",
+                        "mk": None,
+                        "hy": None,
+                        "az": None,
+                        "de": None,
+                        "zh": "[来源请求]",
+                        "uz": "[manba kerak]",
+                        "th": "[ต้องการอ้างอิง]",
                         }
     stats = {}
 

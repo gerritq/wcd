@@ -28,16 +28,25 @@ LANG_MAP = {
     "ro": "ro",
     "ru": "ru", 
     "uk": "uk", 
+    "sr": "sr",
     "bg": "bg", 
     "id": "id",
     "vi": "vi",
     "tr": "tr",
+    "sq": "sq",
+    "hy": "hy",
+    "mk": "ru",
+    "az": "tr",
+    "zh": "zh",
+    "th": "th",
+    "uz": "tr",
+    "de": "de",
 }
 
 # VARs
 QUOTES = "\"'‘’“”«»‹›„‚"
 QUOTES = re.escape(QUOTES)
-END_PUNCT = ".!?"
+END_PUNCT = ".!?。！？"
 END_PUNCT = re.escape(END_PUNCT)
 
 def clean_paragraph(x: str) -> str:
@@ -235,13 +244,16 @@ def drop_sentence(x: str) -> bool:
     Returns a bool.    
     """
 
-    if not x:
-        return True
+    # Chinese aware
+    if lang != "zh":
+        if len(x.split()) < 4:
+            return True
 
-    x = x.strip()
-    
-    if len(x.split()) < 4:
-        return True
+        if x[0].isalpha() and not x[0].isupper():
+            return True
+    else:
+        if len(x) < 6:
+            return True
 
     if len(x) < 15:
         return True
@@ -338,7 +350,7 @@ def proc_article(article: dict, nlp: Pipeline) -> list[dict]:
     return sents
 
 
-def proc_sentence(item: dict) -> dict:
+def proc_sentence(item: dict, lang: str) -> dict:
     """
     Takes a sentence @item as a dict.
     Cleaning removes citation first, then applies final cleaning.
@@ -351,7 +363,7 @@ def proc_sentence(item: dict) -> dict:
     sentence_clean = final_clean(sentence_clean)
     
     # Check if sentence is drop-worthy
-    if drop_sentence(sentence_clean):
+    if drop_sentence(sentence_clean, lang):
         return None
 
     # Clean the context (check for existence within the functions)
@@ -403,7 +415,8 @@ def main():
                               tokenize_pretokenized=False, 
                               use_gpu=torch.cuda.is_available(),
                               dir=os.getenv('HF_HOME'),
-                              model_dir=os.getenv('HF_HOME'))
+                              model_dir=os.getenv('HF_HOME')
+                              )
 
         all_sents = []
         for article in tqdm(data):
@@ -412,7 +425,7 @@ def main():
         out_sents = []
         seen_claims = set()
         for sent in all_sents:
-            item = proc_sentence(sent)
+            item = proc_sentence(sent, lang)
             if item:
                 claim = item['claim']
                 if claim not in seen_claims:

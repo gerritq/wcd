@@ -3423,6 +3423,23 @@ wheels = [
 ]
 
 [[package]]
+name = "sentence-transformers"
+version = "0.3.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nltk" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scikit-learn" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1d/09/36bcda3e1839fee5ba7bd64779ab3824b5f0bbf19ba32d985692c4141ec0/sentence-transformers-0.3.4.tar.gz", hash = "sha256:1171bc8049cc661e8a244696bdf0ccb622b3fb57515ea2054f635e4ce017f988", size = 61316, upload-time = "2020-08-24T16:28:57.765Z" }
+
+[[package]]
 name = "sentencepiece"
 version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3999,6 +4016,7 @@ dependencies = [
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "seaborn" },
+    { name = "sentence-transformers" },
     { name = "sentencepiece" },
     { name = "stanza" },
     { name = "tiktoken" },
@@ -4029,6 +4047,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.5" },
     { name = "scikit-learn", specifier = ">=1.7.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "sentence-transformers", specifier = ">=0.3.4" },
     { name = "sentencepiece", specifier = ">=0.2.1" },
     { name = "stanza", specifier = ">=1.11.0" },
     { name = "tiktoken", specifier = ">=0.11.0" },

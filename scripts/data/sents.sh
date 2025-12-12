@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=s-3
+#SBATCH --job-name=s-de-uz
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=05:30:00
@@ -14,9 +14,10 @@ nvidia-smi
 
 # "en" "nl" "no"
 # "it" "pt" "ro"
-# "ru" "uk" "bg"
+# "ru" "uk" "bg" "sr"
 # "id" "vi" "tr"
-LANGUAGES=("id" "vi" "tr")
+
+LANGUAGES=("de" "uz") # "az" "mk"
 
 start=$(date +%s)
 
