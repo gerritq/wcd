@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050
 
 # comp050 slow
 # comp039 has error
@@ -70,10 +70,10 @@ if [ "$HP_SEARCH" -eq 1 ]; then
         WEIGHT_DECAY=0.01
     else
         # SLM HP search (9 combos)
-        EPOCHS=3
+        EPOCHS=4
         LR_LIST=(5e-4 2e-4 5e-5)
         BATCH_SIZE_LIST=(16)
-        GRAD_NORM_LIST=(0.4 0.7 1)
+        GRAD_NORM_LIST=(0.5 1)
         WEIGHT_DECAY=0.01
     fi
 fi

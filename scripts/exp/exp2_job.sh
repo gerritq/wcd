@@ -3,7 +3,7 @@
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=04:00:00
-#SBATCH --partition=nmes_gpu,gpu
+#SBATCH --partition=nmes_gpu,gpu,interruptible_gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100

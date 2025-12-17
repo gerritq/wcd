@@ -6,7 +6,7 @@
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=1GB
 
-LANGUAGE_LST=("no") # "ro" "bg" "tr"
+LANGUAGE_LST=("pt" "no") # "ro" "bg" "tr"
 MODEL_LST=("gpt-4o-mini")
 SHOTS_LST=(0 1)
 CONTEXT_LST=(1)

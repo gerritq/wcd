@@ -46,14 +46,17 @@ print("="*20)
 MODEL_MAPPING =  {
     "llama3_1b": "meta-llama/Llama-3.2-1B-Instruct",
     "llama3_3b": "meta-llama/Llama-3.2-3B-Instruct",
+    "llama3_3b_base": "meta-llama/Llama-3.2-3B",
     "llama3_8b": "meta-llama/Llama-3.1-8B-Instruct",
     "llama3_8b_base": "meta-llama/Llama-3.1-8B",
     "qwen3_06b": "Qwen/Qwen3-0.6B",
     "qwen3_06b_base": "Qwen/Qwen3-0.6B-Base",
     "qwen3_4b": "Qwen/Qwen3-4B-Instruct-2507",
+    "qwen3_4b_base": "Qwen/Qwen3-4B",
     "qwen3_8b": "Qwen/Qwen3-8B",
     "qwen3_8b_base": "Qwen/Qwen3-8B-Base",
     "aya_8b": "CohereLabs/aya-expanse-8b",
+    "aya_8b_base": "CohereLabs/aya-expanse-8b",
     "mBert": "google-bert/bert-base-multilingual-uncased",
     "xlm-r-b": "FacebookAI/xlm-roberta-base",
     "xlm-r-l": "FacebookAI/xlm-roberta-large",
@@ -230,44 +233,6 @@ class PLM(LM):
         self.model = model
         self._print_setting()
         return self
-        
-
-class Seq2SeqLM(LM):
-    """
-    Seq2Seq class.
-    """
-    def __init__(self, 
-                 model_type: str,
-                 model_name: str, 
-                 quantization: bool = True,
-                 model_dir: str = "",
-                 from_checkpoint: bool = False,
-    ):
-        super().__init__(
-            model_type=model_type,
-            model_name=model_name, 
-            quantization=quantization,
-            model_dir=model_dir,
-            from_checkpoint=from_checkpoint,
-        )
-
-    def build(self):
-
-        if self.from_checkpoint:
-            model_path = self.model_dir
-        else:
-            model_path = self.model_name
-        model = AutoModelForSequenceClassification.from_pretrained(
-            model_path,
-            num_labels=2,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16 if use_bf16 else "auto",
-        )
-        self.model = model
-        self._print_setting()
-        return self
-        
     
 class SLMClassifier(LM):
     def __init__(self, 

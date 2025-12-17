@@ -76,12 +76,12 @@ set -euo pipefail
 #   "en+de"
 # )
 
-# TEST_LANGS=("az")
-# TRAINING_LANG_SETS=(
-#   # "en"
-#   # "tr"
-#   "en+tr"
-# )
+TEST_LANGS=("az")
+TRAINING_LANG_SETS=(
+  "en"
+  "tr"
+  # "en+tr"
+)
 
 # TEST_LANGS=("mk")
 # TRAINING_LANG_SETS=(
@@ -101,12 +101,11 @@ set -euo pipefail
 # )
 
 MODEL_TYPES=("plm")
-MODEL_NAME="llama3_8b" # "xlm-r-b"
+MODEL_NAME="mBert" # "xlm-r-b"
 ATL_VALUES=(1)
 TRAINING_SIZES=(5000) # this is the size per LANG!!!!!!
-HP_SEARCH=1
 
-TIME="01:00:00"
+TIME="00:30:00"
 
 for test_lang in "${TEST_LANGS[@]}"; do
   for training_langs in "${TRAINING_LANG_SETS[@]}"; do
@@ -126,7 +125,7 @@ for test_lang in "${TEST_LANGS[@]}"; do
           sbatch \
             --job-name="$job_name" \
             --time="$TIME" \
-            --export=ALL,TEST_LANG="$test_lang",TRAINING_LANGS="$training_langs",MODEL_TYPE="$model_type",ATL="$atl",MODEL_NAME="$MODEL_NAME",HP_SEARCH="$HP_SEARCH",TRAINING_SIZE="$training_size" \
+            --export=ALL,TEST_LANG="$test_lang",TRAINING_LANGS="$training_langs",MODEL_TYPE="$model_type",ATL="$atl",MODEL_NAME="$MODEL_NAME",TRAINING_SIZE="$training_size" \
             exp2_job.sh
 
         done

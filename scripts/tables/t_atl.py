@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from argparse import Namespace
 from sys import meta_path
+from utils import load_metrics, find_best_metric_from_hyperparameter_search, LANGS, LANG_ORDER
 
 # ------------------------------------------------------------------------------------------
 # configs
@@ -24,12 +25,6 @@ MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
 run_re = re.compile(r"run_\w+")
 meta_re = re.compile(r"meta_\d+")
 
-LANGS = ["en", "nl", "no", "it", "pt", "ro", "ru", "uk", "bg", "vi", "id", "tr", "sq", "hy", "mk", "az"]
-
-def load_metrics(path):
-    """"Load a sinlge meta_file"""
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     root = Path(path)
@@ -39,13 +34,11 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     # iteratore over all lang dirs
     for lang_dir in root.iterdir():
         if not lang_dir.is_dir():
-            print(f"Skipping non-lang-dir: {lang_dir}")
             continue
         
         # iteratre over runs
         for run_dir in lang_dir.iterdir():
             if not (run_dir.is_dir()):
-                print(f"Skipping non-run-dir: {run_dir}")
                 continue
 
             # store best run in a dict
@@ -53,45 +46,47 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
 
             # skip if more than one meta file
             meta_files = [f for f in run_dir.iterdir() if f.is_file()]
-            if len(meta_files) > 1 or len(meta_files) == 0:
-                # print(f"Multiple files found: {run_dir}")
+
+            if len(meta_files) == 0:
+                # print(f"No meta files found in: {run_dir}")
                 continue
 
-            #iteratre over all met files
-            
-            if not (meta_files[0].is_file()):
-                # print(f"Skipping non-meta-file: {meta_files[0]}")
+            if len(meta_files) != 6:
+                # print(f"Skipping due to unexpected number of meta files ({len(meta_files)}) in: {run_dir}")
                 continue
 
-            meta = load_metrics(meta_files[0])
-            print(meta_files[0])
+            # collect meta    
+            meta_1 = load_metrics(meta_files[0])
             
             # FILTERS
-            if (meta["model_type"] in ['icl', 'plm']):
+            if (meta_1["model_type"] in ['icl', 'plm', "clf"]):
                 # print(f"Skipping due to model type mismatch: {meta['model_type']}")
                 continue
 
-            if (meta["prompt_template"] != configs['prompt_template']):
+            if (meta_1["prompt_template"] != configs['prompt_template']):
                 # print(f"Skipping due to prompt template mismatch: {meta['prompt_template']}")
                 continue
 
             # panel generation
-            if meta["atl"] == True:
+            if meta_1["atl"] == True:
                 panel = "ATL"
             else:
                 panel = "VAN"
+
+            # best metric extraction
+            best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=configs['metric'])
         
-            count[(meta['model_name'], meta['lang'], os.path.dirname(meta_files[0]))] += 1
+            count[(meta_1['model_name'], meta_1['lang'], os.path.dirname(meta_files[0]))] += 1
 
             best_run = {
-                        "model_name": meta["model_name"],
-                        "prompt_template": meta["prompt_template"],
+                        "model_name": meta_1["model_name"],
+                        "prompt_template": meta_1["prompt_template"],
                         "panel": panel,
-                        "lang": meta["lang"],
-                        "test_metric": meta["test_metrics"][-1]["metrics"][configs['metric']],
+                        "lang": meta_1["lang"],
+                        "test_metric": best_metric,
                                     }
             
-            rows[(panel, meta["model_name"])][meta["lang"]] = best_run["test_metric"]
+            rows[(panel, meta_1["model_name"])][meta_1["lang"]] = best_run["test_metric"]
     
     
     # sort reverse rows by panel and model name
@@ -121,29 +116,36 @@ def latex_table(rows):
         models.add(model_name)
     n_unique_models = len(models)
 
-    # compute average model performance
-    averages = {} 
-    for (panel, model_name), metrics in rows.items():
-        vals = [v for v in metrics.values() if isinstance(v, (int, float))]
-        avg = sum(vals) / len(vals) if vals else 0.0
-        averages[(panel, model_name)] = avg
+    lang_max = {l: float('-inf') for l in LANG_ORDER}
+    lang_second_max = {l: float('-inf') for l in LANG_ORDER}
 
-    highest_average_model = sorted(averages.items(), key=lambda x: x[1], reverse=True)[0][0]
-    second_highest_average_model = sorted(averages.items(), key=lambda x: x[1], reverse=True)[1][0]
+    for l in LANG_ORDER: 
+        lang_max[l] = float('-inf')
+        lang_second_max[l] = float('-inf')
+
+        for (panel, model_name), metrics in rows.items():
+            for lang, v in metrics.items():
+                if v is None:
+                    continue
+                # update max and second max in one go
+                if v > lang_max[lang]:
+                    lang_second_max[lang] = lang_max[lang]
+                    lang_max[lang] = v
+                elif v > lang_second_max[lang]:
+                    lang_second_max[lang] = v
 
     # print LaTeX table
     table = "\n\n"
-    colspec = "ll" + "c" * (len(LANGS) + 1)
+    colspec = "ll" + "c" * (len(LANG_ORDER) + 3)
     
-    header = "\\textbf{Loss} & \\textbf{Model} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS]) + "& \\textbf{Avg}" + " \\\\"
+    header = " & & \\multicolumn{" + str(len(LANGS['high'])+1) + "}{c}{\\textbf{High Resource}} & \\multicolumn{" + str(len(LANGS['medium'])+1) + "}{c}{\\textbf{Medium Resource}} & \\multicolumn{" + str(len(LANGS['low'])+1) + "}{c}{\\textbf{Low Resource}} \\\\"
+    header += "\\cmidrule(lr){3-" + str(len(LANGS['high'])+3) + "}  \\cmidrule(lr){" + str(len(LANGS['high'])+4) + "-" + str(len(LANGS['high'])+len(LANGS['medium'])+4) + "}  \\cmidrule(lr){" + str(len(LANGS['high'])+len(LANGS['medium'])+5) + "-" + str(len(LANGS['high'])+len(LANGS['medium'])+len(LANGS['low'])+5) + "}"
+    header += "\\textbf{Loss} & \\textbf{Model} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS["high"]]) + "& \\textbf{Avg}" + " & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS["medium"]]) + "& \\textbf{Avg}" + " & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS["low"]]) + "& \\textbf{Avg} \\\\"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
-    table += "\\hline\n"
     table += header + "\n"
     table += "\\hline\n"
 
-    lang_max = {l: float("-inf") for l in LANGS}
-    lang_second_max = {l: float("-inf") for l in LANGS}
 
     for (panel, model_name), metrics in rows.items():
         for lang, v in metrics.items():
@@ -159,26 +161,26 @@ def latex_table(rows):
     prev=None
     for (panel, model_name), metrics in rows.items():
         cells = []
-        for l in LANGS:
-            if l not in metrics.keys():
-                v = None
+        for resource_set in [LANGS['high'], LANGS['medium'], LANGS['low']]:
+            for l in resource_set:
+                if l not in metrics.keys():
+                    v = None
+                else:
+                    v = metrics[l]
+                if isinstance(v, (int, float)) and v == lang_max[l]:
+                    cells.append(f"\\textbf{{{v:.3f}}}")
+                elif isinstance(v, (int, float)) and v == lang_second_max[l]:
+                    cells.append(f"\\underline{{{v:.3f}}}")
+                else:
+                    cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
+            
+            # average cell  
+            lang_values = [metrics[l] for l in resource_set if l in metrics.keys() and isinstance(metrics[l], (int, float))]
+            if len(lang_values) > 0:
+                avg = sum(lang_values) / len(lang_values)
             else:
-                v = metrics[l]
-            if isinstance(v, (int, float)) and v == lang_max[l]:
-                cells.append(f"\\textbf{{{v:.3f}}}")
-            elif isinstance(v, (int, float)) and v == lang_second_max[l]:
-                cells.append(f"\\underline{{{v:.3f}}}")
-            else:
-                cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
-
-        avg = averages[(panel, model_name)]
-        if (panel, model_name) == highest_average_model:
-            avg_cell = f"\\textbf{{{avg:.3f}}}"
-        elif (panel, model_name) == second_highest_average_model:
-            avg_cell = f"\\underline{{{avg:.3f}}}"
-        else:
-            avg_cell = f"{avg:.3f}"
-        cells.append(avg_cell)
+                avg = 0.0
+            cells.append(f"{avg:.3f}")
         
         if prev is None and panel == "VAN":
             table += f"\\multirow{{{n_unique_models}}}{{*}}{{FTL}} & " + f" {MODEL_DISPLAY_NAMES[model_name]} & " + " & ".join(cells) + " \\\\\n"
@@ -207,8 +209,8 @@ def merge_defaultdicts(d,d1):
 def main():
 
     configs: dict = {"context": True,
-                     "metric": "accuracy", # accuracy or f1
-                     "prompt_template": "minimal",
+                     "metric": "f1", # accuracy or f1
+                     "prompt_template": "instruct", # instruct or cls
                      "model_type": "slm",
                      }
 

@@ -15,7 +15,7 @@ from pathlib import Path
 BASE_DIR = os.getenv("BASE_WCD")
 EXP2_DIR = os.path.join(BASE_DIR, "data/exp2")
 
-LAST_EPOCH = True
+LAST_EPOCH = False
 METRIC="f1"
 SHOTS = [0, 50, 100, 200, 400, 600, 800]
 MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",

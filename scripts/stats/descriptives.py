@@ -38,7 +38,7 @@ LANG_METADATA = {
     "en": {
         "name": "English",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Germanic",
         "resource": "high"
     },
@@ -52,49 +52,49 @@ LANG_METADATA = {
     "pt": {
         "name": "Portuguese",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Romance",
         "resource": "high"
     },
     "de": {
         "name": "German",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Germanic",
         "resource": "high"
     },
     "ru": {
         "name": "Russian",
         "script": "Cyrillic",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Slavic",
         "resource": "high"
     },
     "it": {
         "name": "Italian",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Romance",
         "resource": "high"
     },
     "vi": {
         "name": "Vietnamese",
         "script": "Latin",
-        "family": "Austroasiatic",
+        "family": "AA",
         "group": "Mon-Khmer",
         "resource": "high"
     },
     "tr": {
         "name": "Turkish",
         "script": "Latin",
-        "family": "Turkic",
+        "family": "TRK",
         "group": "Oghuz",
         "resource": "high"
     },
     "nl": {
         "name": "Dutch",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Germanic",
         "resource": "high"
     },
@@ -110,35 +110,35 @@ LANG_METADATA = {
     "uk": {
         "name": "Ukrainian",
         "script": "Cyrillic",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Slavic",
         "resource": "mid"
     },
     "ro": {
         "name": "Romanian",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Romance",
         "resource": "mid"
     },
     "id": {
         "name": "Indonesian",
         "script": "Latin",
-        "family": "Austronesian",
+        "family": "AN",
         "group": "Malayo-Polynesian",
         "resource": "mid"
     },
     "bg": {
         "name": "Bulgarian",
         "script": "Cyrillic",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Slavic",
         "resource": "mid"
     },
     "uz": {
         "name": "Uzbek",
         "script": "Latin",
-        "family": "Turkic",
+        "family": "TRK",
         "group": "Karluk",
         "resource": "mid"
     },
@@ -146,35 +146,35 @@ LANG_METADATA = {
     "no": {
         "name": "Norwegian",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Germanic",
         "resource": "low"
     },
     "az": {
         "name": "Azerbaijani",
         "script": "Latin",
-        "family": "Turkic",
+        "family": "TRK",
         "group": "Oghuz",
         "resource": "low"
     },
     "mk": {
         "name": "Macedonian",
         "script": "Cyrillic",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Slavic",
         "resource": "low"
     },
     "hy": {
         "name": "Armenian",
         "script": "Armenian",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Armenian",
         "resource": "low"
     },
     "sq": {
         "name": "Albanian",
         "script": "Latin",
-        "family": "Indo-European",
+        "family": "IE",
         "group": "Albanian",
         "resource": "low"
     },
@@ -244,17 +244,18 @@ def compute_stats(data: list) -> dict:
         subset = [x for x in data if x['source'] == "fa" and int(x['label']) == label]
         
         random.shuffle(subset)
-        nlp_subset = subset[:300]
-        if not subset:
-            continue
         
         total = len(subset)
         avg_len = np.mean([len(str(x['claim']).split()) for x in subset])
         avg_contain_number = np.mean([contain_number(x['claim']) for x in subset])
+        unique_topics = set(x['topic'] for x in subset if x['topic'])
+
+        
         stats["fa"][label] = {
             "total": total,
             "avg_len": round(float(avg_len), 1),
             "contain_num": round(float(avg_contain_number) * 100, 1),
+            "unique_topics": len(unique_topics)
         }
     return stats
 
@@ -262,8 +263,8 @@ def get_cell(sdict, source, label):
     """Return a 3-tuple (#, len, num%) with safe defaults."""
     d = sdict.get(source, {}).get(label, None)
     if d is None:
-        return (0, 0.0, 0.0)
-    return (d["total"], d["avg_len"], d["contain_num"])
+        return (0, 0.0, 0.0, 0)
+    return (d["total"], d["avg_len"], d["contain_num"], d["unique_topics"])
 
 def main():
 
@@ -284,16 +285,22 @@ def main():
         topic_stats[lang] = cosine_similarity_fa_between_labels(data)
         
     table = []
-    table.append("\\begin{tabular}{l cccc ccc ccc c}")
+    table.append("\\begin{tabular}{l cccc ccc ccc cc}")
     
     table.append(" & \\multicolumn{4}{c}{\\textbf{Language Statistics}} & \\multicolumn{3}{c}{\\textbf{No Citation Needed (0)}} & \\multicolumn{3}{c}{\\textbf{Citation Needed (1)}} \\\\")
     table.append("\\cmidrule(lr){2-5}\\cmidrule(l){6-8}\\cmidrule(l){9-11}")
-    table.append(" & \\textbf{Resource} & \\textbf{\\#Featured Articles} & \\textbf{Language Family/Group} & \\textbf{Script} & \\textbf{\\#Claims} & \\textbf{Avg Len} & \\textbf{#Numeric (\\%)} & \\textbf{\\#Claims} & \\textbf{Avg Len} & \\textbf{#Numeric (\\%)} &  \\textbf{Topic Sim.} \\\\")    
+    table.append(" & \\textbf{Resource} & \makecell{\\textbf{N Featured} \\\\ \\textbf{Articles}} & \makecell{\\textbf{Language Group} \\\\ \\textbf{(Family)}} & \\textbf{Script} & \\textbf{N Claims} & \\textbf{Avg Len} & \\textbf{\\% Numeric} & \\textbf{N Claims} & \\textbf{Avg Len} & \\textbf{\\% Numeric} & \makecell{\\textbf{Unique} \\\\ \\textbf{Topics}} & \makecell{\\textbf{Topic} \\\\ \\textbf{Similarity}} \\\\")    
     table.append("\\hline")
 
     total_no_citation_needed = 0
     total_citation_needed = 0
-    
+    average_len_no_citation_needed = 0.0
+    average_len_citation_needed = 0.0
+    average_numperc_no_citation_needed = 0.0
+    average_numperc_citation_needed = 0.0
+    average_topic_sim = 0.0
+    average_number_unique_topics = 0.0
+
     prev_resource_level = ""
     for lang in langs:
         sdict = lang_stats.get(lang, {})
@@ -302,33 +309,52 @@ def main():
         unique_titles = count_unique_titles(load_data(lang))
         fa_articles = unique_titles
         lang_family, lang_group = LANG_METADATA[lang]["family"], LANG_METADATA[lang]["group"]
-        lang_family_group = f"{lang_family}/{lang_group}"
+        lang_family_group = f"{lang_group} ({lang_family})"
         script = LANG_METADATA[lang]["script"]
         
         fa0 = get_cell(sdict, "fa", 0)
         fa1 = get_cell(sdict, "fa", 1)
+        topic_sim = topic_stats[lang]
+
+        # total/avg stats
         total_no_citation_needed += fa0[0]
         total_citation_needed += fa1[0]
-        topic_sim = topic_stats[lang]
+        average_len_no_citation_needed += fa0[1]
+        average_len_citation_needed += fa1[1]
+        average_numperc_no_citation_needed += fa0[2]
+        average_numperc_citation_needed += fa1[2]
+        average_topic_sim += topic_sim
+        average_number_unique_topics += fa0[3] + fa1[3]
+        
 
         if resource_level != prev_resource_level and lang != "en":
             if prev_resource_level != "":
-                table.append("\\\hdashline")
+                table.append("\\hdashline")
             prev_resource_level = resource_level
 
         row = (
             f"{LANG_METADATA[lang]['name']} ({lang}) & "
             f"{resource_level} & {fa_articles:,} & {lang_family_group} & {script} & "
             f"{fa0[0]:,} & {fa0[1]:.1f} & {fa0[2]:.1f} & "
-            f"{fa1[0]:,} & {fa1[1]:.1f} & {fa1[2]:.1f} & {topic_sim:.2f} \\\\ "
+            f"{fa1[0]:,} & {fa1[1]:.1f} & {fa1[2]:.1f} & {fa0[3]} & {topic_sim:.2f} \\\\ "
         )
         table.append(row)
 
+
+    # Compute averages for the totals row
+    n_langs = len(langs)
+    average_len_no_citation_needed /= n_langs
+    average_len_citation_needed /= n_langs
+    average_numperc_no_citation_needed /= n_langs
+    average_numperc_citation_needed /= n_langs
+    average_topic_sim /= n_langs
+    average_number_unique_topics /= n_langs
+
     table.append("\\midrule")
     table.append(
-        f"\\textbf{{Total}} &  &  &  &  & "
-        f"{total_no_citation_needed:,} &  & & "
-        f"{total_citation_needed:,} &  & & \\\\ "
+        f"Total/Average &  &  &  &  & "
+        f"{total_no_citation_needed:,} & {average_len_no_citation_needed:.1f} & {average_numperc_no_citation_needed:.1f} & "
+        f"{total_citation_needed:,} & {average_len_citation_needed:.1f} & {average_numperc_citation_needed:.1f} & {average_number_unique_topics:.0f} & {average_topic_sim:.2f} \\\\ "
     )
     table.append("\\end{tabular}")
 
@@ -336,11 +362,6 @@ def main():
     print("\n\n")
     print(latex_table)
     print("\n\n")
-
-    # optionally save to file
-    # out_path = os.path.join(OUT_DIR, "desc_new.tex")
-    # with open(out_path, "w", encoding="utf-8") as f:
-    #     f.write(latex_table)
 
 if __name__ == "__main__":
     main()

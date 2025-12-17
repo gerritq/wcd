@@ -5,16 +5,17 @@ set -euo pipefail
 # cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 
-# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az")
-LANGS=("de" "uz")
+# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz")
+LANGS=("vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz")
+# LANGS=("ru" "tr")
 MODEL_TYPES=("slm")
 ATLS=(0 1)
-MODEL_NAMES=("qwen3_8b" "llama_8b" "aya_8b") # qwen3_8b llama_8b aya_8b
-PROMPT_TEMPLATES=("minimal") # ""minimal"  "instruct" "verbose"
+MODEL_NAMES=("qwen3_8b" "llama3_8b" "aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
+PROMPT_TEMPLATES=("instruct") # ""minimal"  "instruct" "verbose"
 BATCH_SIZE=16 # fixed for comparability
 
 CONTEXT=1
-HP_SEARCH=0 # do not run HP search
+HP_SEARCH=1 # do not run HP search
 
 for lang in "${LANGS[@]}"; do
   for mtype in "${MODEL_TYPES[@]}"; do
@@ -32,7 +33,7 @@ for lang in "${LANGS[@]}"; do
           if [[ "$ptemp" == "verbose" ]]; then
               TIME="02:30:00"
           else
-              TIME="01:30:00"
+              TIME="02:30:00"
           fi
 
           # override if doing HP search
@@ -40,7 +41,7 @@ for lang in "${LANGS[@]}"; do
               if [[ "$ptemp" == "verbose" ]]; then
                   TIME="15:30:00"
               else
-                  TIME="10:30:00"
+                  TIME="12:30:00"
               fi
           fi
           job_name="e1-${mtype}-${lang}-atl${atl}-${mname}-${ptemp}"

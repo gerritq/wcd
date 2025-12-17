@@ -1,14 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az")
+LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz")
 MODEL_TYPES=("clf")
-MODEL_NAMES=("qwen3_8b" "aya_8b") #  llama_8b
+MODEL_NAMES=("qwen3_8b" "llama3_8b" "aya_8b") #  llama_8b
 
 CONTEXT=1
-HP_SEARCH=0
+HP_SEARCH=1
 
-TIME="01:30:00"
+TIME="08:00:00"
 
 for lang in "${LANGS[@]}"; do
   for mtype in "${MODEL_TYPES[@]}"; do

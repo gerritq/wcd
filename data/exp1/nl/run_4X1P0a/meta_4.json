@@ -1,0 +1,598 @@
+{
+  "model_type": "slm",
+  "model_name": "CohereLabs/aya-expanse-8b",
+  "atl": true,
+  "context": true,
+  "smoke_test": false,
+  "training_size": 5000,
+  "experiment": "binary",
+  "prompt_template": "instruct",
+  "epochs": 4,
+  "learning_rate": 0.0002,
+  "batch_size": 16,
+  "max_grad_norm": 1.0,
+  "weight_decay": 0.01,
+  "quantization": true,
+  "lang": "nl",
+  "run_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1/nl/run_4X1P0a",
+  "notes": "testing 1 grad norm",
+  "train_log_step": 20,
+  "prompt_extension": "",
+  "max_length": 512,
+  "seed": 42,
+  "training_langs": [],
+  "test_lang": "",
+  "model_dir": "",
+  "save_checkpoint": false,
+  "from_checkpoint": false,
+  "label_dist": {
+    "train": {
+      "0": 2500,
+      "1": 2500
+    },
+    "dev": {
+      "0": 250,
+      "1": 249
+    },
+    "test": {
+      "0": 249,
+      "1": 250
+    }
+  },
+  "date": "2025-12-13T08:28:19.089028",
+  "duration": 48,
+  "max_memory": 36.914169788360596,
+  "bf16": true,
+  "train_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 19.18779182434082
+    },
+    {
+      "epoch": 1,
+      "batch": 20,
+      "loss": 4.284408092498779
+    },
+    {
+      "epoch": 1,
+      "batch": 40,
+      "loss": 1.9908440113067627
+    },
+    {
+      "epoch": 1,
+      "batch": 60,
+      "loss": 2.0858466625213623
+    },
+    {
+      "epoch": 1,
+      "batch": 80,
+      "loss": 1.9960123300552368
+    },
+    {
+      "epoch": 1,
+      "batch": 100,
+      "loss": 1.958559274673462
+    },
+    {
+      "epoch": 1,
+      "batch": 120,
+      "loss": 1.9530576467514038
+    },
+    {
+      "epoch": 1,
+      "batch": 140,
+      "loss": 1.8630096912384033
+    },
+    {
+      "epoch": 1,
+      "batch": 160,
+      "loss": 1.947916030883789
+    },
+    {
+      "epoch": 1,
+      "batch": 180,
+      "loss": 1.910000205039978
+    },
+    {
+      "epoch": 1,
+      "batch": 200,
+      "loss": 1.9687938690185547
+    },
+    {
+      "epoch": 1,
+      "batch": 220,
+      "loss": 2.0039992332458496
+    },
+    {
+      "epoch": 1,
+      "batch": 240,
+      "loss": 1.9437111616134644
+    },
+    {
+      "epoch": 1,
+      "batch": 260,
+      "loss": 1.9607264995574951
+    },
+    {
+      "epoch": 1,
+      "batch": 280,
+      "loss": 1.9668570756912231
+    },
+    {
+      "epoch": 1,
+      "batch": 300,
+      "loss": 1.8342963457107544
+    },
+    {
+      "epoch": 2,
+      "batch": 0,
+      "loss": 1.9994033575057983
+    },
+    {
+      "epoch": 2,
+      "batch": 20,
+      "loss": 1.930374026298523
+    },
+    {
+      "epoch": 2,
+      "batch": 40,
+      "loss": 1.9345952272415161
+    },
+    {
+      "epoch": 2,
+      "batch": 60,
+      "loss": 1.8096189498901367
+    },
+    {
+      "epoch": 2,
+      "batch": 80,
+      "loss": 1.958599328994751
+    },
+    {
+      "epoch": 2,
+      "batch": 100,
+      "loss": 1.9392884969711304
+    },
+    {
+      "epoch": 2,
+      "batch": 120,
+      "loss": 1.9455782175064087
+    },
+    {
+      "epoch": 2,
+      "batch": 140,
+      "loss": 1.9387872219085693
+    },
+    {
+      "epoch": 2,
+      "batch": 160,
+      "loss": 1.9424546957015991
+    },
+    {
+      "epoch": 2,
+      "batch": 180,
+      "loss": 1.936207890510559
+    },
+    {
+      "epoch": 2,
+      "batch": 200,
+      "loss": 1.9467023611068726
+    },
+    {
+      "epoch": 2,
+      "batch": 220,
+      "loss": 1.9310134649276733
+    },
+    {
+      "epoch": 2,
+      "batch": 240,
+      "loss": 1.931503176689148
+    },
+    {
+      "epoch": 2,
+      "batch": 260,
+      "loss": 1.9314062595367432
+    },
+    {
+      "epoch": 2,
+      "batch": 280,
+      "loss": 1.9353276491165161
+    },
+    {
+      "epoch": 2,
+      "batch": 300,
+      "loss": 1.9419479370117188
+    },
+    {
+      "epoch": 3,
+      "batch": 0,
+      "loss": 1.9753824472427368
+    },
+    {
+      "epoch": 3,
+      "batch": 20,
+      "loss": 1.9322460889816284
+    },
+    {
+      "epoch": 3,
+      "batch": 40,
+      "loss": 1.9635963439941406
+    },
+    {
+      "epoch": 3,
+      "batch": 60,
+      "loss": 1.9485715627670288
+    },
+    {
+      "epoch": 3,
+      "batch": 80,
+      "loss": 1.9423635005950928
+    },
+    {
+      "epoch": 3,
+      "batch": 100,
+      "loss": 1.930932879447937
+    },
+    {
+      "epoch": 3,
+      "batch": 120,
+      "loss": 1.9322692155838013
+    },
+    {
+      "epoch": 3,
+      "batch": 140,
+      "loss": 1.9277703762054443
+    },
+    {
+      "epoch": 3,
+      "batch": 160,
+      "loss": 1.9388211965560913
+    },
+    {
+      "epoch": 3,
+      "batch": 180,
+      "loss": 1.9301683902740479
+    },
+    {
+      "epoch": 3,
+      "batch": 200,
+      "loss": 1.9390345811843872
+    },
+    {
+      "epoch": 3,
+      "batch": 220,
+      "loss": 1.921055793762207
+    },
+    {
+      "epoch": 3,
+      "batch": 240,
+      "loss": 1.9496519565582275
+    },
+    {
+      "epoch": 3,
+      "batch": 260,
+      "loss": 1.8048845529556274
+    },
+    {
+      "epoch": 3,
+      "batch": 280,
+      "loss": 1.937996745109558
+    },
+    {
+      "epoch": 3,
+      "batch": 300,
+      "loss": 1.8640470504760742
+    },
+    {
+      "epoch": 4,
+      "batch": 0,
+      "loss": 1.9313068389892578
+    },
+    {
+      "epoch": 4,
+      "batch": 20,
+      "loss": 1.9484316110610962
+    },
+    {
+      "epoch": 4,
+      "batch": 40,
+      "loss": 1.9285507202148438
+    },
+    {
+      "epoch": 4,
+      "batch": 60,
+      "loss": 1.9180269241333008
+    },
+    {
+      "epoch": 4,
+      "batch": 80,
+      "loss": 1.9366856813430786
+    },
+    {
+      "epoch": 4,
+      "batch": 100,
+      "loss": 1.9673150777816772
+    },
+    {
+      "epoch": 4,
+      "batch": 120,
+      "loss": 1.9190407991409302
+    },
+    {
+      "epoch": 4,
+      "batch": 140,
+      "loss": 1.9436653852462769
+    },
+    {
+      "epoch": 4,
+      "batch": 160,
+      "loss": 1.9750083684921265
+    },
+    {
+      "epoch": 4,
+      "batch": 180,
+      "loss": 1.9974428415298462
+    },
+    {
+      "epoch": 4,
+      "batch": 200,
+      "loss": 1.9930256605148315
+    },
+    {
+      "epoch": 4,
+      "batch": 220,
+      "loss": 1.9277887344360352
+    },
+    {
+      "epoch": 4,
+      "batch": 240,
+      "loss": 1.9844768047332764
+    },
+    {
+      "epoch": 4,
+      "batch": 260,
+      "loss": 1.9326021671295166
+    },
+    {
+      "epoch": 4,
+      "batch": 280,
+      "loss": 1.9300185441970825
+    },
+    {
+      "epoch": 4,
+      "batch": 300,
+      "loss": 1.9463269710540771
+    }
+  ],
+  "dev_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 19.155
+    },
+    {
+      "epoch": 1,
+      "batch": 60,
+      "loss": 2.0091
+    },
+    {
+      "epoch": 1,
+      "batch": 120,
+      "loss": 1.9472
+    },
+    {
+      "epoch": 1,
+      "batch": 180,
+      "loss": 1.9501
+    },
+    {
+      "epoch": 1,
+      "batch": 240,
+      "loss": 1.9398
+    },
+    {
+      "epoch": 1,
+      "batch": 300,
+      "loss": 1.9408
+    },
+    {
+      "epoch": 2,
+      "batch": 0,
+      "loss": 1.9387
+    },
+    {
+      "epoch": 2,
+      "batch": 60,
+      "loss": 1.9396
+    },
+    {
+      "epoch": 2,
+      "batch": 120,
+      "loss": 1.94
+    },
+    {
+      "epoch": 2,
+      "batch": 180,
+      "loss": 1.9328
+    },
+    {
+      "epoch": 2,
+      "batch": 240,
+      "loss": 1.9356
+    },
+    {
+      "epoch": 2,
+      "batch": 300,
+      "loss": 1.9384
+    },
+    {
+      "epoch": 3,
+      "batch": 0,
+      "loss": 1.9372
+    },
+    {
+      "epoch": 3,
+      "batch": 60,
+      "loss": 1.9423
+    },
+    {
+      "epoch": 3,
+      "batch": 120,
+      "loss": 1.9314
+    },
+    {
+      "epoch": 3,
+      "batch": 180,
+      "loss": 1.9312
+    },
+    {
+      "epoch": 3,
+      "batch": 240,
+      "loss": 1.9353
+    },
+    {
+      "epoch": 3,
+      "batch": 300,
+      "loss": 1.9308
+    },
+    {
+      "epoch": 4,
+      "batch": 0,
+      "loss": 1.9339
+    },
+    {
+      "epoch": 4,
+      "batch": 60,
+      "loss": 1.9346
+    },
+    {
+      "epoch": 4,
+      "batch": 120,
+      "loss": 1.9294
+    },
+    {
+      "epoch": 4,
+      "batch": 180,
+      "loss": 1.9301
+    },
+    {
+      "epoch": 4,
+      "batch": 240,
+      "loss": 1.929
+    },
+    {
+      "epoch": 4,
+      "batch": 300,
+      "loss": 1.929
+    }
+  ],
+  "dev_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.49899799599198397,
+        "f1": 0.6657754010695187,
+        "tp": 249,
+        "fp": 250,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    },
+    {
+      "epoch": 2,
+      "metrics": {
+        "accuracy": 0.49899799599198397,
+        "f1": 0.6657754010695187,
+        "tp": 249,
+        "fp": 250,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    },
+    {
+      "epoch": 3,
+      "metrics": {
+        "accuracy": 0.49899799599198397,
+        "f1": 0.6657754010695187,
+        "tp": 249,
+        "fp": 250,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    },
+    {
+      "epoch": 4,
+      "metrics": {
+        "accuracy": 0.49899799599198397,
+        "f1": 0.6657754010695187,
+        "tp": 249,
+        "fp": 250,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    }
+  ],
+  "test_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.501002004008016,
+        "f1": 0.6675567423230975,
+        "tp": 250,
+        "fp": 249,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    },
+    {
+      "epoch": 2,
+      "metrics": {
+        "accuracy": 0.501002004008016,
+        "f1": 0.6675567423230975,
+        "tp": 250,
+        "fp": 249,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    },
+    {
+      "epoch": 3,
+      "metrics": {
+        "accuracy": 0.501002004008016,
+        "f1": 0.6675567423230975,
+        "tp": 250,
+        "fp": 249,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    },
+    {
+      "epoch": 4,
+      "metrics": {
+        "accuracy": 0.501002004008016,
+        "f1": 0.6675567423230975,
+        "tp": 250,
+        "fp": 249,
+        "tn": 0,
+        "fn": 0,
+        "n_valid": 499,
+        "n_total": 499
+      }
+    }
+  ]
+}

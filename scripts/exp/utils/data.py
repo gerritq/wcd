@@ -42,7 +42,10 @@ PROMPT_LANGUAGE_MAP = {"en": "English",
                         "hy": "Armenian",
                         "sq": "Albanian",
                         "az": "Azerbaijani",
-                        "sr": "Serbian"
+                        "sr": "Serbian",
+                        "de": "German",
+                        "uz": "Uzbek",
+                        "az": "Azerbaijani",
                         }
 
 BASE_DIR = os.getenv("BASE_WCD")
