@@ -16,10 +16,15 @@ trainer_output/
 # Virtual environments
 .venv
 
-# allow exp1 results
+# allow exp1 results and translations
 data/*
 !/data/exp1/
 !/data/exp1/**
+!/data/sets/translated
+!/data/sets/backtranslated
+
+# exclude translation key
+scripts/data/translation-*.json
 
 logs/
 **/wandb/

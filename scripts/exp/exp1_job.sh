@@ -3,11 +3,11 @@
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=04:00:00
-#SBATCH --partition=nmes_gpu,gpu
+#SBATCH --partition=nmes_gpu,gpu,interruptible_gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050
+# SBATCH --constraint=a100
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050,erc-hpc-comp048,erc-hpc-comp049
 
 # comp050 slow
 # comp039 has error

@@ -5,12 +5,11 @@ set -euo pipefail
 # cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 
-# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz")
-LANGS=("vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz")
-# LANGS=("ru" "tr")
+# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz") 
+LANGS=("az" "mk" "hy" "sq")
 MODEL_TYPES=("slm")
 ATLS=(0 1)
-MODEL_NAMES=("qwen3_8b" "llama3_8b" "aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
+MODEL_NAMES=("aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
 PROMPT_TEMPLATES=("instruct") # ""minimal"  "instruct" "verbose"
 BATCH_SIZE=16 # fixed for comparability
 

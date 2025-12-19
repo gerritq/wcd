@@ -2,7 +2,7 @@
 set -euo pipefail
 
 source ~/.bashrc
-cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
+cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp1
 
 
 LANGS=("no" "ro" "bg" "tr")
@@ -10,6 +10,7 @@ CONTEXTS=(1)
 MODEL_TYPES=("clf") # slm clf
 ATLS=(0 1)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b"
+SEEDS(2025 2026)
 
 TIME="02:00:00"
 
