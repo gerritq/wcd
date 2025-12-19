@@ -1,9 +1,8 @@
-from email import parser
-import uuid
 from utils.training import train
 from utils import prompts
 from utils.models import build_slm, MODEL_MAPPING
 from utils.data import get_data, get_tokenizer
+from utils.utils import get_save_path,find_best_hp_run
 
 from datetime import datetime
 import torch
@@ -25,51 +24,6 @@ EX2 = os.path.join(BASE_DIR, "data/exp2")
 # CL_TRAINING_SIZES = [200, 400, 600, 800]
 CL_TRAINING_SIZES = [50, 100, 200, 400, 600, 800]
 
-def get_save_path(args):
-    if args.smoke_test:
-        if args.experiment == "binary":
-            test_dir = os.path.join(EX1 + "_test", "smoke_test")
-
-        if args.experiment in ["cl", "second_stage"]:
-            test_dir = os.path.join(EX2, "smoke_test")
-
-        # Get model number and return test dir
-        os.makedirs(test_dir, exist_ok=True)
-        model_number = get_model_number(test_dir)
-        save_path = os.path.join(test_dir, f"meta_{model_number}.json")
-        return save_path
-
-
-    # Define model fir 
-    if args.experiment == "binary":
-        if not args.run_dir:
-            raise ValueError("For experiment 1 run dir must be given.")
-        model_number = get_model_number(args.run_dir)
-        save_path = os.path.join(args.run_dir, f"meta_{model_number}.json")
-    
-    if args.experiment in ["cl", "second_stage"]:
-        model_number = get_model_number(args.model_dir)
-        save_path = os.path.join(args.model_dir, f"meta_{model_number}.json")
-        
-    directory = os.path.dirname(save_path)
-    os.makedirs(directory, exist_ok=True)
-
-    return save_path
-
-def get_model_number(model_dir: str) -> int:
-    """
-    Identifies the latest meta_<n>.json file in model_dir.
-    Returns the next available number.
-    """
-    meta_files = [f for f in os.listdir(model_dir) if f.startswith("meta_") and f.endswith(".json")]
-
-    numbers = []
-    for fname in meta_files:
-        num = int(fname.split("_")[1].split(".")[0])
-        numbers.append(num)
-
-    return max(numbers) + 1 if numbers else 1
-
 def single_stage_training(args):
 
     # Get saving path
@@ -88,6 +42,7 @@ def single_stage_training(args):
 
     print("="*20)
     print(f"Device {device}")
+    print(f"GPUs available: {torch.cuda.device_count()}")
     print("="*20)
 
     print("="*20)
@@ -212,6 +167,7 @@ def main():
     parser.add_argument("--prompt_extension", type=str, default="")
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--metric", type=str, default="f1")
 
     # EXP4
     parser.add_argument("--training_langs", nargs='+', default=[])
@@ -256,9 +212,33 @@ def main():
     suffix = "_base" if args.model_type == "clf" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
 
-    # Select single run or two stage
-    if args.experiment in ["binary", "size"]:
+    # Select the exp version
+    if args.experiment in ["binary"]: # this is the full hp run
         single_stage_training(args)
+
+    # This is the seed run, finding optimal HP first
+    if args.experiment in ["seed"]:
+        # first find optimal hp
+        optimal_hp_config = find_best_hp_run(args=args)
+        if not optimal_hp_config:
+            raise ValueError(f"No optimal HP config found for {args.model_type} - {args.model_name} - {args.atl}.")
+        
+        # assign optimal hp to args
+        args.epochs = optimal_hp_config['epochs']
+        args.learning_rate = optimal_hp_config['learning_rate']
+        args.max_grad_norm = optimal_hp_config['max_grad_norm']
+        args.weight_decay = optimal_hp_config['weight_decay']
+
+        print("=" * 20)
+        print("Optimal HP configuration found and updated args:")
+        for k, _ in optimal_hp_config.items():
+            print(f"{k}: {getattr(args, k)}")
+        print("=" * 20)
+
+        # run 
+        single_stage_training(args)
+
+
     if args.experiment in ["cl"]:
         two_stage_training(args)
 

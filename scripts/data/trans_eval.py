@@ -2,7 +2,7 @@ import os
 import json
 import random
 import deepl
-from comet import download_model, load_from_checkpoint
+from comet.models import download_model, load_from_checkpoint
 from rouge import Rouge
 
 from bert_score import score
@@ -93,14 +93,20 @@ def main():
 
         items = load_data(target_language=target_language)
 
-        # comet eval
-        comet_metrics = comet_evaluation(items)
+        # # comet eval
+        # print("\t Comet eval ...")
+        # comet_metrics = comet_evaluation(items)
 
         # backtranslation eval
+        print("\t Backtranslatio eval ...")
         bt_metrics = backtranslation_evaluation(items)
-        all_metrics = {**comet_metrics, **bt_metrics}
+        # all_metrics = {**comet_metrics, **bt_metrics}
+        all_metrics = {**bt_metrics}
 
         # save results
         out_path = os.path.join(OUT_DIR, f"{target_language}.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(all_metrics, f, indent=4, ensure_ascii=False)
+
+if __name__ == "__main__":
+    main()

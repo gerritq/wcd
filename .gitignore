@@ -20,11 +20,17 @@ trainer_output/
 data/*
 !/data/exp1/
 !/data/exp1/**
-!/data/sets/translated
-!/data/sets/backtranslated
+
+!data/sets/
+data/sets/*
+data/sets/main/
+!data/sets/translated/
+!data/sets/translated/**
+!data/sets/backtranslated/
+!data/sets/backtranslated/**
 
 # exclude translation key
-scripts/data/translation-*.json
+scripts/data/translation-*.json"
 
 logs/
 **/wandb/

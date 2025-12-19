@@ -4,15 +4,15 @@ set -euo pipefail
 # source ~/.bashrc
 # cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
-
-# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az" "de" "uz") 
-LANGS=("az" "mk" "hy" "sq")
+# LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
+LANGS=("uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
 MODEL_TYPES=("slm")
 ATLS=(0 1)
 MODEL_NAMES=("aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
 PROMPT_TEMPLATES=("instruct") # ""minimal"  "instruct" "verbose"
 BATCH_SIZE=16 # fixed for comparability
 
+GPUS=2
 CONTEXT=1
 HP_SEARCH=1 # do not run HP search
 
@@ -50,6 +50,7 @@ for lang in "${LANGS[@]}"; do
           sbatch \
             --job-name="$job_name" \
             --time="$TIME" \
+            --gres=gpu:="$GPUS" \
             --export=ALL,LANG="$lang",CONTEXT="$CONTEXT",MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",BATCH_SIZE="$BATCH_SIZE",PROMPT_TEMPLATE="$ptemp" \
             exp1_job.sh
             

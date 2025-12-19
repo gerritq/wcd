@@ -64,7 +64,7 @@ def label_distribution(ds: Dataset) -> Dict[int, int]:
 
 
 def filter_long_context_examples(example: dict) -> bool:
-    max_chars = 1000
+    max_chars = 800
 
     text = (
         f"Section: {example['section']}\n"
@@ -181,18 +181,18 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
         print(f"Test removed:  {test_removed}")
         print("="*20)
 
-        distributions = {
-            "train": label_distribution(ds["train"]),
-            "dev":   label_distribution(ds["dev"]),
-            "test":  label_distribution(ds["test"]),
-        }
-        
-        if args.smoke_test:
-            print("="*20)
-            print("SMOKE _TEST")
-            print("="*20)
-            return ds["train"].select(range(96)), ds["dev"].select(range(32)), ds["test"].select(range(32))
+    distributions = {
+        "train": label_distribution(ds["train"]),
+        "dev":   label_distribution(ds["dev"]),
+        "test":  label_distribution(ds["test"]),
+    }
     
+    if args.smoke_test:
+        print("="*20)
+        print("SMOKE_TEST")
+        print("="*20)
+        return ds["train"].select(range(96)), ds["dev"].select(range(32)), ds["test"].select(range(32)), distributions
+
     return ds["train"], ds["dev"], ds["test"], distributions
 
 def resample_data(args: Namespace, ds: Dataset) -> Dataset:

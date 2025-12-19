@@ -2,6 +2,9 @@ import os
 import json
 import random
 import deepl
+import time
+from openai import OpenAI
+
 
 # ----------------------------------------------------------------
 # configs
@@ -12,13 +15,16 @@ IN_DIR = os.path.join(BASE_DIR, "data/sets/translated")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets/backtranslated")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-TARGET_LANGUAGES = ["uk", "ro", "id", "bg", "uz"] + ["no", "az", "mk", "hy", "sq"]
-
-SMOKE_TEST = True
+# TARGET_LANGUAGES = ["uk", "ro", "id", "bg", "uz"] + ["no", "az", "mk", "hy", "sq"]
+# TARGET_LANGUAGES = ["uz", "az", "hy", "sq"]
+TARGET_LANGUAGES = ["uz"]
+SMOKE_TEST = False
 
 DEEPL_AUTH_KEY = os.getenv("DEEPL_AUTH_KEY")
 
 random.seed(42)
+
+PROMPT = "Translate into English. Do not return any explanation or other text. Only the English Translation: {translation}."
 
 # ----------------------------------------------------------------
 # functions
@@ -34,6 +40,27 @@ def load_translated_data(target_language: str):
             data.append(item)
     return data
 
+def query(item: dict, 
+          openai_client, 
+          model: str = "openai/gpt-4o"
+          ) -> int:
+    """query openrouter for detecting translation issues"""
+    
+    translated_text = item["mt"]
+    prompt = PROMPT.format(translation=translated_text)
+    messages = [
+        {"role": "system", "content": "You are an expert translator."},
+        {"role": "user", "content": prompt},
+    ]
+    
+    completion = openai_client.chat.completions.create(
+        model=model,
+        temperature=0.1,
+        messages=messages,
+    )
+    content = completion.choices[0].message.content
+    return content
+
 def single_backtranslation(item: dict, deepl_client, target_language: str = "EN-US") -> dict:
     """translate text using deepl"""
     translated_text = item["mt"]
@@ -42,11 +69,18 @@ def single_backtranslation(item: dict, deepl_client, target_language: str = "EN-
     item['backtranslation'] = result.text
     return item
 
-def backtranslation(items: list[dict], original_language: str, deepl_client=None) -> list[dict]:
+def backtranslation(items: list[dict], original_language: str, client=None) -> list[dict]:
     """backtranslate a list of items"""
     translated_items = []
-    for item in items:
-        translated_item = single_backtranslation(item=item, deepl_client=deepl_client)
+    for i, item in enumerate(items, start=1):
+        
+        # need to use openai for some low-resource languages; deepl does not support those below
+        if original_language in ['hy', "az", "sq", "uz"]:
+            translated_item = query(item=item, openai_client=client)
+        else:
+            translated_item = single_backtranslation(item=item, deepl_client=client)
+            if i%20 == 0:
+                time.sleep(60)
         translated_items.append(translated_item)
     
     with open(os.path.join(OUT_DIR, f"{original_language}.jsonl"), "w", encoding="utf-8") as f:
@@ -73,7 +107,11 @@ def prepare_items(data: list[dict]):
 
 def main():
     deepl_client = deepl.DeepLClient(DEEPL_AUTH_KEY)
-
+    openai_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.environ["OPENROUTER_API_KEY"]
+            )
+    
     for target_language in TARGET_LANGUAGES:
         print("="*20)
         print(f"Backtranslating {target_language} to EN")
@@ -85,7 +123,17 @@ def main():
         # prepare items
         items = prepare_items(items)
         
-        backtranslation(items=items, deepl_client=deepl_client, original_language=target_language)
+        if target_language in ['hy', "az", "sq", "uz"]:
+            backtranslation(items=items, 
+                            client=openai_client, 
+                            original_language=target_language)
+        else:
+            backtranslation(items=items, 
+                        client=deepl_client, 
+                        original_language=target_language)
+
+            print("Sleeping to respect usage quotas")
+            time.sleep(120)
         
 
         

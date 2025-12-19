@@ -3,11 +3,12 @@
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=04:00:00
-#SBATCH --partition=nmes_gpu,gpu,interruptible_gpu
+#SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
-# SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050,erc-hpc-comp048,erc-hpc-comp049
+#SBATCH --constraint=a100
+# SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050,erc-hpc-comp048,erc-hpc-comp049
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050
 
 # comp050 slow
 # comp039 has error
@@ -16,7 +17,7 @@ set -euo pipefail
 
 nvidia-smi
 
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export PYTORCH_ALLOC_CONF=expandable_segments:True
 
 
 LANG="${LANG}"
@@ -28,6 +29,8 @@ ATL="${ATL:-0}" # default 0 for clf and plm
 BATCH_SIZE="${BATCH_SIZE:-16}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
 TRAINING_SIZE="${TRAINING_SIZE:-5000}"
+SEED="${SEED:-42}"
+EXPERIMENT="${EXPERIMENT:-binary}"
 
 echo "Running with:"
 echo "  LANG       = $LANG"
@@ -39,14 +42,12 @@ echo "  HP SEARCH = $HP_SEARCH"
 echo "  BATCH_SIZE = $BATCH_SIZE"
 echo "  PROMPT_TEMPLATE = $PROMPT_TEMPLATE"
 echo "  TRAINING_SIZE = $TRAINING_SIZE"
+echo "  SEED = $SEED"
+echo "  EXPERIMENT = $EXPERIMENT"
 echo
 
 # VARS
-EXPERIMENT="binary"
-MAIN=1
 SMOKE_TEST=0
-
-
 
 # --------------------------------------------------------------------------------------------------
 # HP SELECTION
@@ -83,16 +84,22 @@ fi
 # MODEL DIR
 # --------------------------------------------------------------------------------------------------
 
-if [[ "$MAIN" == "1" ]]; then
-    MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1"
-else 
-    MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1_test"
-fi
+MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1"
 
-# Create a unique run dir
-MODEL_LANG_DIR="${MODEL_DIR}/${LANG}"
-mkdir -p "$MODEL_LANG_DIR"
-RUN_DIR=$(mktemp -d "${MODEL_LANG_DIR}/run_XXXXXX")
+# if [[ "$MAIN" == "1" ]]; then
+#     MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1"
+# else 
+#     MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1_smoke_test"
+# fi
+
+if [[ "$SMOKE_TEST" == "1" ]]; then
+  RUN_DIR=""
+  # Create a unique run dir
+else 
+  MODEL_LANG_DIR="${MODEL_DIR}/${LANG}"
+  mkdir -p "$MODEL_LANG_DIR"
+  RUN_DIR=$(mktemp -d "${MODEL_LANG_DIR}/run_XXXXXX")
+fi
 
 echo "Run directory: $RUN_DIR"
 echo
@@ -121,8 +128,9 @@ for BS in "${BATCH_SIZE_LIST[@]}"; do
         --learning_rate "$LR" \
         --batch_size "$BS" \
         --max_grad_norm "$GN" \
-        --notes "testing 1 grad norm" \
-        --weight_decay "$WEIGHT_DECAY"
+        --weight_decay "$WEIGHT_DECAY" \
+        --seed "$SEED"
+
         
     done
   done

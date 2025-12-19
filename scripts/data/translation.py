@@ -141,7 +141,7 @@ def main():
     source_language = 'en'
     test_set = load_test_data_set(source_language)
 
-    for target_language in TARGET_LANGUAGES[:1]:
+    for target_language in TARGET_LANGUAGES:
         start = time.time()
         print("\n")
         print("="*20)

@@ -2,23 +2,27 @@
 set -euo pipefail
 
 source ~/.bashrc
-cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp1
+cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
-
-LANGS=("no" "ro" "bg" "tr")
-CONTEXTS=(1)
-MODEL_TYPES=("clf") # slm clf
+# LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
+LANGS=("uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
+MODEL_TYPES=("slm") # slm clf
 ATLS=(0 1)
-MODEL_NAMES=("llama3_8b") # "qwen3_8b"
-SEEDS(2025 2026)
+MODEL_NAMES=("llama3_8b" "qwen3_8b") # "qwen3_8b"
+SEEDS=(2025 2026)
+
+
+HP_SEARCH=0
+CONTEXT=1
+EXPERIMENT="seed"
 
 TIME="02:00:00"
 
 for lang in "${LANGS[@]}"; do
-  for ctx in "${CONTEXTS[@]}"; do
     for mtype in "${MODEL_TYPES[@]}"; do
       for atl in "${ATLS[@]}"; do
         for mname in "${MODEL_NAMES[@]}"; do
+          for seed in "${SEEDS[@]}"; do
 
           # skip classifier + atl=1 since it has no effect
           if [[ "$mtype" == "clf" && "$atl" -eq 1 ]]; then
@@ -26,25 +30,15 @@ for lang in "${LANGS[@]}"; do
             continue
           fi
 
-          # select time
-          if [[ "$mtype" == "clf" ]]; then
-            TIME="05:00:00"
-          else
-            TIME="10:00:00"
-          fi
-
-          job_name="e1-${mtype}-${lang}-c${ctx}-atl${atl}-${mname}"
+          job_name="e1-${mtype}-${lang}-c${CONTEXT}-atl${atl}-${mname}-seed${seed}"
 
           echo "Submitting: $job_name (time=$TIME)"
 
-          sbatch --job-name="$job_name" \
-                 --time="$TIME" \
-                 exp1_job.sh \
-                 "$lang" \
-                 "$ctx" \
-                 "$mtype" \
-                 "$atl" \
-                 "$mname"
+          sbatch \
+            --job-name="$job_name" \
+            --time="$TIME" \
+            --export=ALL,LANG="$lang",MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT" \
+            exp1_job.sh
 
         done
       done
