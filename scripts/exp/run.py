@@ -21,9 +21,6 @@ BASE_DIR = os.getenv("BASE_WCD")
 EX1 = os.path.join(BASE_DIR, "data/exp1")
 EX2 = os.path.join(BASE_DIR, "data/exp2")
 
-# CL_TRAINING_SIZES = [200, 400, 600, 800]
-CL_TRAINING_SIZES = [50, 100, 200, 400, 600, 800]
-
 def single_stage_training(args):
 
     # Get saving path
@@ -104,39 +101,39 @@ def single_stage_training(args):
 
     return meta
 
-def two_stage_training(args):
+# def two_stage_training(args):
     
-    stage1_args = copy.deepcopy(args)
-    print("="*20)
-    print(f"STAGE 1: SOURCE LANGUAGE TRAINING  {args.training_langs}")
-    print("="*20)
+#     stage1_args = copy.deepcopy(args)
+#     print("="*20)
+#     print(f"STAGE 1: SOURCE LANGUAGE TRAINING  {args.training_langs}")
+#     print("="*20)
 
-    # add saving checkpoint flag
-    stage1_args.save_checkpoint = True
+#     # add saving checkpoint flag
+#     stage1_args.save_checkpoint = True
 
-    # create a random folder with tempfile
-    model_dir = os.path.join(EX2, stage1_args.test_lang)
-    os.makedirs(model_dir, exist_ok=True)
-    model_dir = tempfile.mkdtemp(dir=model_dir)
-    stage1_args.model_dir = model_dir
+#     # create a random folder with tempfile
+#     model_dir = os.path.join(EX2, stage1_args.test_lang)
+#     os.makedirs(model_dir, exist_ok=True)
+#     model_dir = tempfile.mkdtemp(dir=model_dir)
+#     stage1_args.model_dir = model_dir
         
-    stage_1_meta = single_stage_training(stage1_args)
+#     stage_1_meta = single_stage_training(stage1_args)
     
-    print("="*20)
-    print(f"STAGE 2: EVALUATION ON TARGET LANGUAGE  {args.test_lang}")
-    print("="*20)
+#     print("="*20)
+#     print(f"STAGE 2: EVALUATION ON TARGET LANGUAGE  {args.test_lang}")
+#     print("="*20)
 
-    # Define args for stage 2
-    stage2_args = copy.deepcopy(args)
-    stage2_args.experiment = "second_stage"
-    stage2_args.model_dir = model_dir # this is the local dir where the first stage model is saved
-    stage2_args.from_checkpoint = True # flag to load from checkpoint   
+#     # Define args for stage 2
+#     stage2_args = copy.deepcopy(args)
+#     stage2_args.experiment = "second_stage"
+#     stage2_args.model_dir = model_dir # this is the local dir where the first stage model is saved
+#     stage2_args.from_checkpoint = True # flag to load from checkpoint   
     
-    for training_size in CL_TRAINING_SIZES:
-        stage2_args.training_size = training_size
-        print("="*20)
-        print(f"Fine-tuning with training size: {training_size} ---")
-        stage_2_meta = single_stage_training(stage2_args)
+#     for training_size in CL_TRAINING_SIZES:
+#         stage2_args.training_size = training_size
+#         print("="*20)
+#         print(f"Fine-tuning with training size: {training_size} ---")
+#         stage_2_meta = single_stage_training(stage2_args)
 
 def main():
 
@@ -168,13 +165,15 @@ def main():
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--metric", type=str, default="f1")
+    parser.add_argument("--setting", type=str, default="main")
 
-    # EXP4
-    parser.add_argument("--training_langs", nargs='+', default=[])
-    parser.add_argument("--test_lang", type=str, default="")
-    parser.add_argument("--model_dir", type=str, default="")
+    # EXP2
+    parser.add_argument("--source_langs", nargs='+', default=[])
+    parser.add_argument("--target_langs", nargs='+', default=[])
+    parser.add_argument("--lang_settings", nargs='+', default=[])
+    parser.add_argument("--cl_settings", nargs='+', default=[])
+    parser.add_argument("--lang_setting", type=int, default="main")
     parser.add_argument("--save_checkpoint", type=int, default=0)
-    parser.add_argument("--from_checkpoint", type=int, default=0)
     
     args = parser.parse_args()        
     
@@ -217,7 +216,7 @@ def main():
         single_stage_training(args)
 
     # This is the seed run, finding optimal HP first
-    if args.experiment in ["seed"]:
+    if args.experiment in ["seed", "save"]:
         # first find optimal hp
         optimal_hp_config = find_best_hp_run(args=args)
         if not optimal_hp_config:
@@ -235,12 +234,19 @@ def main():
             print(f"{k}: {getattr(args, k)}")
         print("=" * 20)
 
+        if args.experiment == "save":
+            # create an model dir for saing
+            model_dir = os.path.join(EX2, "models")
+            os.makedirs(model_dir, exist_ok=True)
+            model_dir = tempfile.mkdtemp(dir=model_dir, prefix=f"run_")
+            args.model_dir = model_dir
+
+            # add the save checkpoint flag
+            args.save_checkpoint = True
+
         # run 
         single_stage_training(args)
 
-
-    if args.experiment in ["cl"]:
-        two_stage_training(args)
 
 if __name__ == "__main__":
     main()

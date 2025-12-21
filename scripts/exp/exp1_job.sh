@@ -8,7 +8,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
 # SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050,erc-hpc-comp048,erc-hpc-comp049
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040
 
 # comp050 slow
 # comp039 has error

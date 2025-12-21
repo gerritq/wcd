@@ -50,7 +50,7 @@ for lang in "${LANGS[@]}"; do
           sbatch \
             --job-name="$job_name" \
             --time="$TIME" \
-            --gres=gpu:="$GPUS" \
+            --gres=gpu:"$GPUS" \
             --export=ALL,LANG="$lang",CONTEXT="$CONTEXT",MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",BATCH_SIZE="$BATCH_SIZE",PROMPT_TEMPLATE="$ptemp" \
             exp1_job.sh
             

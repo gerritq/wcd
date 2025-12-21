@@ -12,6 +12,36 @@ def load_metrics(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def find_saved_model_dir(args: Namespace) -> str:
+    """
+    Find trained model in exp2/models that matches the args.
+    Return the model dir path.
+    """
+
+    model_dir  = Path(os.path.join(EX2, "models"))
+    all_model_runs = [d for d in model_dir.glob("run_*") if d.is_dir()]
+
+    for single_run in all_model_runs:
+        meta_file = single_run / "meta_1.json"
+        if not meta_file.exists():
+            continue
+
+        meta_1 = load_metrics(meta_file)
+
+        if (not args.model_type == meta_1["model_type"] or 
+            not args.model_name == meta_1["model_name"] or
+            not args.atl == meta_1["atl"] or
+            not meta_1["seed"] == 42
+            not args.training_langs == meta_1["training_langs"]
+            ):
+            continue
+
+        model_dir = meta_1["model_dir"]
+        
+        print("="*20)
+        print(f"Found saved model dir: {single_run}")
+        print("="*20)        
+        return model_dir
 
 def find_best_hp(args: Namespace,
                  all_meta_file_paths: list[Path]) -> dict:
@@ -102,8 +132,11 @@ def get_save_path(args: Namespace) -> str:
         if args.experiment in ["binary", "seed"]:
             test_dir = os.path.join(EX1, "smoke_test")
 
-        if args.experiment in ["cl", "second_stage"]:
-            test_dir = os.path.join(EX2, "smoke_test")
+        if args.experiment in ["save"]:
+            test_dir = args.model_dir
+
+        if args.experiment in ["cl"]:
+            test_dir = os.path.join(EX2, "eval", "smoke_test")
 
         # Get model number and return test dir
         os.makedirs(test_dir, exist_ok=True)
@@ -119,12 +152,19 @@ def get_save_path(args: Namespace) -> str:
         model_number = get_model_number(args.run_dir)
         save_path = os.path.join(args.run_dir, f"meta_{model_number}.json")
 
-    # 0-shot EXPERIMENT: this is the full hp search run for plms,slms,and clfs
-    #tbd
-    
-    if args.experiment in ["cl", "second_stage"]:
+    # SAVE MODEL FOR CL
+    if args.experiment == "save":
+        if not args.model_dir:
+            raise ValueError("For experiment 2 model dir must be given.")
         model_number = get_model_number(args.model_dir)
         save_path = os.path.join(args.model_dir, f"meta_{model_number}.json")
+
+    # CL EVALUATION
+    if args.experiment == "cl":
+        save_dir = os.path.join(EX2, "eval", args.target_lang)
+        os.makedirs(save_dir, exist_ok=True)
+        model_number = get_model_number(save_dir)
+        save_path = os.path.join(save_dir, f"meta_{model_number}.json")
         
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)

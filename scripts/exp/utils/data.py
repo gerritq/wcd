@@ -1,3 +1,4 @@
+import json
 import os
 import torch
 import random
@@ -76,6 +77,30 @@ def filter_long_context_examples(example: dict) -> bool:
     return len(text) <= max_chars
 
 
+def load_and_prepare_translated_data(lang: str) -> Dataset:
+    """
+    Takes a lang.
+    Gets the translated data, prepares it and returns a ds.
+    """
+    
+    data_dir = os.path.join(DATA_DIR, "translated", f"{lang}.jsonl")
+    # load jsonl
+    with open(data_dir, "r", encoding="utf-8") as f:
+        data = [json.loads(line) for line in f]
+
+    items = []
+    for entry in data:
+        items.append({
+            "section": entry["section_translated"],
+            "previous_sentence": entry["previous_sentence_translated"],
+            "claim": entry["claim_translated"],
+            "subsequent_sentence": entry["subsequent_sentence_translated"],
+            "label": entry["label"],
+            "lang": lang,
+        })
+
+    return Dataset.from_list(items)
+
 def get_monolingual_data_set(args: Namespace, 
                              data_path: str
                             ) -> List[Dataset]:
@@ -86,7 +111,16 @@ def get_monolingual_data_set(args: Namespace,
     
     train = ds["train"]
     dev = ds["dev"]
-    test = ds["test"]
+
+    if args.lang_setting == "translation":
+        # concatenate
+        test = load_and_prepare_translated_data(lang=lang)
+        print("="*20)
+        print("Loaded translated test set with N:", len(test))
+        print("="*20)
+        # open the jsonl
+    else:
+        test = ds["test"]
     
     # Resample training
     if args.training_size < len(train):
@@ -127,14 +161,15 @@ def get_multilingual_data_sets(args: Namespace,
 
     print("="*20)
     print("MULTILINGUAL TRAINING DATA")
+    print(f"TRAINING LANGS: {args.training_langs}")
     print("N:", len(train))
     print("="*20)
 
-    # get target lang dev and test
-    data_dir = os.path.join(data_path, args.test_lang)
-    ds_target = load_from_disk(data_dir)    
-    dev = ds_target["dev"]
-    test = ds_target["test"]
+    # get target lang dev and test in english 
+    data_dir = os.path.join(data_path, "en")
+    ds_en = load_from_disk(data_dir)    
+    dev = ds_en["dev"]
+    test = ds_en["test"]
 
     # return datast dict
     dataset = {"train": Dataset.from_list(train),
@@ -149,7 +184,7 @@ def get_all_data_sets(args: Namespace, data_path: str) -> List[Dataset]:
     and filter overly long context items.
     Return train, dev, test/
     """
-    if args.experiment == "cl":
+    if args.experiment == "save":
         ds = get_multilingual_data_sets(args=args, data_path=data_path)
     else: # binary, size, second_stage
         ds = get_monolingual_data_set(args=args, data_path=data_path)
