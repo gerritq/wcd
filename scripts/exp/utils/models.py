@@ -221,8 +221,12 @@ class PLM(LM):
 
         if self.from_checkpoint:
             model_path = self.model_dir
+            print("="*20)
+            print(f"Loading model from checkpoint {self.model_dir}")
+            print("="*20)
         else:
             model_path = self.model_name
+            
         model = AutoModelForSequenceClassification.from_pretrained(
             model_path,
             num_labels=2,

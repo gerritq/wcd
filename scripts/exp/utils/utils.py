@@ -31,8 +31,8 @@ def find_saved_model_dir(args: Namespace) -> str:
         if (not args.model_type == meta_1["model_type"] or 
             not args.model_name == meta_1["model_name"] or
             not args.atl == meta_1["atl"] or
-            not meta_1["seed"] == 42
-            not args.training_langs == meta_1["training_langs"]
+            not args.seed == meta_1["seed"] or
+            not args.source_langs == meta_1["source_langs"]
             ):
             continue
 
@@ -68,7 +68,8 @@ def find_best_hp(args: Namespace,
                 optimal_hp_config = {"learning_rate": meta_tmp["learning_rate"],
                                      "max_grad_norm": meta_tmp["max_grad_norm"],
                                      "weight_decay": meta_tmp["weight_decay"],
-                                     "epochs": dev_metrics["epoch"],}
+                                     "epochs": dev_metrics["epoch"],
+                                     "batch_size": dev_metrics["batch_size"],}
             
     return optimal_hp_config
 
@@ -107,6 +108,7 @@ def find_best_hp_run(args: Namespace,
         if (not args.model_type == meta_1["model_type"] or 
             not args.model_name == meta_1["model_name"] or
             not args.atl == meta_1["atl"] or
+            not args.lang == meta_1["lang"] or
             not meta_1["seed"] == 42 # this is the seed used during hp tuning            
             ):
             continue
@@ -160,8 +162,8 @@ def get_save_path(args: Namespace) -> str:
         save_path = os.path.join(args.model_dir, f"meta_{model_number}.json")
 
     # CL EVALUATION
-    if args.experiment == "cl":
-        save_dir = os.path.join(EX2, "eval", args.target_lang)
+    if args.experiment == "cl_eval":
+        save_dir = os.path.join(EX2, "eval", args.lang)
         os.makedirs(save_dir, exist_ok=True)
         model_number = get_model_number(save_dir)
         save_path = os.path.join(save_dir, f"meta_{model_number}.json")

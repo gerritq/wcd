@@ -146,7 +146,7 @@ def get_multilingual_data_sets(args: Namespace,
     Keeps the dev and test of the target language.
     """
     train = []
-    for training_lang in args.training_langs:
+    for training_lang in args.source_langs:
         data_dir = os.path.join(data_path, training_lang)
         ds_lang = load_from_disk(data_dir)
 
@@ -161,7 +161,7 @@ def get_multilingual_data_sets(args: Namespace,
 
     print("="*20)
     print("MULTILINGUAL TRAINING DATA")
-    print(f"TRAINING LANGS: {args.training_langs}")
+    print(f"TRAINING LANGS: {args.source_langs}")
     print("N:", len(train))
     print("="*20)
 

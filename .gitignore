@@ -16,6 +16,10 @@ trainer_output/
 # Virtual environments
 .venv
 
+# ------------------------------------------------------------------
+# data
+# ------------------------------------------------------------------
+
 # allow exp1 results and translations
 data/*
 !/data/exp1/
@@ -28,6 +32,24 @@ data/sets/main/
 !data/sets/translated/**
 !data/sets/backtranslated/
 !data/sets/backtranslated/**
+
+# allow exp2 results and translations
+
+!/data/exp2/
+!/data/exp2/**
+
+# ignore models
+/data/exp2/models/*
+
+# allow eval outputs
+!data/exp2/eval/
+!data/exp2/eval/**
+
+# allow translation evaluation outputs
+!data/exp2/trans_eval/
+!data/exp2/trans_eval/**
+
+
 
 # exclude translation key
 scripts/data/translation-*.json"

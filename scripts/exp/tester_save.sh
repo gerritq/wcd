@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # ---- export variables (sbatch-style replacement) ----
+export SOURCE_LANGS="en"
 export LANG="en"
 export MODEL_TYPE="plm"
 export ATL="0"

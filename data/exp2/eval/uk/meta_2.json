@@ -1,0 +1,67 @@
+{
+  "model_type": "plm",
+  "model_name": "google-bert/bert-base-multilingual-uncased",
+  "atl": false,
+  "context": true,
+  "smoke_test": false,
+  "training_size": 5000,
+  "experiment": "cl_eval",
+  "prompt_template": "instruct",
+  "epochs": 3,
+  "learning_rate": 0.0002,
+  "batch_size": 16,
+  "max_grad_norm": 1.0,
+  "weight_decay": 0.01,
+  "quantization": true,
+  "max_length": 512,
+  "metric": "f1",
+  "source_langs": [
+    "en"
+  ],
+  "target_langs": [
+    "uk",
+    "no"
+  ],
+  "lang_settings": [
+    "main",
+    "translation"
+  ],
+  "cl_settings": [
+    "zero"
+  ],
+  "seeds": [
+    "42"
+  ],
+  "from_checkpoint": true,
+  "save_checkpoint": false,
+  "seed": 42,
+  "lang_setting": "translation",
+  "model_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_pm1jcre3",
+  "lang": "uk",
+  "label_dist": {
+    "train": {
+      "0": 2485,
+      "1": 2476
+    },
+    "dev": {
+      "0": 250,
+      "1": 249
+    },
+    "test": {
+      "0": 250,
+      "1": 246
+    }
+  },
+  "date": "2025-12-21T14:31:42.195773",
+  "max_memory": 0.40445613861083984,
+  "bf16": true,
+  "test_metrics_0_shot": {
+    "accuracy": 0.8165322580645161,
+    "f1": 0.7917620137299771,
+    "tp": 173,
+    "fp": 18,
+    "tn": 232,
+    "fn": 73,
+    "n_total": 496
+  }
+}

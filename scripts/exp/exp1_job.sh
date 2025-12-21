@@ -31,6 +31,7 @@ PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
 TRAINING_SIZE="${TRAINING_SIZE:-5000}"
 SEED="${SEED:-42}"
 EXPERIMENT="${EXPERIMENT:-binary}"
+SOURCE_LANGS="${SOURCE_LANGS:-""}"
 
 echo "Running with:"
 echo "  LANG       = $LANG"
@@ -44,6 +45,7 @@ echo "  PROMPT_TEMPLATE = $PROMPT_TEMPLATE"
 echo "  TRAINING_SIZE = $TRAINING_SIZE"
 echo "  SEED = $SEED"
 echo "  EXPERIMENT = $EXPERIMENT"
+echo "  SOURCE_LANGS = $SOURCE_LANGS"
 echo
 
 # VARS
@@ -92,7 +94,7 @@ MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1"
 #     MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1_smoke_test"
 # fi
 
-if [[ "$SMOKE_TEST" == "1" ]]; then
+if [[ "$SMOKE_TEST" == "1" || "$EXPERIMENT" == "save" ]]; then
   RUN_DIR=""
   # Create a unique run dir
 else 
@@ -129,7 +131,8 @@ for BS in "${BATCH_SIZE_LIST[@]}"; do
         --batch_size "$BS" \
         --max_grad_norm "$GN" \
         --weight_decay "$WEIGHT_DECAY" \
-        --seed "$SEED"
+        --seed "$SEED" \
+        --source_langs "$SOURCE_LANGS"
 
         
     done

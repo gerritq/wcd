@@ -159,6 +159,7 @@ def main():
     # Defaults
     parser.add_argument("--lang", type=str, default="")
     parser.add_argument("--run_dir", type=str, default="")
+    parser.add_argument("--model_dir", type=str, default="")
     parser.add_argument("--notes", type=str, default="")
     parser.add_argument("--train_log_step", type=int, default=20)
     parser.add_argument("--prompt_extension", type=str, default="")
@@ -168,12 +169,12 @@ def main():
     parser.add_argument("--setting", type=str, default="main")
 
     # EXP2
-    parser.add_argument("--source_langs", nargs='+', default=[])
-    parser.add_argument("--target_langs", nargs='+', default=[])
-    parser.add_argument("--lang_settings", nargs='+', default=[])
-    parser.add_argument("--cl_settings", nargs='+', default=[])
-    parser.add_argument("--lang_setting", type=int, default="main")
+    parser.add_argument("--source_langs", type=str, default="")
+    parser.add_argument("--target_langs", type=str, default="")
+    parser.add_argument("--lang_settings", type=str, default="")
+    parser.add_argument("--cl_settings", type=str, default="")
     parser.add_argument("--save_checkpoint", type=int, default=0)
+    parser.add_argument("--from_checkpoint", type=int, default=0)
     
     args = parser.parse_args()        
     
@@ -207,6 +208,12 @@ def main():
     args.save_checkpoint = bool(args.save_checkpoint)
     args.from_checkpoint = bool(args.from_checkpoint)
 
+    # create lists form strings
+    args.source_langs = args.source_langs.split() if args.source_langs else []
+    args.target_langs = args.target_langs.split() if args.target_langs else []
+    args.lang_settings = args.lang_settings.split() if args.lang_settings else []
+    args.cl_settings = args.cl_settings.split() if args.cl_settings else []
+
     # Select the HF model name
     suffix = "_base" if args.model_type == "clf" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
@@ -227,6 +234,7 @@ def main():
         args.learning_rate = optimal_hp_config['learning_rate']
         args.max_grad_norm = optimal_hp_config['max_grad_norm']
         args.weight_decay = optimal_hp_config['weight_decay']
+        args.batch_size = optimal_hp_config['batch_size']
 
         print("=" * 20)
         print("Optimal HP configuration found and updated args:")
