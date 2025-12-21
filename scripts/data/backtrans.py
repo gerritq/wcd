@@ -59,7 +59,8 @@ def query(item: dict,
         messages=messages,
     )
     content = completion.choices[0].message.content
-    return content
+    item['backtranslation'] = content
+    return item
 
 def single_backtranslation(item: dict, deepl_client, target_language: str = "EN-US") -> dict:
     """translate text using deepl"""
