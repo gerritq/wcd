@@ -1,7 +1,7 @@
 import os
 import re
 import json
-import glob
+import sys
 from collections import defaultdict
 from pathlib import Path
 from argparse import Namespace
@@ -29,7 +29,7 @@ meta_re = re.compile(r"meta_\d+")
 def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     root = Path(path)
     rows = defaultdict(lambda: {l: [] for l in LANG_ORDER})
-    count = defaultdict(int)
+    count = defaultdict(list)
 
     # iteratore over all lang dirs
     for lang_dir in root.iterdir():
@@ -61,10 +61,10 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                                     "prompt_template": meta_1["prompt_template"],
                                     "panel": "ATL" if meta_1["atl"] else "VAN",
                                     "lang": meta_1["lang"],
-                                    "test_metric": meta_1[configs['metric']],
+                                    "test_metric": meta_1["test_metrics"][-1]['metrics'][configs['metric']],
                                     }
-                        rows[(best_run["panel"], best_run["model_name"])][best_run["lang"]].append(best_run["test_metric"][-1][configs['metric']])
-                        count[(meta_1['model_name'], meta_1['lang'])] += 1
+                        rows[(best_run["panel"], best_run["model_name"])][best_run["lang"]].append(best_run['test_metric'])
+                        count[(meta_1['model_name'], meta_1['lang'], meta_1['atl'])].append((meta_1['seed'], meta_files[0].parent.name))  
                 continue
 
             # collect meta    
@@ -90,7 +90,6 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
             # best metric extraction
             best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=configs['metric'])
         
-            count[(meta_1['model_name'], meta_1['lang'])] += 1
 
             best_run = {
                         "model_name": meta_1["model_name"],
@@ -99,30 +98,34 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                         "lang": meta_1["lang"],
                         "test_metric": best_metric,
                                     }
-            
-            rows[(panel, meta_1["model_name"])][meta_1["lang"]] = best_run["test_metric"]
+            count[(meta_1['model_name'], meta_1['lang'], meta_1['atl'])].append(("hp", meta_files[0].parent.name))
+            rows[(panel, meta_1["model_name"])][meta_1["lang"]].append(best_run["test_metric"])
     
     
     # sort reverse rows by panel and model name
     rows = dict(sorted(rows.items(), key=lambda x: (x[0][0], x[0][1]), reverse=True))
     
     print("="*20)
-    print("COLLECTED MODELS COUNT")
-    for k,v in count.items():
-        print(f"{k}: {v}") 
-        print()
     print("="*20)
-    print("PRE-AVERAGE ROWS")
-    for k,v in rows.items():
-        print(f"{k}: {v}") 
-        print()
+    print("OVERVIEW OF COLLECTED FILES")
+    print("="*20)
+    print("="*20)
+    # sortt by lang
+    sorted_count = dict(sorted(count.items(), key=lambda x: (x[0][1], x[0][0], x[0][2])))
+    for k,v in sorted_count.items():
+        print(f"LANG: {k[1]} | MODEL {k[0]} {'ATL' if k[2] else 'VAN'}: {len(v)} runs -> {sorted(v, key=lambda x: str(x[0]))}")
+        if len(v) > 3:
+            print("WARNING: TOO MANY RUNS!")
+        if set([run[0] for run in v]) != set([2025, 2026, 'hp']):
+            print("WARNING: INCORRECT NUMBER OF RUNS!")
+        print("")
     print("="*20)
 
     # create averages
     out_rows = defaultdict(dict)
     for (panel, model_name), metrics in rows.items():
         for lang, v in metrics.items():
-            if isinstance(v, list) and len(v) > 0:
+            if isinstance(v, list) and len(v) == 3:
                 avg_v = sum(v) / len(v)
                 out_rows[(panel, model_name)][lang] = avg_v
             else:
