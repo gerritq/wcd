@@ -4,9 +4,9 @@ set -euo pipefail
 # ---- export variables (sbatch-style replacement) ----
 export SOURCE_LANGS="en"
 export LANG="en"
-export MODEL_TYPE="plm"
-export ATL="0"
-export MODEL_NAME="mBert"
+export MODEL_TYPE="slm"
+export ATL="1"
+export MODEL_NAME="llama3_8b"
 export HP_SEARCH="0"
 export CONTEXT="1"
 export SEED="42"

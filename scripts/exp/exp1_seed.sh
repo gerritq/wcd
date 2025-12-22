@@ -6,8 +6,8 @@ cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
 LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl")
-MODEL_TYPES=("slm") # slm clf
-ATLS=(0 1)
+MODEL_TYPES=("clf") # slm clf
+ATLS=(0)
 MODEL_NAMES=("llama3_8b" "qwen3_8b") # "qwen3_8b"
 SEEDS=(2025 2026)
 

@@ -167,7 +167,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--metric", type=str, default="f1")
     parser.add_argument("--setting", type=str, default="main")
-
+    parser.add_argument("--lang_setting", type=str, default="main")
+    
     # EXP2
     parser.add_argument("--source_langs", type=str, default="")
     parser.add_argument("--target_langs", type=str, default="")

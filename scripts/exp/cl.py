@@ -136,6 +136,8 @@ def main():
     # Defaults
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--metric", type=str, default="f1")
+    parser.add_argument("--lang_setting", type=str, default="main")
+    parser.add_argument("--lang", type=str, default="")
 
     # CL
     parser.add_argument("--source_langs", type=str, default="")

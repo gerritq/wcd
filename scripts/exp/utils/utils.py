@@ -21,6 +21,7 @@ def find_saved_model_dir(args: Namespace) -> str:
     model_dir  = Path(os.path.join(EX2, "models"))
     all_model_runs = [d for d in model_dir.glob("run_*") if d.is_dir()]
 
+    found_model_dir = None
     for single_run in all_model_runs:
         meta_file = single_run / "meta_1.json"
         if not meta_file.exists():
@@ -36,12 +37,15 @@ def find_saved_model_dir(args: Namespace) -> str:
             ):
             continue
 
-        model_dir = meta_1["model_dir"]
+        found_model_dir = meta_1["model_dir"]
         
         print("="*20)
         print(f"Found saved model dir: {single_run}")
         print("="*20)        
-        return model_dir
+    
+    if not found_model_dir:
+        raise ValueError("Could not find specified model.")
+    return found_model_dir
 
 def find_best_hp(args: Namespace,
                  all_meta_file_paths: list[Path]) -> dict:
@@ -69,7 +73,7 @@ def find_best_hp(args: Namespace,
                                      "max_grad_norm": meta_tmp["max_grad_norm"],
                                      "weight_decay": meta_tmp["weight_decay"],
                                      "epochs": dev_metrics["epoch"],
-                                     "batch_size": dev_metrics["batch_size"],}
+                                     "batch_size": meta_tmp["batch_size"],}
             
     return optimal_hp_config
 

@@ -2,14 +2,13 @@
 set -euo pipefail
 
 
-# LANGS=("en" "nl" "it" "pt" "ru" "tr" "vi" "id" "ro" "uk" "bg" "no" "sq" "mk" "hy" "az")
-LANGS=("en")
+LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
 CONTEXTS=(1)
 MODEL_TYPES=("plm")
-MODEL_NAMES=("mBert") # "mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l"
+MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l") # "mBert" "xlm-r-b" "xlm-r-l", "mDeberta-b", "mDeberta-l"
 HP_SEARCH=1
 
-TIME="00:15:00"
+TIME="00:20:00"
 
 for lang in "${LANGS[@]}"; do
   for context in "${CONTEXTS[@]}"; do
