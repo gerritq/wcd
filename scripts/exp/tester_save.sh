@@ -4,7 +4,7 @@ set -euo pipefail
 # ---- export variables (sbatch-style replacement) ----
 export SOURCE_LANGS="en"
 export LANG="en"
-export MODEL_TYPE="slm"
+export MODEL_TYPE="clf"
 export ATL="1"
 export MODEL_NAME="llama3_8b"
 export HP_SEARCH="0"
@@ -17,4 +17,4 @@ env | grep -E 'LANG=|MODEL_TYPE=|ATL=|MODEL_NAME=|HP_SEARCH=|CONTEXT=|SEED=|EXPE
 echo
 
 # ---- run the job script ----
-bash exp1_job.sh
+sbatch exp1_job.sh

@@ -1,15 +1,15 @@
-export MODEL_TYPE="slm"
-export MODEL_NAME="llama3_8b"
-export ATL=1
+export MODEL_TYPE="plm"
+export MODEL_NAME="mBert"
+export ATL=0
 export SEEDS="42"
 
 
-export TARGET_LANGS="uk no"
+export TARGET_LANGS="uk"
 export SOURCE_LANGS="en"
 export LANG="en"
 
-export LANG_SETTINGS="main translation"
-export CL_SETTINGS="zero"
+export LANG_SETTINGS="main"
+export CL_SETTINGS="few"
 
 export EXPERIMENT="cl_eval"
 
@@ -18,4 +18,4 @@ env | grep -E 'LANG=|MODEL_TYPES=|MODEL_NAMES=|ATL=|SEEDS=|TARGET_LANGS=|SOURCE_
 echo
 
 # ---- run the job script ----
-bash exp3_job.sh
+bash exp2_job.sh
