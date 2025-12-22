@@ -39,13 +39,16 @@ def find_saved_model_dir(args: Namespace) -> str:
 
         found_model_dir = meta_1["model_dir"]
         
+        if found_model_dir:
+            all_meta_file_paths = list(single_run.glob("meta_*.json"))
+            optimal_hps = find_best_hp_run(args=args, all_meta_file_paths=all_meta_file_paths)
         print("="*20)
         print(f"Found saved model dir: {single_run}")
         print("="*20)        
     
     if not found_model_dir:
         raise ValueError("Could not find specified model.")
-    return found_model_dir
+    return found_model_dir, optimal_hps
 
 def find_best_hp(args: Namespace,
                  all_meta_file_paths: list[Path]) -> dict:

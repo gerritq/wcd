@@ -21,6 +21,18 @@ BASE_DIR = os.getenv("BASE_WCD")
 EX1 = os.path.join(BASE_DIR, "data/exp1")
 EX2 = os.path.join(BASE_DIR, "data/exp2")
 
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+elif torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
+
+print("="*20)
+print(f"Device {device}")
+print(f"GPUs available: {torch.cuda.device_count()}")
+print("="*20)
+
 def single_stage_training(args):
 
     # Get saving path
@@ -29,18 +41,6 @@ def single_stage_training(args):
     meta = vars(args).copy()
 
     set_seed(args.seed)
-
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
-    print("="*20)
-    print(f"Device {device}")
-    print(f"GPUs available: {torch.cuda.device_count()}")
-    print("="*20)
 
     print("="*20)
     print("HP SETTINGS")

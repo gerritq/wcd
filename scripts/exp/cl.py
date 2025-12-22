@@ -1,5 +1,4 @@
-from email import parser
-import uuid
+
 from utils.training import evaluate_wrapper
 from utils import prompts
 from utils.models import build_slm, MODEL_MAPPING
@@ -13,9 +12,13 @@ import argparse
 from transformers import set_seed
 import os
 import json
-import tempfile
 import copy
 from argparse import Namespace
+from run import single_stage_training
+
+# ------------------------------------------------------------------------
+# configs
+# ------------------------------------------------------------------------
 
 CL_TRAINING_SIZES = [50, 100, 250, 500]
 
@@ -24,6 +27,21 @@ EX1_DATA = os.path.join(BASE_DIR, "data/exp1")
 EX2_MODELS = os.path.join(BASE_DIR, "data/exp2/models")
 EX2_EVAL = os.path.join(BASE_DIR, "data/exp2/eval")
 
+# Just cofigs
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+elif torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
+
+print("="*20)
+print(f"Device {device}")
+print("="*20)
+
+# ------------------------------------------------------------------------
+# zero shot
+# ------------------------------------------------------------------------
 
 def single_target_zero_shot_evaluation(args: Namespace,
                                        slm: torch.nn.Module,
@@ -56,21 +74,8 @@ def single_target_zero_shot_evaluation(args: Namespace,
 
 def zero_shot_evaluation(args: Namespace):
 
-
-    # Just cofigs
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
-    print("="*20)
-    print(f"Device {device}")
-    print("="*20)
-
     # find trained model
-    model_dir = find_saved_model_dir(args)
+    model_dir, _ = find_saved_model_dir(args)
     args.model_dir = model_dir
 
 
@@ -113,6 +118,89 @@ def zero_shot_evaluation(args: Namespace):
         with open(save_path, "w") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
+
+# ------------------------------------------------------------------------
+# few shot
+# ------------------------------------------------------------------------
+
+
+def few_shot_evaluation(args: Namespace):
+
+    # find trained model
+    model_dir, optimal_hps = find_saved_model_dir(args)
+    
+    # update args with optimal hps
+    args.learning_rate = optimal_hps["learning_rate"]
+    args.max_grad_norm = optimal_hps["max_grad_norm"]
+    args.weight_decay = optimal_hps["weight_decay"]
+    args.epochs = optimal_hps["epochs"]
+    args.batch_size = optimal_hps["batch_size"]
+    args.model_dir = model_dir
+
+    if args.lower_lr:
+        args.learning_rate = 1e-6
+        print("="*20)
+        print(f"Lowering learning rate to {args.learning_rate} for few-shot training")
+        print("="*20)
+
+    # loop over target langs
+    for target_lang in args.target_langs:
+        args.lang = target_lang
+
+        print("="*20)
+        print(f"Few-shot evaluation on target lang: {target_lang}")
+        print("="*20)
+
+        # saves internally
+        _ = single_target_few_shot_evaluation(args=args)
+
+def single_target_few_shot_evaluation(args: Namespace):
+
+    few_shot_args = copy.deepcopy(args)
+    
+    for training_size in CL_TRAINING_SIZES:
+        few_shot_args.training_size = training_size
+
+        print("="*20)
+        print(f"Few-shot training for {args.lang} with {training_size} samples")
+        print("="*20)
+
+        _ = single_stage_training(args=few_shot_args)
+
+
+def run_x_shot(args: Namespace):
+    
+    # for both settting zero and few shot
+    for cl_setting in args.cl_settings:
+        args.cl_setting = cl_setting
+        
+        # loop over seeds
+        for seed in args.seeds:
+            set_seed(int(seed))
+            args.seed = int(seed)
+            print("="*20)
+            print(f"Set seed to {args.seed}")
+
+            # zero shot
+            if cl_setting == "zero":
+                # loop over translation or wild
+                for lang_setting in args.lang_settings:
+                    args.lang_setting = lang_setting
+                    args.cl_setting = cl_setting
+                    print(f"Starting zero-shot evaluation for lang setting: {lang_setting}")
+                    print("="*20)
+                    zero_shot_evaluation(args)
+            
+            # few shot
+            if cl_setting == "few":
+                # loop over translation or wild
+                for lang_setting in args.lang_settings:
+                    args.lang_setting = lang_setting
+                    args.cl_setting = cl_setting
+                    print(f"Starting few-shot evaluation for lang setting: {lang_setting}")
+                    print("="*20)
+                    few_shot_evaluation(args)
+
 def main():
     parser = argparse.ArgumentParser()
     # Required
@@ -138,6 +226,7 @@ def main():
     parser.add_argument("--metric", type=str, default="f1")
     parser.add_argument("--lang_setting", type=str, default="main")
     parser.add_argument("--lang", type=str, default="")
+    
 
     # CL
     parser.add_argument("--source_langs", type=str, default="")
@@ -147,6 +236,7 @@ def main():
     parser.add_argument("--seeds", type=str, default="42")
     parser.add_argument("--from_checkpoint", type=int, default=1)    
     parser.add_argument("--save_checkpoint", type=int, default=0)
+    parser.add_argument("--lower_lr", type=int, default=0)
     args = parser.parse_args()     
 
 
@@ -165,6 +255,7 @@ def main():
         and args.atl in [0, 1]
         and args.from_checkpoint in [0, 1]
         and args.save_checkpoint in [0, 1]
+        and args.lower_lr in [0, 1]
         ), "Incorrect boolean values"
 
     args.smoke_test = bool(args.smoke_test)
@@ -173,6 +264,7 @@ def main():
     args.atl = bool(args.atl)
     args.from_checkpoint = bool(args.from_checkpoint)
     args.save_checkpoint = bool(args.save_checkpoint)
+    args.lower_lr = bool(args.lower_lr)
 
 
     # create lists form strings
@@ -193,27 +285,10 @@ def main():
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
 
 
-    # setthe load from checpoint flag
+    # ensure this is always loading ffrom checkpoint
     args.from_checkpoint = True
 
-    # Loop through defined settings in args: cl_settings and lang_settings
-    for cl_setting in args.cl_settings:
-        args.cl_setting = cl_setting
-        for seed in args.seeds:
-            set_seed(int(seed))
-            args.seed = int(seed)
-            print("="*20)
-            print(f"Set seed to {args.seed}")
-            if cl_setting == "zero":
-                for lang_setting in args.lang_settings:
-                    args.lang_setting = lang_setting
-                    args.cl_setting = cl_setting
-                    print(f"Starting zero-shot evaluation for lang setting: {lang_setting}")
-                    print("="*20)
-                    zero_shot_evaluation(args)
-
-            if cl_setting == "few":
-                pass
+    run_x_shot(args=args)
 
 if __name__ == "__main__":
     main()
