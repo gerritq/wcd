@@ -3,11 +3,12 @@
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=04:00:00
-#SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
+#SBATCH --reservation=rental_8734
+# SBATCH --partition=nmes_gpu,gpu
+# SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
 
 # comp050 slow
 # comp039 has error
@@ -25,6 +26,7 @@ TARGET_LANGS="${TARGET_LANGS}"
 SEEDS="${SEEDS}"
 LANG_SETTINGS="${LANG_SETTINGS}"
 CL_SETTINGS="${CL_SETTINGS}"
+LOWER_LR="${LOWER_LR}"
 
 LANG="${LANG:-en}"
 ATL="${ATL:-0}"
@@ -32,7 +34,6 @@ CONTEXT="${CONTEXT:-1}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
 TRAINING_SIZE="${TRAINING_SIZE:-5000}"
 EXPERIMENT="${EXPERIMENT:-binary}"
-LOWER_LR="${LOWER_LR:-0}"
 
 echo "Running with:"
 echo "  MODEL_TYPE = $MODEL_TYPE"
@@ -45,6 +46,7 @@ echo "  ATL        = $ATL"
 echo "  PROMPT_TEMPLATE = $PROMPT_TEMPLATE"
 echo "  TRAINING_SIZE = $TRAINING_SIZE"
 echo "  EXPERIMENT = $EXPERIMENT"
+echo "  LOWER_LR = $LOWER_LR"
 echo
 
 # VARS

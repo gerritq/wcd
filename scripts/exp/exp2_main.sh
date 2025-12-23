@@ -13,15 +13,16 @@ SEEDS="42"
 # all med and lower langs
 # TARGET_LANGS="uk ro id bg uz no az mk hy sq"
 # TARGET_LANGS="uk ro id bg uz"
-TARGET_LANGS="no az mk hy sq"
+TARGET_LANGS="uk ro id bg uz no az mk hy sq"
 SOURCE_LANGS="en"
 
 LANG_SETTINGS="main translation"
 CL_SETTINGS="zero few"
+LOWER_LR=1
 
 EXPERIMENT="cl_eval"
 
-TIME="08:00:00"
+TIME="15:00:00"
 
 for mname in "${MODEL_NAMES[@]}"; do
 
@@ -39,6 +40,6 @@ for mname in "${MODEL_NAMES[@]}"; do
     sbatch \
     --job-name="$job_name" \
     --time="$TIME" \
-    --export=ALL,LANG="$SOURCE_LANGS",MODEL_TYPE="$MODEL_TYPE",ATL="$ATL",MODEL_NAME="$mname",SEEDS="$SEEDS",EXPERIMENT="$EXPERIMENT",TARGET_LANGS="$TARGET_LANGS",SOURCE_LANGS="$SOURCE_LANGS",LANG_SETTINGS="$LANG_SETTINGS",CL_SETTINGS="$CL_SETTINGS" \
+    --export=ALL,LANG="$SOURCE_LANGS",MODEL_TYPE="$MODEL_TYPE",ATL="$ATL",MODEL_NAME="$mname",SEEDS="$SEEDS",EXPERIMENT="$EXPERIMENT",TARGET_LANGS="$TARGET_LANGS",SOURCE_LANGS="$SOURCE_LANGS",LANG_SETTINGS="$LANG_SETTINGS",CL_SETTINGS="$CL_SETTINGS",LOWER_LR="$LOWER_LR" \
     exp2_job.sh
 done

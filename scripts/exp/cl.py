@@ -255,8 +255,6 @@ def main():
     parser.add_argument("--lower_lr", type=int, default=0)
     args = parser.parse_args()     
 
-
-
    # Checks
     if args.model_type not in ['slm', 'clf', "plm"]:
         raise ValueError(f"Unknown model type: {args.model_type}")
@@ -300,7 +298,12 @@ def main():
     suffix = "_base" if args.model_type == "clf" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
 
-
+    print("="*20)
+    print("SETTINGS")
+    for k, v in vars(args).items():
+        print(f"{k}: {v}")
+    print("="*20)
+    
     # ensure this is always loading ffrom checkpoint
     args.from_checkpoint = True
 
