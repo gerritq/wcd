@@ -3,15 +3,13 @@
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=04:00:00
-#SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-# SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp034,erc-hpc-comp040,erc-hpc-comp052,erc-hpc-comp050,erc-hpc-comp048,erc-hpc-comp049
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040
+#SBATCH --reservation=rental_8734
+# SBATCH --partition=nmes_gpu,gpu
+# SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
 
-# comp050 slow
-# comp039 has error
 
 set -euo pipefail
 
@@ -20,12 +18,12 @@ nvidia-smi
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 
 
-LANG="${LANG}"
 CONTEXT="${CONTEXT}"
 MODEL_TYPE="${MODEL_TYPE}"
 MODEL_NAME="${MODEL_NAME}"
 HP_SEARCH="${HP_SEARCH}"
 ATL="${ATL:-0}" # default 0 for clf and plm
+LANG="${LANG:-""}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
 TRAINING_SIZE="${TRAINING_SIZE:-5000}"

@@ -5,7 +5,7 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 
-MODEL_TYPE="plm"
+MODEL_TYPE="slm"
 MODEL_NAMES=("mBert")
 ATL=(0)
 SEEDS="42"

@@ -226,7 +226,7 @@ def main():
     parser.add_argument("--metric", type=str, default="f1")
     parser.add_argument("--lang_setting", type=str, default="main")
     parser.add_argument("--lang", type=str, default="")
-    
+    parser.add_argument("--train_log_step", type=int, default=20)    
 
     # CL
     parser.add_argument("--source_langs", type=str, default="")

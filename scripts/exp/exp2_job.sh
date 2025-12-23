@@ -32,6 +32,7 @@ CONTEXT="${CONTEXT:-1}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
 TRAINING_SIZE="${TRAINING_SIZE:-5000}"
 EXPERIMENT="${EXPERIMENT:-binary}"
+LOWER_LR="${LOWER_LR:-0}"
 
 echo "Running with:"
 echo "  MODEL_TYPE = $MODEL_TYPE"
@@ -92,4 +93,5 @@ uv run cl.py \
   --source_langs "$SOURCE_LANGS" \
   --target_langs "$TARGET_LANGS" \
   --lang_settings "$LANG_SETTINGS" \
-  --cl_settings "$CL_SETTINGS"
+  --cl_settings "$CL_SETTINGS" \
+  --lower_lr "$LOWER_LR"

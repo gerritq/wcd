@@ -5,11 +5,12 @@ set -euo pipefail
 # cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # If two langs combine with +
+
 TRAINING_LANGS=("en")
-MODEL_TYPES=("slm")
-ATLS=(0 1)
+MODEL_TYPES=("clf")
+ATLS=(0)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
-SEEDS=(42 2025 2026)
+SEEDS=(42)
 
 PROMPT_TEMPLATES=("instruct") # ""minimal"  "instruct" "verbose"
 BATCH_SIZE=16 # fixed for comparability
@@ -46,7 +47,7 @@ for lang in "${TRAINING_LANGS[@]}"; do
             --job-name="$job_name" \
             --time="$TIME" \
             --gres=gpu:"$GPUS" \
-            --export=ALL,LANG="$lang",MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT" \
+            --export=ALL,MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT",SOURCE_LANGS="$lang" \
             exp1_job.sh
             
         done

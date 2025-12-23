@@ -1,17 +1,19 @@
-export MODEL_TYPE="plm"
-export MODEL_NAME="mBert"
-export ATL=0
+export MODEL_TYPE="slm"
+export MODEL_NAME="llama3_8b"
+export ATL=1
 export SEEDS="42"
 
-
-export TARGET_LANGS="uk"
+# ALL: "uk ro id bg uz no az mk hy sq"
+export TARGET_LANGS="uk ro id bg uz no az mk hy sq"
 export SOURCE_LANGS="en"
 export LANG="en"
 
-export LANG_SETTINGS="main"
-export CL_SETTINGS="few"
+export LANG_SETTINGS="main translation"
+export CL_SETTINGS="few zero"
 
 export EXPERIMENT="cl_eval"
+
+export LOWER_LR="1"
 
 echo "Running exp3_job.sh with:"
 env | grep -E 'LANG=|MODEL_TYPES=|MODEL_NAMES=|ATL=|SEEDS=|TARGET_LANGS=|SOURCE_LANGS=|LANG_SETTINGS=|CL_SETTINGS=|EXPERIMENT='

@@ -19,7 +19,9 @@ MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
                        "google-bert/bert-base-multilingual-uncased": "mBert",
                        "FacebookAI/xlm-roberta-base": "XLM-R-base",
                        "FacebookAI/xlm-roberta-large": "XLM-R-large",
-                       "openai/gpt-4o-mini": "GPT-4o-mini"
+                       "openai/gpt-4o-mini": "GPT-4o-mini",
+                       'google/gemini-2.5-flash': "Gemini 2.5 Flash",
+                       'openai/gpt-5.1': "GPT-5"
                         }
                         
 def load_metrics(path):

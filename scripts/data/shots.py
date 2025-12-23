@@ -9,20 +9,26 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 def main():
 
-    languages  = [
-    "en",  # English
-    "nl",  # Dutch
-    "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
-    "it",  # Italian
-    "pt",  # Portuguese
-    "ro",  # Romanian
-    "ru",  # Russian
-    "uk",  # Ukrainian
-    "bg",  # Bulgarian
-    "id",   # Indonesian
-    "vi",
-    "tr"
-    ]   
+    languages = [
+        "en",  # English
+        "pt",  # Portuguese
+        "de",  # German
+        "ru",  # Russian
+        "it",  # Italian
+        "vi",  # Vietnamese
+        "tr",  # Turkish
+        "nl",  # Dutch
+        "uk",  # Ukrainian
+        "ro",  # Romanian
+        "id",  # Indonesian
+        "bg",  # Bulgarian
+        "uz",  # Uzbek
+        "no",  # Norwegian
+        "az",  # Azerbaijani
+        "mk",  # Macedonian
+        "hy",  # Armenian
+        "sq",  # Albanian
+    ]
 
     all_shots = {}
     for lang in languages:

@@ -40,8 +40,11 @@ def find_saved_model_dir(args: Namespace) -> str:
         found_model_dir = meta_1["model_dir"]
         
         if found_model_dir:
-            all_meta_file_paths = list(single_run.glob("meta_*.json"))
-            optimal_hps = find_best_hp_run(args=args, all_meta_file_paths=all_meta_file_paths)
+            optimal_hps = {"learning_rate": meta_1["learning_rate"],
+                                     "max_grad_norm": meta_1["max_grad_norm"],
+                                     "weight_decay": meta_1["weight_decay"],
+                                     "epochs": meta_1["epochs"],
+                                     "batch_size": meta_1["batch_size"],}
         print("="*20)
         print(f"Found saved model dir: {single_run}")
         print("="*20)        
@@ -87,7 +90,6 @@ def find_best_hp_run(args: Namespace,
     Find the best hp run according to the args.
     Returns a dict with the best hyperparameter configurations
     """
-
     language_dir = Path(os.path.join(EX1, args.lang))
     all_language_runs = list(language_dir.glob("run_*"))
     optimal_hp_dir = None

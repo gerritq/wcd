@@ -5,10 +5,11 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
-LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl")
-MODEL_TYPES=("clf") # slm clf
+LANGS=("az" "bg" "hy" "id" "mk", "no")
+MODEL_TYPES=("clf") # slm clf plm
 ATLS=(0)
-MODEL_NAMES=("llama3_8b" "qwen3_8b") # "qwen3_8b"
+MODEL_NAMES=("llama3_8b" "aya_8b" "qwen3_8b") # "qwen3_8b" "llama3_8b"
+# MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l")
 SEEDS=(2025 2026)
 
 

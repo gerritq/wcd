@@ -18,26 +18,27 @@ from prompts import INSTRUCT_PROMPT, VERBOSE_PROMPT
 # --------------------------------------------------------------------------------------------------
 
 
-PROMPT_LANGUAGE_MAP = {"en": "English",
-                       "nl": "Dutch",
-                       "no": "Norwegian",
-                       "it": "Italian",
-                       "pt": "Portuguese",
-                       "ro": "Romanian",
-                       "ru": "Russian",
-                       "uk": "Ukrainian",
-                       "bg": "Bulgarian",
-                       "id": "Indonesian",
-                       "vi": "Vietnamese",
-                       "tr": "Turkish"
-                        }
+PROMPT_LANGUAGE_MAP = {
+    "en": "English",
+    "pt": "Portuguese",
+    "de": "German",
+    "ru": "Russian",
+    "it": "Italian",
+    "vi": "Vietnamese",
+    "tr": "Turkish",
+    "nl": "Dutch",
+    "uk": "Ukrainian",
+    "ro": "Romanian",
+    "id": "Indonesian",
+    "bg": "Bulgarian",
+    "uz": "Uzbek",
+    "no": "Norwegian",
+    "az": "Azerbaijani",
+    "mk": "Macedonian",
+    "hy": "Armenian",
+    "sq": "Albanian",
+}
 
-MODEL_MAPPING =  {
-
-    "gpt-4o-mini": "openai/gpt-4o-mini",
-    "llama_8b": "meta-llama/llama-3.1-8b-instruct",
-    "qwen_8b": "qwen/qwen3-8b"
-    }
 
 # PROMPT = {
 #     "system": (
@@ -94,7 +95,7 @@ BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
 OUT_DIR = os.path.join(BASE_DIR, "data/exp1")
 TEST_DIR = os.path.join(BASE_DIR, "data/exp1_test")
-SHOTS_DIR = os.path.join(DATA_DIR, "../shots")
+SHOTS_DIR = os.path.join(BASE_DIR, "data/sets/shots")
 
 def get_model_number(model_dir: str) -> int:
     '''Function is differnt than in utils, as we are not chekcing for dir but files'''
@@ -299,8 +300,6 @@ def main() -> None:
     args.smoke_test = bool(args.smoke_test)
     args.context = bool(args.context)
     args.verbose = bool(args.verbose)
-
-    args.model = MODEL_MAPPING[args.model]
 
     # Select the correct prompt user message
     

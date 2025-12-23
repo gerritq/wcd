@@ -2,13 +2,13 @@
 #SBATCH --job-name=exp1-api
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=02:00:00
+#SBATCH --time=10:00:00
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=1GB
 
-LANGUAGE_LST=("pt" "no") # "ro" "bg" "tr"
-MODEL_LST=("gpt-4o-mini")
-SHOTS_LST=(0 1)
+LANGUAGE_LST=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
+MODEL_LST=("google/gemini-2.5-flash" "openai/gpt-5.1") # openai/gpt-5.1 google/gemini-2.5-flash
+SHOTS_LST=(0 1) # 0 1
 CONTEXT_LST=(1)
 VERBOSE_LST=(0 1)
 SMOKE_TEST=0
