@@ -15,6 +15,7 @@ import json
 import copy
 from argparse import Namespace
 from run import single_stage_training
+import tempfile
 
 # ------------------------------------------------------------------------
 # configs
@@ -85,7 +86,7 @@ def zero_shot_evaluation(args: Namespace):
                     from_checkpoint=args.from_checkpoint,
                     quantization=args.quantization,
     )
-
+    slm.model.to(device)
     # tokenisers
     tokenizer_train = get_tokenizer(args=args,
                                     inference=False
@@ -102,6 +103,7 @@ def zero_shot_evaluation(args: Namespace):
 
     for target_lang in args.target_langs:
         args.lang = target_lang
+        args.run_dir = create_temp_dir(args)
 
         print("="*20)
         print(f"Zero-shot evaluation on target lang: {target_lang}")
@@ -136,16 +138,23 @@ def few_shot_evaluation(args: Namespace):
     args.epochs = optimal_hps["epochs"]
     args.batch_size = optimal_hps["batch_size"]
     args.model_dir = model_dir
+    
+    print("="*20)
+    print("Optimal hyperparameters found:")
+    print(optimal_hps)
+    print("="*20)
 
     if args.lower_lr:
         args.learning_rate = 1e-6
+        args.epochs = 2
         print("="*20)
-        print(f"Lowering learning rate to {args.learning_rate} for few-shot training")
+        print(f"Lowering learning rate to {args.learning_rate} and fixing epochs to {args.epochs} for few-shot training")
         print("="*20)
 
     # loop over target langs
     for target_lang in args.target_langs:
         args.lang = target_lang
+        args.run_dir = create_temp_dir(args)
 
         print("="*20)
         print(f"Few-shot evaluation on target lang: {target_lang}")
@@ -200,6 +209,13 @@ def run_x_shot(args: Namespace):
                     print(f"Starting few-shot evaluation for lang setting: {lang_setting}")
                     print("="*20)
                     few_shot_evaluation(args)
+
+def create_temp_dir(args: Namespace) -> str:
+    # create an model dir for saing
+    run_dir = os.path.join(EX2_EVAL, args.lang)
+    os.makedirs(run_dir, exist_ok=True)
+    run_dir = tempfile.mkdtemp(dir=run_dir, prefix=f"run_")
+    return run_dir
 
 def main():
     parser = argparse.ArgumentParser()

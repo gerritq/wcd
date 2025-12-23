@@ -7,8 +7,8 @@ set -euo pipefail
 # If two langs combine with +
 
 TRAINING_LANGS=("en")
-MODEL_TYPES=("clf")
-ATLS=(0)
+MODEL_TYPES=("slm")
+ATLS=(1)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
 SEEDS=(42)
 
@@ -34,7 +34,7 @@ for lang in "${TRAINING_LANGS[@]}"; do
 
             # default time based on prompt template
             if [[ "$mtype" == "plm" ]]; then
-                TIME="00:30:00"
+                TIME="00:15:00"
             else
                 TIME="02:00:00"
             fi
@@ -47,7 +47,7 @@ for lang in "${TRAINING_LANGS[@]}"; do
             --job-name="$job_name" \
             --time="$TIME" \
             --gres=gpu:"$GPUS" \
-            --export=ALL,MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT",SOURCE_LANGS="$lang" \
+            --export=ALL,MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT",SOURCE_LANGS="$lang",LANG="$lang" \
             exp1_job.sh
             
         done

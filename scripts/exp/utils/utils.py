@@ -157,7 +157,7 @@ def get_save_path(args: Namespace) -> str:
 
 
     # BINARY EXPERIMENT: this is the full hp search run for plms,slms,and clfs
-    if args.experiment in ["binary", "seed"]:
+    if args.experiment in ["binary", "seed", "cl_eval"]:
         if not args.run_dir:
             raise ValueError("For experiment 1 run dir must be given.")
         model_number = get_model_number(args.run_dir)
@@ -171,11 +171,11 @@ def get_save_path(args: Namespace) -> str:
         save_path = os.path.join(args.model_dir, f"meta_{model_number}.json")
 
     # CL EVALUATION
-    if args.experiment == "cl_eval":
-        save_dir = os.path.join(EX2, "eval", args.lang)
-        os.makedirs(save_dir, exist_ok=True)
-        model_number = get_model_number(save_dir)
-        save_path = os.path.join(save_dir, f"meta_{model_number}.json")
+    # if args.experiment == "cl_eval":
+    #     save_dir = os.path.join(EX2, "eval", args.lang)
+    #     os.makedirs(save_dir, exist_ok=True)
+    #     model_number = get_model_number(save_dir)
+    #     save_path = os.path.join(save_dir, f"meta_{model_number}.json")
         
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)

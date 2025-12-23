@@ -1,15 +1,15 @@
-export MODEL_TYPE="slm"
+export MODEL_TYPE="clf"
 export MODEL_NAME="llama3_8b"
-export ATL=1
+export ATL=0
 export SEEDS="42"
 
 # ALL: "uk ro id bg uz no az mk hy sq"
-export TARGET_LANGS="uk ro id bg uz no az mk hy sq"
+export TARGET_LANGS="uk"
 export SOURCE_LANGS="en"
 export LANG="en"
 
-export LANG_SETTINGS="main translation"
-export CL_SETTINGS="few zero"
+export LANG_SETTINGS="main"
+export CL_SETTINGS="zero"
 
 export EXPERIMENT="cl_eval"
 

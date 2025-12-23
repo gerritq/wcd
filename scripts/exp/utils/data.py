@@ -24,7 +24,7 @@ from transformers import set_seed
 
 """
 
-EVAL_BATCH=16
+EVAL_BATCH=8
 
 PROMPT_LANGUAGE_MAP = {"en": "English",
                        "nl": "Dutch",
@@ -65,7 +65,7 @@ def label_distribution(ds: Dataset) -> Dict[int, int]:
 
 
 def filter_long_context_examples(example: dict) -> bool:
-    max_chars = 800
+    max_chars = 500
 
     text = (
         f"Section: {example['section']}\n"

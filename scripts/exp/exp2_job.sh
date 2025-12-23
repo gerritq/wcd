@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
 
 # comp050 slow
 # comp039 has error
@@ -26,7 +26,7 @@ SEEDS="${SEEDS}"
 LANG_SETTINGS="${LANG_SETTINGS}"
 CL_SETTINGS="${CL_SETTINGS}"
 
-LANG="${ATL:-em}"
+LANG="${LANG:-en}"
 ATL="${ATL:-0}"
 CONTEXT="${CONTEXT:-1}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
@@ -61,14 +61,6 @@ BATCH_SIZE=16
 GRAD_NORM=1
 WEIGHT_DECAY=0.01
 
-
-
-# --------------------------------------------------------------------------------------------------
-# MODEL DIR
-# --------------------------------------------------------------------------------------------------
-
-RUN_DIR=""
-
 # --------------------------------------------------------------------------------------------------
 # HP LOOP
 # --------------------------------------------------------------------------------------------------
@@ -89,7 +81,7 @@ uv run cl.py \
   --batch_size "$BATCH_SIZE" \
   --max_grad_norm "$GRAD_NORM" \
   --weight_decay "$WEIGHT_DECAY" \
-  --seed "$SEEDS" \
+  --seeds "$SEEDS" \
   --source_langs "$SOURCE_LANGS" \
   --target_langs "$TARGET_LANGS" \
   --lang_settings "$LANG_SETTINGS" \
