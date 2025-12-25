@@ -10,6 +10,7 @@
 # SBATCH --partition=nmes_gpu,gpu
 # SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
 
+
 # comp050 slow
 # comp039 has error
 
@@ -28,6 +29,7 @@ LANG_SETTINGS="${LANG_SETTINGS}"
 CL_SETTINGS="${CL_SETTINGS}"
 LOWER_LR="${LOWER_LR}"
 
+NEW_LEARNING_RATE="${NEW_LEARNING_RATE:-1e-5}"
 LANG="${LANG:-en}"
 ATL="${ATL:-0}"
 CONTEXT="${CONTEXT:-1}"
@@ -47,6 +49,7 @@ echo "  PROMPT_TEMPLATE = $PROMPT_TEMPLATE"
 echo "  TRAINING_SIZE = $TRAINING_SIZE"
 echo "  EXPERIMENT = $EXPERIMENT"
 echo "  LOWER_LR = $LOWER_LR"
+echo "  NEW_LEARNING_RATE = $NEW_LEARNING_RATE"
 echo
 
 # VARS
@@ -88,4 +91,5 @@ uv run cl.py \
   --target_langs "$TARGET_LANGS" \
   --lang_settings "$LANG_SETTINGS" \
   --cl_settings "$CL_SETTINGS" \
-  --lower_lr "$LOWER_LR"
+  --lower_lr "$LOWER_LR" \
+  --new_learning_rate "$NEW_LEARNING_RATE"

@@ -1,0 +1,80 @@
+{
+  "model_type": "clf",
+  "model_name": "meta-llama/Llama-3.1-8B",
+  "atl": false,
+  "context": true,
+  "smoke_test": false,
+  "training_size": 5000,
+  "experiment": "cl_eval",
+  "prompt_template": "instruct",
+  "epochs": 3,
+  "learning_rate": 0.0002,
+  "batch_size": 16,
+  "max_grad_norm": 1.0,
+  "weight_decay": 0.01,
+  "quantization": true,
+  "max_length": 512,
+  "metric": "f1",
+  "lang_setting": "main",
+  "lang": "sq",
+  "train_log_step": 20,
+  "source_langs": [
+    "en"
+  ],
+  "target_langs": [
+    "uk",
+    "ro",
+    "id",
+    "bg",
+    "uz",
+    "no",
+    "az",
+    "mk",
+    "hy",
+    "sq"
+  ],
+  "lang_settings": [
+    "main",
+    "translation"
+  ],
+  "cl_settings": [
+    "zero",
+    "few"
+  ],
+  "seeds": [
+    "42"
+  ],
+  "from_checkpoint": true,
+  "save_checkpoint": false,
+  "lower_lr": true,
+  "cl_setting": "zero",
+  "seed": 42,
+  "model_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_vjmx0mc0",
+  "run_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/eval/sq/run_e387hyjy",
+  "label_dist": {
+    "train": {
+      "0": 2468,
+      "1": 2457
+    },
+    "dev": {
+      "0": 250,
+      "1": 250
+    },
+    "test": {
+      "0": 250,
+      "1": 250
+    }
+  },
+  "date": "2025-12-24T20:08:36.859678",
+  "max_memory": 13.488529205322266,
+  "bf16": true,
+  "test_metrics_0_shot": {
+    "accuracy": 0.7,
+    "f1": 0.6822033898305084,
+    "tp": 161,
+    "fp": 61,
+    "tn": 189,
+    "fn": 89,
+    "n_total": 500
+  }
+}

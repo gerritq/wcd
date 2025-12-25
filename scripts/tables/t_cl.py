@@ -33,12 +33,16 @@ def load_zero(rows: list[dict],
     if meta_1["model_type"] == "slm" and meta_1['atl'] == True:
         model_name += f" (TOL) {1 if meta_1['lower_lr'] else 0}"
     
-    rows.append({"model_name": model_name,
-                 "lang": meta_1["lang"],
-                 "lang_setting": meta_1["lang_setting"],
-                 "shots": 0,
-                 "metric": meta_1["test_metrics_0_shot"][METRIC]
-                })
+    try:
+        rows.append({"model_name": model_name,
+                    "lang": meta_1["lang"],
+                    "lang_setting": meta_1["lang_setting"],
+                    "shots": 0,
+                    "metric": meta_1["test_metrics_0_shot"][METRIC]
+                    })
+    except:
+        pass
+
     return rows
 
 

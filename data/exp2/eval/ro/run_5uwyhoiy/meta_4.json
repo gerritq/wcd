@@ -1,0 +1,114 @@
+{
+  "model_type": "plm",
+  "model_name": "google-bert/bert-base-multilingual-uncased",
+  "atl": false,
+  "context": true,
+  "smoke_test": false,
+  "training_size": 500,
+  "experiment": "cl_eval",
+  "prompt_template": "instruct",
+  "epochs": 1,
+  "learning_rate": 5e-05,
+  "batch_size": 32,
+  "max_grad_norm": 1.0,
+  "weight_decay": 0.01,
+  "quantization": true,
+  "max_length": 512,
+  "metric": "f1",
+  "lang_setting": "translation",
+  "lang": "ro",
+  "train_log_step": 20,
+  "source_langs": [
+    "en"
+  ],
+  "target_langs": [
+    "uk",
+    "ro",
+    "id",
+    "bg",
+    "uz",
+    "no",
+    "az",
+    "mk",
+    "hy",
+    "sq"
+  ],
+  "lang_settings": [
+    "main",
+    "translation"
+  ],
+  "cl_settings": [
+    "zero",
+    "few"
+  ],
+  "seeds": [
+    "42"
+  ],
+  "from_checkpoint": true,
+  "save_checkpoint": false,
+  "lower_lr": false,
+  "cl_setting": "few",
+  "seed": 42,
+  "model_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_y9lhy6rm",
+  "run_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/eval/ro/run_5uwyhoiy",
+  "label_dist": {
+    "train": {
+      "0": 249,
+      "1": 242
+    },
+    "dev": {
+      "0": 250,
+      "1": 249
+    },
+    "test": {
+      "0": 249,
+      "1": 244
+    }
+  },
+  "date": "2025-12-24T19:35:40.397437",
+  "duration": 0,
+  "max_memory": 4.746895790100098,
+  "bf16": true,
+  "train_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 0.701873779296875
+    }
+  ],
+  "dev_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 0.6677
+    }
+  ],
+  "dev_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.5671342685370742,
+        "f1": 0.6625,
+        "tp": 212,
+        "fp": 179,
+        "tn": 71,
+        "fn": 37,
+        "n_total": 499
+      }
+    }
+  ],
+  "test_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.7931034482758621,
+        "f1": 0.8125,
+        "tp": 221,
+        "fp": 79,
+        "tn": 170,
+        "fn": 23,
+        "n_total": 493
+      }
+    }
+  ]
+}

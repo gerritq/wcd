@@ -144,11 +144,13 @@ def few_shot_evaluation(args: Namespace):
     print(optimal_hps)
     print("="*20)
 
-    if args.lower_lr:
-        args.learning_rate = 1e-6
+    if args.model_type in ["slm", "clf"]:
         args.epochs = 2
+
+    if args.lower_lr:
+        args.learning_rate = args.new_learning_rate
         print("="*20)
-        print(f"Lowering learning rate to {args.learning_rate} and fixing epochs to {args.epochs} for few-shot training")
+        print(f"Lowering learning rate to {args.new_learning_rate} and fixing epochs to {args.epochs} for few-shot training")
         print("="*20)
 
     # loop over target langs
@@ -236,6 +238,8 @@ def main():
     parser.add_argument("--max_grad_norm", type=float, required=True)
     parser.add_argument("--weight_decay", type=float, required=True)
     parser.add_argument("--quantization", type=int, default=1) # we always quantise
+    parser.add_argument("--lower_lr", type=int, default=0)
+    parser.add_argument("--new_learning_rate", type=float, default=5e-5)
 
     # Defaults
     parser.add_argument("--max_length", type=int, default=512)
@@ -252,7 +256,6 @@ def main():
     parser.add_argument("--seeds", type=str, default="42")
     parser.add_argument("--from_checkpoint", type=int, default=1)    
     parser.add_argument("--save_checkpoint", type=int, default=0)
-    parser.add_argument("--lower_lr", type=int, default=0)
     args = parser.parse_args()     
 
    # Checks

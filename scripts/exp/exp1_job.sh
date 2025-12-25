@@ -73,7 +73,7 @@ if [ "$HP_SEARCH" -eq 1 ]; then
         # SLM HP search (9 combos)
         EPOCHS=4
         LR_LIST=(5e-4 2e-4 5e-5)
-        BATCH_SIZE_LIST=(16)
+        BATCH_SIZE_LIST=("$BATCH_SIZE")
         GRAD_NORM_LIST=(0.5 1)
         WEIGHT_DECAY=0.01
     fi

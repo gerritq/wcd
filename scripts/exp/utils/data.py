@@ -65,7 +65,7 @@ def label_distribution(ds: Dataset) -> Dict[int, int]:
 
 
 def filter_long_context_examples(example: dict) -> bool:
-    max_chars = 500
+    max_chars = 800
 
     text = (
         f"Section: {example['section']}\n"
