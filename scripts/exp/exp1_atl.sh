@@ -5,10 +5,10 @@ set -euo pipefail
 # cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
-LANGS=("pt")
+LANGS=("bg" "de")
 MODEL_TYPES=("slm")
-ATLS=(1)
-MODEL_NAMES=("llama3_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
+ATLS=(0 1)
+MODEL_NAMES=("aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
 PROMPT_TEMPLATES=("instruct") # ""minimal"  "instruct" "verbose"
 BATCH_SIZE=8 # lower to avoid cuda errors
 GPUS=1

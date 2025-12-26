@@ -1,14 +1,12 @@
 import os
-from pdb import run
-
-import json
-import glob
 from collections import defaultdict
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import argparse
 from pathlib import Path
 from utils import MODEL_DISPLAY_NAMES, LANG_ORDER, LANGS, load_metrics
 import pandas as pd
+import sys
 
 # ----------------------------------------------------------------------
 # Configs
@@ -23,22 +21,24 @@ COUNT = defaultdict(list)
 SHOTS = [0, 50, 100, 250, 500]
 
 def load_zero(rows: list[dict],
+              meta_file: Path,
               meta_1: dict,
               ) -> dict[str, dict]:
 
     # COLLECT
     model_name = MODEL_DISPLAY_NAMES[meta_1["model_name"]]
     if meta_1["model_type"] == "clf":
-        model_name += f" (ES) {1 if meta_1['lower_lr'] else 0}"
+        model_name += f" (ES) {meta_1['learning_rate']}"
     if meta_1["model_type"] == "slm" and meta_1['atl'] == True:
-        model_name += f" (TOL) {1 if meta_1['lower_lr'] else 0}"
+        model_name += f" (TOL) {meta_1['learning_rate']}"
     
     try:
         rows.append({"model_name": model_name,
                     "lang": meta_1["lang"],
                     "lang_setting": meta_1["lang_setting"],
                     "shots": 0,
-                    "metric": meta_1["test_metrics_0_shot"][METRIC]
+                    "metric": meta_1["test_metrics_0_shot"][METRIC],
+                    "source": meta_file.parent.name
                     })
     except:
         pass
@@ -55,15 +55,16 @@ def load_few(rows: list[dict],
         meta_1 = load_metrics(meta_file)    
         model_name = MODEL_DISPLAY_NAMES[meta_1["model_name"]]
         if meta_1["model_type"] == "clf":
-            model_name += f" (ES) {1 if meta_1['lower_lr'] else 0}"
+            model_name += f" (ES) {meta_1['learning_rate']}"
         if meta_1["model_type"] == "slm" and meta_1['atl'] == True:
-            model_name += f" (TOL) {1 if meta_1['lower_lr'] else 0}"
+            model_name += f" (TOL) {meta_1['learning_rate']}"
         
         rows.append({"model_name": model_name,
                     "lang": meta_1["lang"],
                     "lang_setting": meta_1["lang_setting"],
                     "shots": meta_1["training_size"],
-                    "metric": meta_1["test_metrics"][-1]['metrics'][METRIC]
+                    "metric": meta_1["test_metrics"][-1]['metrics'][METRIC],
+                    "source": meta_file.parent.name
                     })
         
     return rows
@@ -92,7 +93,7 @@ def load_all_models(path: str) -> dict[str, dict]:
 
             if len(meta_files) == 1:
                 meta_1 = load_metrics(meta_files[0])
-                rows = load_zero(rows, meta_1)
+                rows = load_zero(rows=rows, meta_file=meta_files[0], meta_1=meta_1)
 
             if len(meta_files) == 4:
                 rows = load_few(rows=rows, all_meta_files=meta_files)
@@ -100,42 +101,176 @@ def load_all_models(path: str) -> dict[str, dict]:
 
     return rows
 
-def create_df(rows: list[dict]) -> pd.DataFrame:
+
+def create_zero_shot_df(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
 
-    pivot = (
-    df
-    .pivot_table(
-        index=["lang", "model_name"],
-        columns=["lang_setting", "shots"],
-        values="metric",
-        aggfunc="mean"
+    zero_results_check = (
+        df[df["shots"] == 0]
+        .groupby(["lang_setting", "lang", "model_name"])
+        .agg(
+            metric_mean=("metric", "mean"),
+            metric_count=("metric", "count"),
+            sources=("source", list),
+            metrics_lst=("metric", list),
+        )
+        .reset_index()
     )
-    .sort_index(axis=1, level=[0, 1])  # optional: clean column order
+
+    print("="*60)
+    print("="*60)
+    print("CHECK ZERO-SHOT RESULTS")    
+    print(zero_results_check)
+    print("="*60)
+    print("="*60)
+
+
+    # CREATE 0SHOT PIVOT
+    zero_results = (
+        df[df["shots"] == 0]
+        .pivot_table(
+            index=["lang_setting", "lang"],
+            columns=["model_name"],
+            values=["metric"],
+            aggfunc="mean"
+        )
+    )
+
+    zero_results.columns = zero_results.columns.droplevel(0)
+    zero_results = zero_results.reset_index().rename(columns={df.index.name:'index'})
+
+    # add resource level
+    def get_resource(lang: str) -> str:
+        for resource, langs in LANGS.items():
+            if lang in langs:
+                return resource
+        return "unknown"
+    zero_results["resource"] = zero_results["lang"].apply(get_resource)
+
+
+    # group by lang setting and resource
+    zero_results = (zero_results
+                    .reset_index(drop=True).groupby(["lang_setting", "resource"])
+                    .mean(numeric_only=True).reset_index()
+                    )
+
+
+    # SORT COLUMNS
+    def model_priority(col: str) -> tuple:
+        col_l = col.lower()
+        if "tol" in col_l:
+            return (2, col)
+        if "es" in col_l:
+            return (1, col)
+        if "mbert" in col_l:
+            return (0, col)
+        return (3, col)
+    model_cols = sorted(
+        [c for c in zero_results.columns if c not in ["lang_setting", "resource"]],
+        key=model_priority
+    )
+    cols = ["lang_setting", "resource"] + model_cols
+    zero_results = zero_results[cols]
+
+    # rename mbert column
+    zero_results = zero_results.rename(columns={"mBert": "mBERT"})
+
+    # SORT ROWS
+    zero_results['lang_setting'] = pd.Categorical(zero_results['lang_setting'], categories=['translation', 'main'], ordered=True)
+    zero_results['resource'] = pd.Categorical(zero_results['resource'], categories=['medium', 'low'], ordered=True)
+
+    zero_results = zero_results.sort_values(['lang_setting', 'resource']).reset_index(drop=True)
+
+    # reset index
+    zero_results = zero_results.reset_index(drop=True)
+
+    # rename values
+    zero_results['lang_setting'] = zero_results['lang_setting'].replace({
+        'translation': 'Parallel',
+        'main': 'Non-Parallel'
+    })
+    zero_results['resource'] = zero_results['resource'].replace({
+        'medium': 'Medium',
+        'low': 'Low'
+    })
+    return zero_results
+
+
+def zero_shot_latex_table(df: pd.DataFrame) -> str:
+    table = "\n\n"
+    colspec = "ll" + "c" * (len(df.columns) - 2)
+
+    header = "\\textbf{Setting} & \\textbf{Resource Level} "
+    for model in df.columns[2:]:
+        header += f"& \\textbf{{{model}}}"
+    header += "\\\\ \\hline\n"
+
+    table += "\\begin{tabular}{" + colspec + "}\n"
+    table += header
+
+    prev_lang_setting = None
+    for _, row in df.iterrows():
+
+        if prev_lang_setting != row['lang_setting'] and prev_lang_setting is not None:
+            table += "\\cmidrule(lr){2-" + str(len(df.columns)) + "}\n"
+
+        if prev_lang_setting is None or prev_lang_setting != row['lang_setting']:
+            n_setting_rows = df[df['lang_setting'] == row['lang_setting']].shape[0]
+            line = f"\\multirow{{{n_setting_rows}}}{{*}}{{{row['lang_setting']}}} & {row['resource']} "
+        else:
+            line = f" & {row['resource']} "
+        for model in df.columns[2:]:
+            if "mbert" in model.lower():
+                line += f"& {row[model]:.2f} "
+            else:
+                diff = row[model] - row['mBERT']
+                line += f"& {row[model]:.2f} (\\posneg{{{diff:.2f}}}) "
+
+        line += "\\\\\n"
+        table += line
+
+        prev_lang_setting = row['lang_setting']
+
+    table += "\\bottomrule\n"
+    table += "\\end{tabular}\n"
+    table += "\n\n"
+    
+    print("\n\n")
+    print("ZERO-SHOT TABLE")
+    print(table)
+    print("\n\n")
+   
+def create_all_results_df(rows: list[dict]) -> pd.DataFrame:
+ 
+    df = pd.DataFrame(rows)
+    # CRAETE ALL RESULTS PIVOT
+    all_results = (df.pivot_table(
+            index=["lang", "model_name"],
+            columns=["lang_setting", "shots"],
+            values="metric",
+            aggfunc="mean"
+        )
+        .sort_index(axis=1, level=[0, 1])
     )
 
     
-    pivot.columns = [
+    all_results.columns = [
         c if isinstance(c, str) else f"{c[0]}_{c[1]}"
-        for c in pivot.columns
+        for c in all_results.columns
     ]
-    pivot = pivot.reset_index() 
-
+    all_results = all_results.reset_index() 
     id_cols = ["lang", "model_name"]
-    trans_cols = [c for c in pivot.columns if c.startswith("translation_")]
-    main_cols  = [c for c in pivot.columns if c.startswith("main_")]
+    trans_cols = [c for c in all_results.columns if c.startswith("translation_")]
+    main_cols  = [c for c in all_results.columns if c.startswith("main_")]
 
-    pivot = pivot[id_cols + trans_cols + main_cols]
+    all_results = all_results[id_cols + trans_cols + main_cols]
 
     # sort LANG_ORDER
-    pivot['lang'] = pd.Categorical(pivot['lang'], categories=LANG_ORDER, ordered=True)
-    pivot = pivot.sort_values(['lang', 'model_name']).reset_index(drop=True)
+    all_results['lang'] = pd.Categorical(all_results['lang'], categories=LANG_ORDER, ordered=True)
+    all_results = all_results.sort_values(['lang', 'model_name']).reset_index(drop=True)
+    return all_results
 
-    return pivot
-
-def generate_figure(df: pd.DataFrame):
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as cm
+def generate_main_figure(df: pd.DataFrame):
 
     plt.rcParams.update({"font.size": 12})
 
@@ -228,7 +363,7 @@ def generate_figure(df: pd.DataFrame):
     fig.savefig("plots/main_fig.pdf", format="pdf", bbox_inches="tight")
             
 
-def latex_table(df: pd.DataFrame) -> str:
+def all_results_latex_table(df: pd.DataFrame) -> str:
     table = "\n\n"
     colspec = "ll" + "c" * (len(df.columns) - 2)
 
@@ -285,12 +420,14 @@ def latex_table(df: pd.DataFrame) -> str:
 def main():
     rows = load_all_models(path=EXP2_DIR)
 
-    pivot = create_df(rows)
-    print(pivot)
-    print(pivot.columns)
+    # zero shot
+    zero_shot_df = create_zero_shot_df(rows)
+    zero_shot_latex_table(zero_shot_df)
 
-    latex_table(pivot)
+    # all results
+    pivot = create_all_results_df(rows)
 
-    generate_figure(pivot)
+    all_results_latex_table(pivot)  
+    generate_main_figure(pivot)
 if __name__ == "__main__":
     main()

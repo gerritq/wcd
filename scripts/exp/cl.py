@@ -136,7 +136,8 @@ def few_shot_evaluation(args: Namespace):
     args.max_grad_norm = optimal_hps["max_grad_norm"]
     args.weight_decay = optimal_hps["weight_decay"]
     args.epochs = optimal_hps["epochs"]
-    args.batch_size = optimal_hps["batch_size"]
+    if args.model_type in ["plm"]:
+        args.batch_size = optimal_hps["batch_size"]
     args.model_dir = model_dir
     
     print("="*20)
@@ -240,6 +241,7 @@ def main():
     parser.add_argument("--quantization", type=int, default=1) # we always quantise
     parser.add_argument("--lower_lr", type=int, default=0)
     parser.add_argument("--new_learning_rate", type=float, default=5e-5)
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
 
     # Defaults
     parser.add_argument("--max_length", type=int, default=512)
@@ -300,6 +302,13 @@ def main():
     # Select the HF model name
     suffix = "_base" if args.model_type == "clf" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
+
+    # if slm and batch size is low, we increase gradient accumulation steps
+    if args.model_type in ["slm", "clf"] and args.batch_size < 16:
+        args.gradient_accumulation_steps = 2
+        print("="*20)
+        print(f"INCREASED GRADIENT ACCUMULATION STEPS TO {args.gradient_accumulation_steps}")
+        print("="*20)
 
     print("="*20)
     print("SETTINGS")

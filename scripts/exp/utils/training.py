@@ -60,7 +60,12 @@ def train(args: Namespace,
     start = time.time()
     model.to(device)
     optimizer = get_optimizer(args=args, model=model)
-    num_training_steps = args.epochs * len(train_dataloader)
+
+    # need to acc for remainder i len train data is nit divisible by grad acc steps
+    steps_per_epoch = len(train_dataloader) // args.gradient_accumulation_steps
+    if len(train_dataloader) % args.gradient_accumulation_steps != 0:
+        steps_per_epoch += 1
+    num_training_steps = args.epochs * steps_per_epoch
     warmup_steps = int(0.03 * num_training_steps)
 
     scheduler = get_linear_schedule_with_warmup(
@@ -75,6 +80,8 @@ def train(args: Namespace,
     dev_loss = []
     dev_metrics = []
     test_metrics = []
+
+    optimizer.zero_grad(set_to_none=True)
 
     for epoch in range(1, args.epochs + 1):
         model.train() 
@@ -91,23 +98,24 @@ def train(args: Namespace,
                 enabled=use_bf16
             ):
                 outputs = model(**batch)
-                loss = outputs.loss
+                loss = outputs.loss / args.gradient_accumulation_steps # norm loss here
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.max_grad_norm)
-
-            optimizer.step()
-            scheduler.step() 
-            optimizer.zero_grad(set_to_none=True)
+            if (batch_idx + 1) % args.gradient_accumulation_steps == 0 or (batch_idx + 1) == total_batches:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.max_grad_norm)
+                optimizer.step()
+                scheduler.step() 
+                optimizer.zero_grad(set_to_none=True)
 
             # Train loss
             if batch_idx % args.train_log_step == 0:
+                current_loss = loss.item() * args.gradient_accumulation_steps
                 print(f"Epoch {epoch} | "
                       f"Batch {batch_idx+1}/{total_batches} | "
-                      f"Training Loss = {loss.item():.4f}"
+                      f"Training Loss = {current_loss:.4f}"
                 )
                 train_loss.append(
-                    {"epoch": epoch, "batch": batch_idx, "loss": float(loss.item())}
+                    {"epoch": epoch, "batch": batch_idx, "loss": float(current_loss)}
                 )
 
             # Dev loss
@@ -123,8 +131,7 @@ def train(args: Namespace,
                 )
                 model.train() 
 
-            total_loss += loss.item()
-
+            total_loss += loss.item() * args.gradient_accumulation_steps
             progress_bar.update(1)
 
         avg_loss = total_loss / len(train_dataloader)

@@ -8,7 +8,7 @@ set -euo pipefail
 
 TRAINING_LANGS=("en")
 MODEL_TYPES=("slm")
-ATLS=(1)
+ATLS=(0)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
 SEEDS=(42)
 

@@ -155,6 +155,7 @@ def main():
     parser.add_argument("--max_grad_norm", type=float, required=True)
     parser.add_argument("--weight_decay", type=float, required=True)
     parser.add_argument("--quantization", type=int, default=1) # we always quantise
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
 
     # Defaults
     parser.add_argument("--lang", type=str, default="")
@@ -219,6 +220,13 @@ def main():
     suffix = "_base" if args.model_type == "clf" else ""
     args.model_name = MODEL_MAPPING[args.model_name+suffix]
 
+    # if slm and batch size is low, we increase gradient accumulation steps
+    if args.model_type in ["slm", "clf"] and args.batch_size < 16:
+        args.gradient_accumulation_steps = 2
+        print("="*20)
+        print(f"INCREASED GRADIENT ACCUMULATION STEPS TO {args.gradient_accumulation_steps}")
+        print("="*20)
+
     # Select the exp version
     if args.experiment in ["binary"]: # this is the full hp run
         single_stage_training(args)
@@ -235,7 +243,8 @@ def main():
         args.learning_rate = optimal_hp_config['learning_rate']
         args.max_grad_norm = optimal_hp_config['max_grad_norm']
         args.weight_decay = optimal_hp_config['weight_decay']
-        args.batch_size = optimal_hp_config['batch_size']
+        if args.gradient_accumulation_steps == 1:
+            args.batch_size = optimal_hp_config['batch_size']
 
         print("=" * 20)
         print("Optimal HP configuration found and updated args:")

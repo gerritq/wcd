@@ -5,14 +5,14 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
-LANGS=("az" "bg" "hy" "id" "mk", "no")
-MODEL_TYPES=("clf") # slm clf plm
-ATLS=(0)
-MODEL_NAMES=("llama3_8b" "aya_8b" "qwen3_8b") # "qwen3_8b" "llama3_8b"
+LANGS=("vi")
+MODEL_TYPES=("slm") # slm clf plm
+ATLS=(0 1)
+MODEL_NAMES=("aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b"
 # MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l")
 SEEDS=(2025 2026)
 
-
+BATCH_SIZE=8 # lower to avoid cuda errors
 HP_SEARCH=0
 CONTEXT=1
 EXPERIMENT="seed"
@@ -38,7 +38,7 @@ for lang in "${LANGS[@]}"; do
           sbatch \
             --job-name="$job_name" \
             --time="$TIME" \
-            --export=ALL,LANG="$lang",MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT" \
+            --export=ALL,LANG="$lang",MODEL_TYPE="$mtype",ATL="$atl",MODEL_NAME="$mname",HP_SEARCH="$HP_SEARCH",CONTEXT="$CONTEXT",SEED="$seed",EXPERIMENT="$EXPERIMENT",BATCH_SIZE="$BATCH_SIZE" \
             exp1_job.sh
 
         done

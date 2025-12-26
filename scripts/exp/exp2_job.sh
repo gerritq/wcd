@@ -6,10 +6,9 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=a100
-#SBATCH --reservation=rental_8734
-# SBATCH --partition=nmes_gpu,gpu
-# SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
-
+#SBATCH --partition=nmes_gpu,gpu
+#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
+# SBATCH --reservation=rental_8734
 
 # comp050 slow
 # comp039 has error
@@ -31,6 +30,7 @@ LOWER_LR="${LOWER_LR}"
 
 NEW_LEARNING_RATE="${NEW_LEARNING_RATE:-1e-5}"
 LANG="${LANG:-en}"
+BATCH_SIZE="${BATCH_SIZE:-16}"
 ATL="${ATL:-0}"
 CONTEXT="${CONTEXT:-1}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-instruct}"
@@ -50,6 +50,7 @@ echo "  TRAINING_SIZE = $TRAINING_SIZE"
 echo "  EXPERIMENT = $EXPERIMENT"
 echo "  LOWER_LR = $LOWER_LR"
 echo "  NEW_LEARNING_RATE = $NEW_LEARNING_RATE"
+echo "  BATCH_SIZE = $BATCH_SIZE"
 echo
 
 # VARS
@@ -62,7 +63,7 @@ SMOKE_TEST=0
 # Default will be overwritten
 EPOCHS=3
 LR=2e-4
-BATCH_SIZE=16
+BATCH_SIZE="$BATCH_SIZE"
 GRAD_NORM=1
 WEIGHT_DECAY=0.01
 
