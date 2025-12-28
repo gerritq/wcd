@@ -5,7 +5,7 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
-LANGS=("vi")
+LANGS=("hy")
 MODEL_TYPES=("slm") # slm clf plm
 ATLS=(0 1)
 MODEL_NAMES=("aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b"

@@ -1,0 +1,159 @@
+{
+  "model_type": "clf",
+  "model_name": "meta-llama/Llama-3.1-8B",
+  "atl": false,
+  "context": true,
+  "smoke_test": false,
+  "training_size": 250,
+  "experiment": "cl_eval",
+  "prompt_template": "instruct",
+  "epochs": 2,
+  "learning_rate": 1e-07,
+  "batch_size": 8,
+  "max_grad_norm": 0.5,
+  "weight_decay": 0.01,
+  "quantization": true,
+  "lower_lr": true,
+  "new_learning_rate": 1e-07,
+  "gradient_accumulation_steps": 2,
+  "max_length": 512,
+  "metric": "f1",
+  "lang_setting": "translation",
+  "lang": "uz",
+  "train_log_step": 20,
+  "source_langs": [
+    "en"
+  ],
+  "target_langs": [
+    "uk",
+    "ro",
+    "id",
+    "bg",
+    "uz",
+    "no",
+    "az",
+    "mk",
+    "hy",
+    "sq"
+  ],
+  "lang_settings": [
+    "main",
+    "translation"
+  ],
+  "cl_settings": [
+    "few"
+  ],
+  "seeds": [
+    "2025"
+  ],
+  "from_checkpoint": true,
+  "save_checkpoint": false,
+  "cl_setting": "few",
+  "seed": 2025,
+  "model_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_tms9020j",
+  "run_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/eval/uz/run_c6pmt18g",
+  "label_dist": {
+    "train": {
+      "0": 124,
+      "1": 124
+    },
+    "dev": {
+      "0": 250,
+      "1": 250
+    },
+    "test": {
+      "0": 249,
+      "1": 241
+    }
+  },
+  "date": "2025-12-28T03:22:46.518721",
+  "duration": 3,
+  "max_memory": 16.788036346435547,
+  "bf16": true,
+  "train_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 0.8765802383422852
+    },
+    {
+      "epoch": 1,
+      "batch": 20,
+      "loss": 1.135833740234375
+    },
+    {
+      "epoch": 2,
+      "batch": 0,
+      "loss": 1.8326148986816406
+    },
+    {
+      "epoch": 2,
+      "batch": 20,
+      "loss": 0.9989013671875
+    }
+  ],
+  "dev_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 0.9613
+    },
+    {
+      "epoch": 2,
+      "batch": 0,
+      "loss": 0.9429
+    }
+  ],
+  "dev_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.628,
+        "f1": 0.6815068493150684,
+        "tp": 199,
+        "fp": 135,
+        "tn": 115,
+        "fn": 51,
+        "n_total": 500
+      }
+    },
+    {
+      "epoch": 2,
+      "metrics": {
+        "accuracy": 0.626,
+        "f1": 0.6792452830188679,
+        "tp": 198,
+        "fp": 135,
+        "tn": 115,
+        "fn": 52,
+        "n_total": 500
+      }
+    }
+  ],
+  "test_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.8795918367346939,
+        "f1": 0.879837067209776,
+        "tp": 216,
+        "fp": 34,
+        "tn": 215,
+        "fn": 25,
+        "n_total": 490
+      }
+    },
+    {
+      "epoch": 2,
+      "metrics": {
+        "accuracy": 0.8795918367346939,
+        "f1": 0.879837067209776,
+        "tp": 216,
+        "fp": 34,
+        "tn": 215,
+        "fn": 25,
+        "n_total": 490
+      }
+    }
+  ]
+}

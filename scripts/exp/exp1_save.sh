@@ -7,10 +7,10 @@ set -euo pipefail
 # If two langs combine with +
 
 TRAINING_LANGS=("en")
-MODEL_TYPES=("slm")
+MODEL_TYPES=("clf")
 ATLS=(0)
 MODEL_NAMES=("llama3_8b") # "qwen3_8b" "llama3_8b" "aya_8b" "llama3_3b" "qwen3_4b"
-SEEDS=(42)
+SEEDS=(2025 2026)
 
 PROMPT_TEMPLATES=("instruct") # ""minimal"  "instruct" "verbose"
 BATCH_SIZE=16 # fixed for comparability

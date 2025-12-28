@@ -1,42 +1,59 @@
 import os
-import re
-import json
-import glob
+import sys
 from collections import defaultdict
 from pathlib import Path
 from argparse import Namespace
 from utils import load_metrics, find_best_metric_from_hyperparameter_search, LANGS, LANG_ORDER, MODEL_DISPLAY_NAMES
+import numpy as np
+import pandas as pd
+
 # ------------------------------------------------------------------------------------------
 # configs
 # ------------------------------------------------------------------------------------------
+
 BASE_DIR = os.getenv("BASE_WCD")
 SLM_DIR = os.path.join(BASE_DIR, "data/exp1")
 
 COUNT = defaultdict(list)
 
+def get_resource(lang: str) -> str:
+    for resource, langs in LANGS.items():
+        if lang in langs:
+            return resource
+    return "unknown"
+
+def llm_variant_display_name(x: str) -> str:
+    if x in ["few_verbose", "zero_verbose"]:
+        return "Verbose"
+    if x in ["few_instruct", "zero_instruct"]:
+        return "Instruct"
+
 def load_llms(configs: dict,
               rows: dict,
               meta_1: dict,
+              meta_files: list[Path],
               ) -> dict[str, dict]:
-
-    # COLLECT
-    model_name = MODEL_DISPLAY_NAMES[meta_1["model_name"]]
-    variant = ""
-    if meta_1["verbose"]  == True:
-        variant = "(verbose)"
-    else:
-        variant = "(instruct)"
-
-    if meta_1['shots'] == True:
-        panel = ("LLMs", "few")
-    else:
-        panel = ("LLMs", "zero")
-
-    model_name = f"{model_name} {variant}"
-
-    key = (model_name, panel)
     
-    rows[key][meta_1["lang"]].append(meta_1["test_metrics"][configs['metric']])
+
+    variant = ""
+    if meta_1['shots'] == True and meta_1['verbose'] == True:
+        variant = "few_verbose"
+    elif meta_1['shots'] == True and meta_1['verbose'] == False:
+        variant = "few_instruct"
+    elif meta_1['shots'] == False and meta_1['verbose'] == True:
+        variant = "zero_verbose"
+    else:
+        variant = "zero_instruct"
+
+    # COLLECT 
+    rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
+                 "model_type": "LLM",
+                 "variant": variant,
+                 "metric": meta_1["test_metrics"][configs['metric']],
+                 "lang": meta_1["lang"],
+                 'run_dir': meta_files[0].parent.name,
+                 "seed": 42,
+                 })
     
     return rows
 
@@ -47,30 +64,30 @@ def load_slms(configs: dict,
     
     meta_1 = load_metrics(meta_files[0])
     
-    # panel
-    if meta_1['model_type'] == "clf":
-        panel = ("SLMs", "3Classifier")
-    else:
-        if meta_1["atl"]:
-            panel = ("SLMs", "2ATL")
-        else:
-            panel = ("SLMs", "1VAN")
     
-    model_name = MODEL_DISPLAY_NAMES[meta_1["model_name"]]
-    key = (model_name, panel)
-
     if len(meta_files) == 1:    
         if meta_1['seed'] in [2025, 2026]:
             best_metric = meta_1["test_metrics"][-1]['metrics'][configs['metric']]
-            rows[key][meta_1["lang"]].append(best_metric)
-            COUNT[(model_name, meta_1['model_type'], meta_1['lang'], meta_1['atl'])].append((meta_1['seed'], meta_files[0].parent.name))  
-            
+
+            rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
+                         "model_type": "SLM",
+                         "variant": "ES" if meta_1["model_type"] == "clf" else ("TOL" if meta_1["atl"] else "FTL"),
+                         "metric": best_metric,
+                         "lang": meta_1["lang"],
+                         "run_dir": meta_files[0].parent.name,
+                         "seed": meta_1["seed"],
+                        })
         
     if len(meta_files) == 6:
         best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=configs['metric'])
-        rows[key][meta_1["lang"]].append(best_metric) 
-
-        COUNT[(model_name, meta_1['model_type'], meta_1['lang'], meta_1['atl'])].append(("hp", meta_files[0].parent.name))
+        rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
+                        "model_type": "SLM",
+                        "variant": "ES" if meta_1["model_type"] == "clf" else ("TOL" if meta_1["atl"] else "FTL"),
+                        "metric": best_metric,
+                        "lang": meta_1["lang"],
+                        "run_dir": meta_files[0].parent.name,
+                        "seed": "hp",
+                    })
     return rows
 
 def load_plms(configs: dict, 
@@ -79,24 +96,24 @@ def load_plms(configs: dict,
                   ) -> dict[str, dict]:
     
     meta_1 = load_metrics(meta_files[0])
-    
-    # panel
-    model_name = MODEL_DISPLAY_NAMES[meta_1["model_name"]]
-    panel = ("PLMs", "default")
-    key = (model_name, panel)
         
     if len(meta_files) == 6:
         best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=configs['metric'])
-        rows[key][meta_1["lang"]].append(best_metric) 
+        rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
+                    "model_type": "PLM",
+                    "variant": "default",
+                    "metric": best_metric,
+                    "lang": meta_1["lang"],
+                    "run_dir": meta_files[0].parent.name,
+                    "seed": meta_1["seed"],
+                    })
 
-        COUNT[(model_name, meta_1['lang'], meta_1['atl'])].append((meta_1['seed'], meta_files[0].parent.name))
     return rows
 
 
 def load_all_models(configs: dict, path: str) -> dict[str, dict]:
     root = Path(path)
-    rows = defaultdict(lambda: {l: [] for l in LANG_ORDER})
-    count = defaultdict(list)
+    rows = []
 
     # iteratore over all lang dirs
     for lang_dir in root.iterdir():
@@ -119,185 +136,267 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
 
             if meta_1["model_type"] == "icl":
                 # load llms
-                rows = load_llms(configs=configs, rows=rows, meta_1=meta_1)
-                
-                count[(meta_1['model_name'], meta_1['lang'], meta_1['shots'], meta_1['verbose'])].append((meta_files[0].parent.name))  
+                rows = load_llms(configs=configs, rows=rows, meta_1=meta_1, meta_files=meta_files)
                 continue
 
             if meta_1["model_type"] in ["slm", "clf"]:
                 rows = load_slms(configs=configs, rows=rows, meta_files=meta_files)
-                hp_seed = "hp" if len(meta_files) == 6 else meta_1['seed']
-                count[(meta_1['model_name'], meta_1['lang'], meta_1['model_type'], meta_1['atl'])].append((hp_seed, meta_files[0].parent.name))  
                 continue
 
             if meta_1["model_type"] == "plm":
                 rows = load_plms(configs=configs, rows=rows, meta_files=meta_files)
-                count[(meta_1['model_name'], meta_1['lang'])].append((meta_1['seed'], meta_files[0].parent.name))  
                 continue
 
-    print("="*20)
-    print("="*20)
-    print("OVERVIEW OF COLLECTED FILES")
-    print("="*20)
-    print("="*20)
-    # sortt by lang
-    sorted_count = dict(sorted(count.items(), key=lambda x: (x[0][1], x[0][0])))
-    prev_lang = None
-    for k,v in sorted_count.items():
-        if not prev_lang or k[1] != prev_lang:
-            print("="*20)
-            print(f"LANG {k[1]}")
-            print("="*20)
-            prev_lang = k[1]
+    return rows
+  
+def create_df(rows: list[dict]) -> pd.DataFrame:
+    df = pd.DataFrame(rows)
 
-        if len(k) == 4 and k[2] in ['clf', "slm"]:
-            print(f"LANG: {k[1]} | MODEL {k[0]} | TYPE {k[2]} | LOSS {'ATL' if k[3] else 'VAN'}: {len(v)} run(s) -> {sorted(v, key=lambda x: str(x[0]))}")
-            if len(v) > 3:
-                print("WARNING: TOO MANY RUNS!")
-            if set([run[0] for run in v]) != set([2025, 2026, 'hp']):
-                print("WARNING: INCORRECT NUMBER OF RUNS!")
-            print("")
-        elif len(k) == 4:
-            print(f"LANG: {k[1]} | MODEL {k[0]} | {'Few-shot' if k[2] else 'Zero-shot'} | {'Verbose' if k[3] else 'Instruct'}: {len(v)} runs -> {sorted(v, key=lambda x: str(x[0]))}")
-            print("")
-        elif len(k) == 2:
-            print(f"LANG: {k[1]} | MODEL {k[0]}: {len(v)} runs -> {sorted(v, key=lambda x: str(x[0]))}")
-            if set([run[0] for run in v]) != set([2025, 2026, 42]):
-                print("WARNING: INCORRECT NUMBER OF RUNS!")
-            print("")
-    print("="*20)
+    # CHECK TABLE
+    df_check = (df
+                .groupby(['model_type', 'model_name', 'variant', 'lang'])
+                .agg(
+                    metric_mean=("metric", "mean"),
+                    metric_std=("metric", "std"),
+                    metric_count=("metric", "count"),
+                    metrics_lst=("metric", list),
+                    sources=("run_dir", list),
+                    seeds_lst=("seed", list),
+        )
+        .reset_index())
+    
+    # sort and sace
+    df_check = df_check.sort_values(by=['model_type', 'model_name', 'variant', 'lang'])
+    df_check.to_excel("checks/all.xlsx", index=False)
 
-    # generate averages
-    out_rows = defaultdict(dict)
-    for (model_name, pabel), metrics in rows.items():
-        for lang, v in metrics.items():
-            if isinstance(v, list) and len(v) > 0:
-                avg_v = sum(v) / len(v)
-                out_rows[(model_name, pabel)][lang] = avg_v
-            else:
-                out_rows[(model_name, pabel)][lang] = None
+    print("="*80)
+    print("CHECK DF")
+    print("="*80)
+    print(df_check.head())
 
-    # print("FINAL ROWS")
-    # for k,v in out_rows.items():
-    #     print(f"{k}: {v}")
-    #     print()
-    # return out_rows
+    # ACG per resource level
+    # merge resouce level to df_check
+    df_check['resource'] = df_check['lang'].apply(get_resource)
+    df_avg = (df_check
+              .groupby(['model_type', 'model_name', 'variant', 'resource'])
+              .agg(
+                  metric_mean=("metric_mean", "mean"),
+                  metric_std=("metric_mean", "std"),
+                  metric_count=("metric_mean", "count"),
+              )
+              .reset_index())
+    
+    df_avg = df_avg.sort_values(by=['model_type', 'model_name', 'variant', 'resource'])
 
-    # sort rows
+    # multiply all values by 100
+    for col in df_avg.columns:
+        if col.startswith("metric_mean") or col.startswith("metric_std"):
+            df_avg[col] = df_avg[col] * 100.0
+
+    print("="*80)
+    print("AVG DF")
+    print("="*80)
+    print(df_avg.head())
 
 
-    final_rows = {}
-    # LLMs
-    llms = {k: v for k, v in out_rows.items() if k[1][0] == "LLMs"}
-    llms = dict(sorted(llms.items(), key=lambda x: (x[0][1][1]), reverse=True))
-    final_rows.update(llms)
-    # PLMs
-    plms = {k: v for k, v in out_rows.items() if k[1][0] == "PLMs"}
-    plms = dict(sorted(plms.items(), key=lambda x: (x[0][0])))
-    final_rows.update(plms)
-    # SLMs
-    slms = {k: v for k, v in out_rows.items() if k[1][0] == "SLMs"}
-    slms = dict(sorted(slms.items(), key=lambda x: (x[0][1][1], x[0][0])))
-    final_rows.update(slms)
+    # MODEL AVG
+    df_model_avg = (df
+                .groupby(['model_type', 'model_name', 'variant'])
+                .agg(
+                    metric_mean=("metric", "mean"),
+                    metric_std=("metric", "std")
+                ).reset_index())
+    
+    # multiply all values by 100
+    for col in df_model_avg.columns:
+        if col.startswith("metric_mean") or col.startswith("metric_std"):
+            df_model_avg[col] = df_model_avg[col] * 100.0
 
-    return final_rows
+    print("="*80)
+    print("MODEL AVG DF")
+    print("="*80)
+    print(df_model_avg.head())
 
-def latex_table(rows, context):
 
-    lang_max = {l: float("-inf") for l in LANG_ORDER}
-    lang_second_max = {l: float("-inf") for l in LANG_ORDER}
-    for (_, panel), metrics in rows.items():
-        for lang, v in metrics.items():
-            if v is None:
-                continue
-            # update max and second max in one go
-            if v > lang_max[lang]:
-                lang_second_max[lang] = lang_max[lang]
-                lang_max[lang] = v
-            elif v > lang_second_max[lang]:
-                lang_second_max[lang] = v
-        
+    # MAIN PIVOT TABLE
+    pivot = df_check.pivot_table(index=['model_type', 'model_name', 'variant'], columns='lang', values=['metric_mean', 'metric_std'])
+    
+    # remove multi columns
+    pivot.columns = [f"{col[0]}_{col[1]}" for col in pivot.columns]
+
+    # set index to columns
+    pivot = pivot.reset_index()
+
+    # multiply all values by 100
+    for col in pivot.columns:
+        if col.startswith("metric_mean_") or col.startswith("metric_std_"):
+            pivot[col] = pivot[col] * 100.0
+
+    # KEEP ONLY BEST PERFORMING SLM PER VARIANT (by overall mean)
+    best_slm_variants = (
+        df_model_avg[df_model_avg["model_type"] == "SLM"]
+        .sort_values(["model_name", "metric_mean"], ascending=[True, False])
+        .drop_duplicates(subset=["model_name"], keep="first")[["model_name", "variant"]]
+    )
+
+    # Filter pivot:
+    pivot = pivot[
+        (pivot["model_type"] != "SLM")
+        | pivot.set_index(["model_name", "variant"]).index.isin(
+            best_slm_variants.set_index(["model_name", "variant"]).index
+        )
+    ].copy()
+
+    
+    # sort model_types
+    pivot['model_type'] = pd.Categorical(pivot['model_type'], categories=["LLM", "PLM", "SLM"], ordered=True)
+    pivot['variant'] = pd.Categorical(pivot['variant'], categories=["zero_instruct", "zero_verbose", "few_instruct", "few_verbose", "FTL", "TOL", "ES", "default"], ordered=True)
+    pivot = pivot.sort_values(by=['model_type', 'model_name', 'variant'])
+
+    
+    # sort llms only
+    pivot['_name_key'] = pivot['model_name']
+    pivot[['_shots_key', '_prompt_key']] = pivot['variant'].astype(str).str.split('_', n=1, expand=True)
+
+    llm = pivot['model_type'] == 'LLM'
+
+    pivot['_variant_key'] = None
+    pivot.loc[llm, '_variant_key'] = pivot.loc[llm, '_shots_key'].map({'zero': 0, 'few': 1})
+
+    pivot = (
+        pivot
+        .sort_values(['model_type', '_variant_key', '_name_key'], na_position='last')
+        .drop(columns=['_name_key', '_variant_key', '_shots_key', '_prompt_key'])
+    )
+
+    print("="*80)
+    print("PIVOT DF")
+    print("="*80)
+    print(pivot.head())
+
+
+    return pivot, df_avg, df_model_avg
+
+def latex_table(df, df_avg, df_model_avg):
     # print LaTeX table
     table = "\n\n"
-    colspec = "l" + "c" * (len(LANG_ORDER) + 3)
+    colspec = "l" + "C" * (len(LANG_ORDER) + 4)
     
     header = " & \\multicolumn{" + str(len(LANGS['high'])+1) + "}{c}{\\textbf{High Resource}} & \\multicolumn{" + str(len(LANGS['medium'])+1) + "}{c}{\\textbf{Medium Resource}} & \\multicolumn{" + str(len(LANGS['low'])+1) + "}{c}{\\textbf{Low Resource}} \\\\"
     header += "\\cmidrule(lr){2-" + str(len(LANGS['high'])+2) + "}  \\cmidrule(lr){" + str(len(LANGS['high'])+3) + "-" + str(len(LANGS['high'])+len(LANGS['medium'])+3) + "}  \\cmidrule(lr){" + str(len(LANGS['high'])+len(LANGS['medium'])+4) + "-" + str(len(LANGS['high'])+len(LANGS['medium'])+len(LANGS['low'])+4) + "}"
-    header += " & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS['high']]) + " & \\textbf{Avg} & "  + " & ".join([f"\\textbf{{{l}}}" for l in LANGS['medium']]) + " & \\textbf{Avg} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS['low']]) + " & \\textbf{Avg} \\\\"
+    header += " & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS['high']]) + " & \\textbf{Avg} & "  + " & ".join([f"\\textbf{{{l}}}" for l in LANGS['medium']]) + " & \\textbf{Avg} & " + " & ".join([f"\\textbf{{{l}}}" for l in LANGS['low']]) + " & \\textbf{Avg} & \\textbf{Avg} \\\\"
     
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += header + "\n"
-    table += "\\hline\n"
-    
+    table += "\\toprule\n"
+
     prev_main_header=None
     prev_minor_header=None
-    for (model_name, panel), metrics in rows.items():
+    for _, row in df.iterrows():
+        model_type = row['model_type']
+        model_name = row['model_name']
+        variant = row['variant']
         cells = []
-        for resource_set in [LANGS['high'], LANGS['medium'], LANGS['low']]:
+        for resource, resource_set in [('high', LANGS['high']), ('medium', LANGS['medium']), ('low', LANGS['low'])]:
             for l in resource_set:
-                if l not in metrics.keys():
-                    v = None
+                mean_col = f"metric_mean_{l}"
+                std_col = f"metric_std_{l}"
+                v = row[mean_col] if mean_col in row else None
+                std = row[std_col] if std_col in row else None
+                
+                # max lang column
+                max_lang = df[f"metric_mean_{l}"].max()
+                second_max_lang = df[df[f"metric_mean_{l}"] < max_lang][f"metric_mean_{l}"].max()
+
+                # cell formatting
+                if v == max_lang:
+                    v_cell = f"\\textbf{{{v:.2f}}}"
+                elif v == second_max_lang:
+                    v_cell = f"\\underline{{{v:.2f}}}"
                 else:
-                    v = metrics[l]
-                if isinstance(v, (int, float)) and v == lang_max[l]:
-                    cells.append(f"\\textbf{{{v:.3f}}}")
-                elif isinstance(v, (int, float)) and v == lang_second_max[l]:
-                    cells.append(f"\\underline{{{v:.3f}}}")
+                    v_cell = f"{v:.2f}"
+                
+                if model_type in ["SLM", "PLM"]:
+                    cells.append(f"{v_cell} \\scriptsize{{($\\pm{std:.2f}$)}}" if std is not None else v_cell)
                 else:
-                    cells.append(f"{v:.3f}" if isinstance(v, (int, float)) else "--")
+                    cells.append(v_cell)
+
             
-            # average cell  
-            lang_values = [metrics[l] for l in resource_set if l in metrics.keys() and isinstance(metrics[l], (int, float))]
-            if len(lang_values) > 0:
-                avg = sum(lang_values) / len(lang_values)
+            # average cell
+            max_avg = df_avg[df_avg['resource'] == resource]['metric_mean'].max()
+            second_max_avg = df_avg[(df_avg['resource'] == resource) & (df_avg['metric_mean'] < max_avg)]['metric_mean'].max()
+
+            avg_row = df_avg[(df_avg['model_name'] == model_name) & (df_avg['variant'] == variant) & (df_avg['resource'] == resource)]['metric_mean'].values[0]
+            avg_std = df_avg[(df_avg['model_name'] == model_name) & (df_avg['variant'] == variant) & (df_avg['resource'] == resource)]['metric_std'].values[0]
+
+            if avg_row == max_avg:
+                v_cell = f"\\cellcolor{{gray!25}} \\textbf{{{avg_row:.2f}}}"
+            elif avg_row == second_max_avg:
+                v_cell = f"\\cellcolor{{gray!25}} \\underline{{{avg_row:.2f}}}"
             else:
-                avg = 0.0
-            cells.append(f"{avg:.3f}")
-
-        # MAJOR HEADER LINES
-        if prev_main_header is None and panel[0] == "LLMs":
-                # table += "\\hline\n"
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANG_ORDER)+4}}}{{c}}{{\\textbf{{Decoder-based LLMs}}}} \\\\\n"
-                table += "\\hline\n"
-        if prev_main_header and prev_main_header != panel[0]:
-            if panel[0] == "PLMs":
-                table += "\\hline\n"
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANG_ORDER)+4}}}{{c}}{{\\textbf{{Encoder-based PLMs}}}} \\\\\n"
-                table += "\\hline\n"
-            elif panel[0] == "SLMs":
-                table += "\\hline\n"    
-                table += f"\\rowcolor{{lightgray}}\\multicolumn{{{len(LANG_ORDER)+4}}}{{c}}{{\\textbf{{Decoder-based SLMs}}}} \\\\\n"   
-                table += "\\hline\n"
+                v_cell = f"\\cellcolor{{gray!25}} {avg_row:.2f}"
+            
         
-        # MINOR HEADER LINES
-        if prev_minor_header is None and panel[1] == "zero":
-            table += f"\\textbf{{Zero-shot}} \\\\\n"
-            table += "\\hline\n"
+            cells.append(f"{v_cell} \\scriptsize{{($\\pm{avg_std:.2f}$)}}")
+            
 
-        if prev_minor_header == "zero" and panel[1] == "few":
-            table += f"\\textbf{{Few-shot}} \\\\\n"
-            table += "\\hline\n"
+        # add overall average cell
+        model_avg_row = df_model_avg[(df_model_avg['model_name'] == model_name) & (df_model_avg['variant'] == variant)]['metric_mean'].values[0]
+        model_avg_std = df_model_avg[(df_model_avg['model_name'] == model_name) & (df_model_avg['variant'] == variant)]['metric_std'].values[0]
 
-        if prev_minor_header != panel[1] and panel[1] not in ["default", "zero", "few"]:
-            if panel[1] == "1VAN":
-                panel_name = "Full-token Loss (FTL)"
-            elif panel[1] == "2ATL":
-                panel_name = "Target-only Loss (TOL)"
-            elif panel[1] == "3Classifier":
-                panel_name = "Encoder-style"
-            table += f"\\textbf{{{panel_name}}} \\\\\n"
-            table += "\\hline\n"
-        table += f"{model_name} & " + " & ".join(cells) + " \\\\\n"
-    
-        prev_main_header = panel[0]
-        prev_minor_header = panel[1]
+        overall_max = df_model_avg['metric_mean'].max()
+        overall_second_max = df_model_avg[df_model_avg['metric_mean'] < overall_max]['metric_mean'].max()
+        if model_avg_row == overall_max:
+            v_cell = f"\\textbf{{{model_avg_row:.2f}}}"
+        elif model_avg_row == overall_second_max:
+            v_cell = f"\\underline{{{model_avg_row:.2f}}}"
+        else:
+            v_cell = f"{model_avg_row:.2f}" 
+        
+        
+        cells.append(f"{v_cell} \\scriptsize{{($\\pm{model_avg_std:.2f}$)}}")
 
-    table += "\\hline\n"
+        
+        # major header
+        if prev_main_header is None and model_type == "LLM":
+                table += f"\\multicolumn{{{len(LANG_ORDER)+5}}}{{c}}{{\\textbf{{Decoder-based LLMs}}}} \\\\\n"
+                table += "\\midrule\n"
+        if prev_main_header and prev_main_header != model_type:
+            if model_type == "PLM":
+                table += "\\midrule\n"
+                table += f"\\multicolumn{{{len(LANG_ORDER)+5}}}{{c}}{{\\textbf{{Encoder-based PLMs}}}} \\\\\n"
+                table += "\\midrule\n"
+            elif model_type == "SLM":
+                table += "\\midrule\n"    
+                table += f"\\multicolumn{{{len(LANG_ORDER)+5}}}{{c}}{{\\textbf{{Decoder-based SLMs}}}} \\\\\n"   
+                table += "\\midrule\n"
+
+        # minor header
+        if prev_minor_header is None and variant in ["zero_instruct", "zero_verbose"]:
+            table += f"\\textit{{Zero-shot}} \\\\\n"
+            table += "\\midrule\n"
+        if prev_minor_header and prev_minor_header.startswith("zero") and variant.startswith("few"):
+            table += "\\midrule\n"
+            table += f"\\textit{{Few-shot}} \\\\\n"
+            table += "\\midrule\n"
+
+        if model_type == "LLM":
+            display_name = f"{model_name} ({llm_variant_display_name(variant)})"
+        elif model_type == "PLM":
+            display_name = f"{model_name}"
+        else:   
+            display_name = f"{model_name} ({variant})"
+        table += f"{display_name} & " + " & ".join(cells) + " \\\\\n"
+        
+        prev_main_header = model_type
+        prev_minor_header = variant
+
+    table += "\\bottomrule\n"
     table += "\\end{tabular}\n"
-
     print("\n\n")
     print(table)
     print("\n\n")
+
 
 def main():
 
@@ -307,8 +406,13 @@ def main():
 
     # load all models
     rows = load_all_models(configs, SLM_DIR)
+    # create dataframe
+    df = create_df(rows)
 
     # print latex table
-    latex_table(rows, configs)
+    print("="*80)
+    print(f"Metric: {configs['metric']}")
+    print("="*80)
+    latex_table(df[0], df[1], df[2])
 if __name__ == "__main__":
     main()

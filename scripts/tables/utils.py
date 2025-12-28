@@ -20,7 +20,7 @@ MODEL_DISPLAY_NAMES = {"meta-llama/Llama-3.1-8B": "Llama3-8B",
                        "FacebookAI/xlm-roberta-base": "XLM-R-base",
                        "FacebookAI/xlm-roberta-large": "XLM-R-large",
                        "openai/gpt-4o-mini": "GPT-4o-mini",
-                       'google/gemini-2.5-flash': "Gemini 2.5 Flash",
+                       'google/gemini-2.5-flash': "Gemini 2.5",
                        'openai/gpt-5.1': "GPT-5"
                         }
                         

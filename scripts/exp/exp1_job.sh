@@ -8,8 +8,7 @@
 #SBATCH --constraint=a100
 #SBATCH --partition=nmes_gpu,gpu
 #SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
-# SBATCH --reservation=rental_8734
-
+#SBATCH --begin=now+5hours
 
 set -euo pipefail
 
