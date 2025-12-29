@@ -100,38 +100,6 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
                 count[(meta_1['model_name'], meta_1['lang'], meta_1['model_type'], meta_1['atl'])].append((hp_seed, meta_files[0].parent.name))  
                 continue
 
-    # print("="*20)
-    # print("="*20)
-    # print("OVERVIEW OF COLLECTED FILES")
-    # print("="*20)
-    # print("="*20)
-    # # sortt by lang
-    # sorted_count = dict(sorted(count.items(), key=lambda x: (x[0][1], x[0][0])))
-    # prev_lang = None
-    # for k,v in sorted_count.items():
-    #     if not prev_lang or k[1] != prev_lang:
-    #         print("="*20)
-    #         print(f"LANG {k[1]}")
-    #         print("="*20)
-    #         prev_lang = k[1]
-
-    #     if len(k) == 4 and k[2] in ['clf', "slm"]:
-    #         print(f"LANG: {k[1]} | MODEL {k[0]} | TYPE {k[2]} | LOSS {'ATL' if k[3] else 'VAN'}: {len(v)} run(s) -> {sorted(v, key=lambda x: str(x[0]))}")
-    #         if len(v) > 3:
-    #             print("WARNING: TOO MANY RUNS!")
-    #         if set([run[0] for run in v]) != set([2025, 2026, 'hp']):
-    #             print("WARNING: INCORRECT NUMBER OF RUNS!")
-    #         print("")
-    #     elif len(k) == 4:
-    #         print(f"LANG: {k[1]} | MODEL {k[0]} | {'Few-shot' if k[2] else 'Zero-shot'} | {'Verbose' if k[3] else 'Instruct'}: {len(v)} runs -> {sorted(v, key=lambda x: str(x[0]))}")
-    #         print("")
-    #     elif len(k) == 2:
-    #         print(f"LANG: {k[1]} | MODEL {k[0]}: {len(v)} runs -> {sorted(v, key=lambda x: str(x[0]))}")
-    #         if set([run[0] for run in v]) != set([2025, 2026, 42]):
-    #             print("WARNING: INCORRECT NUMBER OF RUNS!")
-    #         print("")
-    # print("="*20)
-
     return rows
 
 
