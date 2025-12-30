@@ -5,19 +5,19 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 # LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
-LANGS=("hy")
-MODEL_TYPES=("slm") # slm clf plm
-ATLS=(0 1)
-MODEL_NAMES=("aya_8b") # "qwen3_8b" "llama3_8b" "aya_8b"
+LANGS=("bg")
+MODEL_TYPES=("clf") # slm clf plm
+ATLS=(0)
+MODEL_NAMES=("llama3_8b") # "qwen3_8b" "llama3_8b" "aya_8b"
 # MODEL_NAMES=("mBert" "xlm-r-b" "xlm-r-l")
-SEEDS=(2025 2026)
+SEEDS=(2025)
 
 BATCH_SIZE=8 # lower to avoid cuda errors
 HP_SEARCH=0
 CONTEXT=1
 EXPERIMENT="seed"
 
-TIME="02:00:00"
+TIME="01:30:00"
 
 for lang in "${LANGS[@]}"; do
     for mtype in "${MODEL_TYPES[@]}"; do

@@ -243,7 +243,7 @@ def latex_table(pivot, df_avg):
 def main():
 
     configs = {
-        "metric": "accuracy",
+        "metric": "f1",
     }
 
     # load all models

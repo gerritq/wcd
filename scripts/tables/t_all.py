@@ -401,7 +401,7 @@ def latex_table(df, df_avg, df_model_avg):
 def main():
 
     configs = {
-        "metric": "accuracy",
+        "metric": "f1",
     }
 
     # load all models

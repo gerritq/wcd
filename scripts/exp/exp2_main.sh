@@ -5,9 +5,9 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 
-MODEL_TYPE="clf"
+MODEL_TYPE="slm"
 MODEL_NAMES=("llama3_8b")
-ATL=0
+ATL=1
 SEEDS="2026"
 
 # all med and lower langs
@@ -15,15 +15,15 @@ TARGET_LANGS="uk ro id bg uz no az mk hy sq"
 SOURCE_LANGS="en"
 
 LANG_SETTINGS="main translation"
-CL_SETTINGS="zero"
+CL_SETTINGS="few"
 
-LOWER_LR=0
-NEW_LEARNING_RATE=1e-07 # 1e-05 1e-6 1e-7 -- 5e-6
+LOWER_LR=1
+NEW_LEARNING_RATE=1e-04 # 1e-04 1e-05 1e-6 1e-7 -- 5e-6
 
 BATCH_SIZE=8
 EXPERIMENT="cl_eval"
 
-TIME="02:00:00"
+TIME="14:00:00"
 
 for mname in "${MODEL_NAMES[@]}"; do
 
@@ -34,7 +34,7 @@ for mname in "${MODEL_NAMES[@]}"; do
     fi
 
     TARGET_TAG=$(echo "$TARGET_LANGS" | tr ' ' '+')
-    job_name="e2-${MODEL_TYPE}-${mname}-lr${NEW_LEARNING_RATE}-seed${SEEDS}-${TARGET_TAG}"
+    job_name="e2-${MODEL_TYPE}-${mname}-atl${ATL}-lr_low${LOWER_LR}-lr${NEW_LEARNING_RATE}-seed${SEEDS}-${TARGET_TAG}"
 
     echo "Submitting: $job_name (time=$TIME)"
 

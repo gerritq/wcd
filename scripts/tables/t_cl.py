@@ -15,11 +15,11 @@ import numpy as np
 BASE_DIR = os.getenv("BASE_WCD")
 EXP2_DIR = os.path.join(BASE_DIR, "data/exp2/eval")
 
-METRIC="f1"
+METRIC="accuracy"
 COUNT = defaultdict(list)
 SHOTS = [0, 50, 100, 250, 500]
 
-ITEM = "ALL"  # zero | LR | ALL
+ITEM = "LR"  # zero | LR | ALL
 
 # ----------------------------------------------------------------------
 # COLLECTORS AND HELPERS
