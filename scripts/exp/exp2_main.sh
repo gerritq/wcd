@@ -5,10 +5,10 @@ source ~/.bashrc
 cd /scratch/prj/inf_nlg_ai_detection/wcd/scripts/exp
 
 
-MODEL_TYPE="slm"
-MODEL_NAMES=("llama3_8b")
-ATL=1
-SEEDS="2026"
+MODEL_TYPE="plm"
+MODEL_NAMES=("mBert")
+ATL=0
+SEEDS="42 2025 2026"
 
 # all med and lower langs
 TARGET_LANGS="uk ro id bg uz no az mk hy sq"
