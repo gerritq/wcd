@@ -1,0 +1,118 @@
+{
+  "model_type": "plm",
+  "model_name": "google-bert/bert-base-multilingual-uncased",
+  "atl": false,
+  "context": true,
+  "smoke_test": false,
+  "training_size": 500,
+  "experiment": "cl_eval",
+  "prompt_template": "instruct",
+  "epochs": 1,
+  "learning_rate": 5e-05,
+  "batch_size": 32,
+  "max_grad_norm": 1.0,
+  "weight_decay": 0.01,
+  "quantization": true,
+  "lower_lr": false,
+  "new_learning_rate": 0.0001,
+  "gradient_accumulation_steps": 1,
+  "max_length": 512,
+  "metric": "f1",
+  "lang_setting": "translation",
+  "lang": "no",
+  "train_log_step": 20,
+  "source_langs": [
+    "en"
+  ],
+  "target_langs": [
+    "uk",
+    "ro",
+    "id",
+    "bg",
+    "uz",
+    "no",
+    "az",
+    "mk",
+    "hy",
+    "sq"
+  ],
+  "lang_settings": [
+    "main",
+    "translation"
+  ],
+  "cl_settings": [
+    "few",
+    "zero"
+  ],
+  "seeds": [
+    "42",
+    "2025",
+    "2026"
+  ],
+  "from_checkpoint": true,
+  "save_checkpoint": false,
+  "cl_setting": "few",
+  "seed": 2026,
+  "model_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_shdvvi1r",
+  "run_dir": "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/eval/no/run_zqke_mci",
+  "label_dist": {
+    "train": {
+      "0": 249,
+      "1": 250
+    },
+    "dev": {
+      "0": 250,
+      "1": 250
+    },
+    "test": {
+      "0": 250,
+      "1": 247
+    }
+  },
+  "date": "2025-12-31T08:29:01.680031",
+  "duration": 0,
+  "max_memory": 4.749391078948975,
+  "bf16": true,
+  "train_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 0.7506103515625
+    }
+  ],
+  "dev_loss": [
+    {
+      "epoch": 1,
+      "batch": 0,
+      "loss": 0.6742
+    }
+  ],
+  "dev_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.586,
+        "f1": 0.637478108581436,
+        "tp": 182,
+        "fp": 139,
+        "tn": 111,
+        "fn": 68,
+        "n_total": 500
+      }
+    }
+  ],
+  "test_metrics": [
+    {
+      "epoch": 1,
+      "metrics": {
+        "accuracy": 0.8169014084507042,
+        "f1": 0.8100208768267223,
+        "tp": 194,
+        "fp": 38,
+        "tn": 212,
+        "fn": 53,
+        "n_total": 497
+      }
+    }
+  ]
+}

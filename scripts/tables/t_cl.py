@@ -16,12 +16,12 @@ import numpy as np
 BASE_DIR = os.getenv("BASE_WCD")
 EXP2_DIR = os.path.join(BASE_DIR, "data/exp2/eval")
 
-METRIC="f1"  # accuracy | f1_macro | f1_weighted | exact_match
+METRIC="accuracy"  # accuracy | f1_macro | f1_weighted | exact_match
 COUNT = defaultdict(list)
 SHOTS = [0, 50, 100, 250, 500]
 
 LANG_SETTING = "main"  # main | translation
-ITEM = "FEW"  # zero | LR | FEW
+ITEM = "LR"  # zero | LR | FEW
 
 # ----------------------------------------------------------------------
 # COLLECTORS AND HELPERS

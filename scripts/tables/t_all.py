@@ -14,6 +14,7 @@ import pandas as pd
 BASE_DIR = os.getenv("BASE_WCD")
 SLM_DIR = os.path.join(BASE_DIR, "data/exp1")
 
+METRIC = "f1" 
 COUNT = defaultdict(list)
 
 def get_resource(lang: str) -> str:
@@ -28,8 +29,7 @@ def llm_variant_display_name(x: str) -> str:
     if x in ["few_instruct", "zero_instruct"]:
         return "Instruct"
 
-def load_llms(configs: dict,
-              rows: dict,
+def load_llms(rows: dict,
               meta_1: dict,
               meta_files: list[Path],
               ) -> dict[str, dict]:
@@ -49,7 +49,7 @@ def load_llms(configs: dict,
     rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
                  "model_type": "LLM",
                  "variant": variant,
-                 "metric": meta_1["test_metrics"][configs['metric']],
+                 "metric": meta_1["test_metrics"][METRIC],
                  "lang": meta_1["lang"],
                  'run_dir': meta_files[0].parent.name,
                  "seed": 42,
@@ -57,8 +57,7 @@ def load_llms(configs: dict,
     
     return rows
 
-def load_slms(configs: dict, 
-                  meta_files: list[Path],
+def load_slms(meta_files: list[Path],
                   rows: dict,
                   ) -> dict[str, dict]:
     
@@ -67,7 +66,7 @@ def load_slms(configs: dict,
     
     if len(meta_files) == 1:    
         if meta_1['seed'] in [2025, 2026]:
-            best_metric = meta_1["test_metrics"][-1]['metrics'][configs['metric']]
+            best_metric = meta_1["test_metrics"][-1]['metrics'][METRIC]
 
             rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
                          "model_type": "SLM",
@@ -79,7 +78,7 @@ def load_slms(configs: dict,
                         })
         
     if len(meta_files) == 6:
-        best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=configs['metric'])
+        best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=METRIC)
         rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
                         "model_type": "SLM",
                         "variant": "ES" if meta_1["model_type"] == "clf" else ("TOL" if meta_1["atl"] else "FTL"),
@@ -90,15 +89,14 @@ def load_slms(configs: dict,
                     })
     return rows
 
-def load_plms(configs: dict, 
-                  meta_files: list[Path],
+def load_plms(meta_files: list[Path],
                   rows: dict,
                   ) -> dict[str, dict]:
     
     meta_1 = load_metrics(meta_files[0])
         
     if len(meta_files) == 6:
-        best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=configs['metric'])
+        best_metric = find_best_metric_from_hyperparameter_search(all_meta_file_paths=meta_files, metric=METRIC)
         rows.append({"model_name": MODEL_DISPLAY_NAMES[meta_1["model_name"]],
                     "model_type": "PLM",
                     "variant": "default",
@@ -111,7 +109,7 @@ def load_plms(configs: dict,
     return rows
 
 
-def load_all_models(configs: dict, path: str) -> dict[str, dict]:
+def load_all_models(path: str) -> dict[str, dict]:
     root = Path(path)
     rows = []
 
@@ -136,15 +134,15 @@ def load_all_models(configs: dict, path: str) -> dict[str, dict]:
 
             if meta_1["model_type"] == "icl":
                 # load llms
-                rows = load_llms(configs=configs, rows=rows, meta_1=meta_1, meta_files=meta_files)
+                rows = load_llms(rows=rows, meta_1=meta_1, meta_files=meta_files)
                 continue
 
             if meta_1["model_type"] in ["slm", "clf"]:
-                rows = load_slms(configs=configs, rows=rows, meta_files=meta_files)
+                rows = load_slms(rows=rows, meta_files=meta_files)
                 continue
 
             if meta_1["model_type"] == "plm":
-                rows = load_plms(configs=configs, rows=rows, meta_files=meta_files)
+                rows = load_plms(rows=rows, meta_files=meta_files)
                 continue
 
     return rows
@@ -167,7 +165,7 @@ def create_df(rows: list[dict]) -> pd.DataFrame:
     
     # sort and sace
     df_check = df_check.sort_values(by=['model_type', 'model_name', 'variant', 'lang'])
-    df_check.to_excel("checks/all.xlsx", index=False)
+    df_check.to_excel(f"checks/all_check_{METRIC}.xlsx", index=False)
 
     print("="*80)
     print("CHECK DF")
@@ -400,18 +398,14 @@ def latex_table(df, df_avg, df_model_avg):
 
 def main():
 
-    configs = {
-        "metric": "f1",
-    }
-
     # load all models
-    rows = load_all_models(configs, SLM_DIR)
+    rows = load_all_models(SLM_DIR)
     # create dataframe
     df = create_df(rows)
 
     # print latex table
     print("="*80)
-    print(f"Metric: {configs['metric']}")
+    print(f"Metric: {METRIC}")
     print("="*80)
     latex_table(df[0], df[1], df[2])
 if __name__ == "__main__":

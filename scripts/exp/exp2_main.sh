@@ -18,12 +18,12 @@ LANG_SETTINGS="main translation"
 CL_SETTINGS="few"
 
 LOWER_LR=1
-NEW_LEARNING_RATE=1e-04 # 1e-04 1e-05 1e-6 1e-7 -- 5e-6
+NEW_LEARNING_RATE=1e-5 # 1e-04 1e-05 1e-6 1e-7 -- 5e-6
 
 BATCH_SIZE=8
 EXPERIMENT="cl_eval"
 
-TIME="14:00:00"
+TIME="01:00:00"
 
 for mname in "${MODEL_NAMES[@]}"; do
 
