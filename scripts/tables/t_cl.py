@@ -20,8 +20,8 @@ METRIC="f1"  # accuracy | f1_macro | f1_weighted | exact_match
 COUNT = defaultdict(list)
 SHOTS = [0, 50, 100, 250, 500]
 
-LANG_SETTING = "translation"  # main | translation
-ITEM = "FEW"  # zero | LR | FEW
+LANG_SETTING = "main"  # main | translation
+ITEM = "LR"  # zero | LR | FEW
 
 # ----------------------------------------------------------------------
 # COLLECTORS AND HELPERS
@@ -1238,113 +1238,6 @@ def  few_shot_table(df: pd.DataFrame, lang_setting: str) -> None:
 # Few-shot LR
 # ----------------------------------------------------------------------
 
-def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
-    
-
-    df = pd.DataFrame(rows)
-
-    print
-    df_shots = df[
-        (df["shots"] > 0)
-        & (df["learning_rate"] != 5e-6)
-    ]
-    # add resource level
-
-    df_shots["resource"] = df_shots["lang"].apply(get_resource)
-
-    df_shots = (df_shots
-        .pivot_table(
-            index=["lang_setting", "model_name", "resource", "lang", "learning_rate", "seed"],
-            columns=["shots"],
-            values="metric",
-            aggfunc=["mean", "std"] #"count"
-        ).reset_index()
-    )
-
-    # flatten column names
-    df_shots.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_shots.columns]
-    # get zero shot helper
-    zero_results = zero_shot_helper_df(rows)
-    # add zero-shot values
-    df_shots = df_shots.merge(zero_results,
-                            on=["lang_setting", "resource", "lang", "model_name"],
-                            how="left")
-
-    # rename
-    df_shots = df_shots.rename(columns={"shot_0_mean":'mean_0', "shot_0_std":'std_0'})
-
-    # # drop std
-    # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
-    
-
-    print(df_shots)
-    print("AFTER")
-    df_shots = df_shots.pivot_table(
-        index=["model_name", "resource", "lang", "learning_rate", "seed"],
-        columns="lang_setting", 
-        values=[col for col in df_shots.columns if col.startswith("mean") or col.startswith("std")],
-        aggfunc="first"
-    ).reset_index()
-
-    # flatten columns
-    df_shots.columns = [
-        f"{metric}_{setting}" if setting else metric
-        for metric, setting in df_shots.columns
-    ]
-
-
-    # gen differences
-    for lang_setting in df['lang_setting'].unique():
-        for shot in SHOTS[1:]:
-            df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
-
-        df_shots[f'diff_avg_{lang_setting}'] = df_shots[[f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]].mean(axis=1)
-    # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
-    
-
-    # mean over langs and seeds
-    df_shots = (df_shots
-                .groupby(["model_name", "resource", "learning_rate"])
-                .mean(numeric_only=True)
-                .reset_index()
-        )
-    
-
-        # multiply all scores by 100
-    for col in df_shots.columns:
-        if col not in ["model_name", "resource", "learning_rate"]:
-            df_shots[col] = df_shots[col] * 100.0
-
-    # # drop seed and trans
-    # df_shots.to_excel("checks/TEST.xlsx")
-
-    # sys.exit(0)
-
-    # Sort rows
-    df_shots['resource'] = pd.Categorical(df_shots['resource'], categories=['medium', 'low'], ordered=True)
-    df_shots['model_name'] = pd.Categorical(df_shots['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
-    df_shots = df_shots.sort_values(['resource', 'model_name', 'learning_rate'],
-                                                    ascending=[True, True, False]).reset_index(drop=True)
-    
-
-    # print(df_shots)
-    # # Add averages
-    # for lang_setting in df['lang_setting'].unique():        
-    #     for shot in SHOTS[1:]:
-    #         df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
-    
-    #     diff_cols = [f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]
-    #     df_shots[f'diff_avg_{lang_setting}'] = df_shots[diff_cols].mean(axis=1)
-
-    print("="*60)
-    print("FEW-SHOT LEARNING RATE DF")
-    print(df_shots)
-    print("="*60)
-
-    return df_shots
-
-
-# OG
 # def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
     
 
@@ -1361,25 +1254,20 @@ def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
 
 #     df_shots = (df_shots
 #         .pivot_table(
-#             index=["lang_setting", "model_name", "resource", "learning_rate"],
+#             index=["lang_setting", "model_name", "resource", "lang", "learning_rate"],
 #             columns=["shots"],
 #             values="metric",
-#             aggfunc=["mean", "std"] #"count"
+#             aggfunc=["mean"] #"count"
 #         ).reset_index()
-#     )
+#     ) 
 
 #     # flatten column names
 #     df_shots.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_shots.columns]
 #     # get zero shot helper
 #     zero_results = zero_shot_helper_df(rows)
-#     # group by resource
-#     zero_results = zero_results.groupby(["lang_setting", "resource", "model_name"]).mean(numeric_only=True).reset_index()
-
-    
-
 #     # add zero-shot values
 #     df_shots = df_shots.merge(zero_results,
-#                             on=["lang_setting", "resource", "model_name"],
+#                             on=["lang_setting", "resource", "lang", "model_name"],
 #                             how="left")
 
 #     # rename
@@ -1392,9 +1280,9 @@ def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
 #     print(df_shots)
 #     print("AFTER")
 #     df_shots = df_shots.pivot_table(
-#         index=["model_name", "resource", "learning_rate"],
+#         index=["model_name", "resource", "lang", "learning_rate", "seed"],
 #         columns="lang_setting", 
-#         values=[col for col in df_shots.columns if col.startswith("mean") or col.startswith("diff") or col.startswith("std")],
+#         values=[col for col in df_shots.columns if col.startswith("mean") or col.startswith("std")],
 #         aggfunc="first"
 #     ).reset_index()
 
@@ -1404,46 +1292,159 @@ def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
 #         for metric, setting in df_shots.columns
 #     ]
 
+
+#     # gen differences
+#     for lang_setting in df['lang_setting'].unique():
+#         for shot in SHOTS[1:]:
+#             df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
+
+#         df_shots[f'diff_avg_{lang_setting}'] = df_shots[[f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]].mean(axis=1)
+#     # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
+    
+
+#     # mean over langs and seeds
+#     df_shots = (df_shots
+#                 .groupby(["model_name", "resource", "learning_rate"])
+#                 .mean(numeric_only=True)
+#                 .reset_index()
+#         )
+    
+
+#         # multiply all scores by 100
+#     for col in df_shots.columns:
+#         if col not in ["model_name", "resource", "learning_rate"]:
+#             df_shots[col] = df_shots[col] * 100.0
+
+#     # # drop seed and trans
+#     # df_shots.to_excel("checks/TEST.xlsx")
+
+#     # sys.exit(0)
+
 #     # Sort rows
 #     df_shots['resource'] = pd.Categorical(df_shots['resource'], categories=['medium', 'low'], ordered=True)
 #     df_shots['model_name'] = pd.Categorical(df_shots['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
 #     df_shots = df_shots.sort_values(['resource', 'model_name', 'learning_rate'],
 #                                                     ascending=[True, True, False]).reset_index(drop=True)
     
-#     # multiply all scores by 100
-#     for col in df_shots.columns:
-#         if col not in ["model_name", "resource", "learning_rate"]:
-#             df_shots[col] = df_shots[col] * 100.0
 
-#     print(df_shots)
-#     # Add averages
-#     for lang_setting in df['lang_setting'].unique():        
-#         for shot in SHOTS[1:]:
-#             df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
+#     # print(df_shots)
+#     # # Add averages
+#     # for lang_setting in df['lang_setting'].unique():        
+#     #     for shot in SHOTS[1:]:
+#     #         df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
     
-#         diff_cols = [f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]
-#         df_shots[f'diff_avg_{lang_setting}'] = df_shots[diff_cols].mean(axis=1)
+#     #     diff_cols = [f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]
+#     #     df_shots[f'diff_avg_{lang_setting}'] = df_shots[diff_cols].mean(axis=1)
 
 #     print("="*60)
 #     print("FEW-SHOT LEARNING RATE DF")
 #     print(df_shots)
 #     print("="*60)
 
+#     print(df_shots[[col for col in df_shots.columns if col.startswith("std") ]])
+
 #     return df_shots
+
+
+# OG
+def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
+    
+
+    df = pd.DataFrame(rows)
+
+    print
+    df_shots = df[
+        (df["shots"] > 0)
+        & (df["learning_rate"] != 5e-6)
+    ]
+    # add resource level
+
+    df_shots["resource"] = df_shots["lang"].apply(get_resource)
+
+    df_shots = (df_shots
+        .pivot_table(
+            index=["lang_setting", "model_name", "resource", "learning_rate"],
+            columns=["shots"],
+            values="metric",
+            aggfunc=["mean", "std"] #"count"
+        ).reset_index()
+    )
+
+    # flatten column names
+    df_shots.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_shots.columns]
+    # get zero shot helper
+    zero_results = zero_shot_helper_df(rows)
+    # group by resource
+    zero_results = zero_results.groupby(["lang_setting", "resource", "model_name"]).mean(numeric_only=True).reset_index()
+
+    
+
+    # add zero-shot values
+    df_shots = df_shots.merge(zero_results,
+                            on=["lang_setting", "resource", "model_name"],
+                            how="left")
+
+    # rename
+    df_shots = df_shots.rename(columns={"shot_0_mean":'mean_0', "shot_0_std":'std_0'})
+
+    # # drop std
+    # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
+    
+
+    print(df_shots)
+    print("AFTER")
+    df_shots = df_shots.pivot_table(
+        index=["model_name", "resource", "learning_rate"],
+        columns="lang_setting", 
+        values=[col for col in df_shots.columns if col.startswith("mean") or col.startswith("diff") or col.startswith("std")],
+        aggfunc="first"
+    ).reset_index()
+
+    # flatten columns
+    df_shots.columns = [
+        f"{metric}_{setting}" if setting else metric
+        for metric, setting in df_shots.columns
+    ]
+
+    # Sort rows
+    df_shots['resource'] = pd.Categorical(df_shots['resource'], categories=['medium', 'low'], ordered=True)
+    df_shots['model_name'] = pd.Categorical(df_shots['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
+    df_shots = df_shots.sort_values(['resource', 'model_name', 'learning_rate'],
+                                                    ascending=[True, True, False]).reset_index(drop=True)
+    
+    # multiply all scores by 100
+    for col in df_shots.columns:
+        if col not in ["model_name", "resource", "learning_rate"]:
+            df_shots[col] = df_shots[col] * 100.0
+
+    print(df_shots)
+    # Add averages
+    for lang_setting in df['lang_setting'].unique():        
+        for shot in SHOTS[1:]:
+            df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
+    
+        diff_cols = [f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]
+        df_shots[f'diff_avg_{lang_setting}'] = df_shots[diff_cols].mean(axis=1)
+
+    print("="*60)
+    print("FEW-SHOT LEARNING RATE DF")
+    print(df_shots)
+    print("="*60)
+
+    return df_shots
 
 def few_shot_learning_rate_table(df: pd.DataFrame) -> str:
     
-    shot_length = len(SHOTS) -2 + 2 # - 1 to excl zero and + 1 for avg column
+    shot_length = len(SHOTS) -1 + 1 # - 1 to excl zero and + 1 for avg column
     table = "\n\n"
-    colspec = "ll" + "c" * ((2 * shot_length) + 2)
+    colspec = "ll" + "c" * ((shot_length) + 1)
 
     header = (
         " & & "
-        + "\\multicolumn{" + str(shot_length) + "}{c}{\\textbf{Shots (Parallel Data)}} "
-        + "\\multicolumn{" + str(shot_length) + "}{c}{\\textbf{Shots (Non-Parallel Data)}} \\\\ \n"
+        + f"\\multicolumn{{{shot_length}}}{{c}}{{\\textbf{{Shots}}}} \\\\ \n"
     )
-    header += "\\cmidrule(lr){3-" + str(2 + shot_length) + "}" + " \\cmidrule(lr){" + str(3 + shot_length) + "-" + str(2 + 2*shot_length) + "} \n"
-    header += "\\textbf{Model}   & \\textbf{LR} & $k=50$ & $k=100$ & $k=250$ & $k=500$ & \\textbf{Avg} $\\Delta$ & $k=50$ & $k=100$ & $k=250$ & $k=500$ & \\textbf{Avg} $\\Delta$ \\\\ \\toprule\n"
+    header += "\\cmidrule(lr){3-" + str(2 + shot_length) + "} \n"
+    header += "\\textbf{Model}   & \\textbf{LR} & $k=50$ & $k=100$ & $k=250$ & $k=500$ & \\textbf{Avg} $\\Delta$ \\\\ \\toprule\n"
 
     table += "\\begin{tabular}{" + colspec + "}\n"
     table += header
@@ -1472,29 +1473,22 @@ def few_shot_learning_rate_table(df: pd.DataFrame) -> str:
 
             line = f"\\multirow{{{n_model_rows}}}{{*}}{{{model_name}}} & {row['learning_rate']:.0e} "
             if prev_models and row['resource'] == prev_resource:
-                table += "\\cmidrule(lr){2-" + str(2 + 2 * shot_length) + "}\n"
+                table += "\\cmidrule(lr){2-" + str(2 + shot_length) + "}\n"
         else:
             line = f" & {row['learning_rate']:.0e} "
 
         # add shots with diff
-        for lang_setting in ['translation', 'main']:
-            for shot in SHOTS[1:]:
-                diff = row[f'diff_shot_{shot}_{lang_setting}']
-                line += f"& \\makecell{{{row[f'mean_{shot}_{lang_setting}']:.2f} \\\\[-3pt] \\small{{($\\pm${{{row[f'std_{shot}_{lang_setting}']:.2f}}})}}}}  \\small{{(\\posneg{{{diff:.2f}}})}} "
-                
-            # add avg
-            if lang_setting == 'main':
-                if row[f'diff_avg_{lang_setting}'] == df[(df['model_name'] == row['model_name']) & (df['resource'] == row['resource'])][f'diff_avg_{lang_setting}'].max():
-                    line += f"& \\textbf{{{row[f'diff_avg_{lang_setting}']:.2f}}} \\\\ \n"
-                else:
-                    line += f"& {row[f'diff_avg_{lang_setting}']:.2f} \\\\ \n"
+        for shot in SHOTS[1:]:
+            diff = row[f'diff_shot_{shot}_main']
+            line += f"& \\makecell{{{row[f'mean_{shot}_main']:.2f} \\\\[-3pt] \\small{{($\\pm${{{row[f'std_{shot}_main']:.2f}}})}}}}  \\small{{(\\posneg{{{diff:.2f}}})}} "
+            
+        # add avg
+        
+        if row[f'diff_avg_main'] == df[(df['model_name'] == row['model_name']) & (df['resource'] == row['resource'])][f'diff_avg_main'].max():
+            line += f"& \\textbf{{{row[f'diff_avg_main']:.2f}}} \\\\ \n"
+        else:
+            line += f"& {row[f'diff_avg_main']:.2f} \\\\ \n"
 
-            if lang_setting == 'translation':
-                if row[f'diff_avg_{lang_setting}'] == df[(df['model_name'] == row['model_name']) & (df['resource'] == row['resource'])][f'diff_avg_{lang_setting}'].max():
-                    line += f"& \\textbf{{{row[f'diff_avg_{lang_setting}']:.2f}}} "
-                else:
-                    line += f"& {row[f'diff_avg_{lang_setting}']:.2f} "
-    
         table += line   
 
         
@@ -1505,7 +1499,7 @@ def few_shot_learning_rate_table(df: pd.DataFrame) -> str:
     table += "\\end{tabular}\n"
     table += "\n\n"
     
-    table = table.replace("nan", "-")
+    # table = table.replace("nan", "-")
     print("\n\n")
     print(table)
     print("\n\n")
