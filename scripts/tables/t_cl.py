@@ -16,12 +16,12 @@ import numpy as np
 BASE_DIR = os.getenv("BASE_WCD")
 EXP2_DIR = os.path.join(BASE_DIR, "data/exp2/eval")
 
-METRIC="accuracy"  # accuracy | f1_macro | f1_weighted | exact_match
+METRIC="f1"  # accuracy | f1_macro | f1_weighted | exact_match
 COUNT = defaultdict(list)
 SHOTS = [0, 50, 100, 250, 500]
 
-LANG_SETTING = "main"  # main | translation
-ITEM = "LR"  # zero | LR | FEW
+LANG_SETTING = "translation"  # main | translation
+ITEM = "FEW"  # zero | LR | FEW
 
 # ----------------------------------------------------------------------
 # COLLECTORS AND HELPERS
@@ -259,45 +259,59 @@ def create_zero_shot_df(rows: list[dict]) -> pd.DataFrame:
 
     print("="*60)
     print("ZERO-SHOT RESULTS PIVOT")
-    print(zero_results_average)
+    print(zero_results_average[[col for col in zero_results_average.columns if not col.endswith('std')]].head())
     print("="*60)
 
     return zero_results_average
 
 def zero_shot_plot(
-            df,
-            panel_col="lang_setting",
-            x_col="resource",
-            resource_order=("Low", "Medium"),
-            panel_order=("Parallel", "Non-Parallel"),
-            model_order=(
-                ("mBert", "mBert_mean", "mBert_std"),
-                ("Llama3-8B (FTL)", "Llama3-8B (FTL)_mean", "Llama3-8B (FTL)_std"),
-                ("Llama3-8B (TOL)", "Llama3-8B (TOL)_mean", "Llama3-8B (TOL)_std"),
-                ("Llama3-8B (ES)", "Llama3-8B (ES)_mean", "Llama3-8B (ES)_std"),
-            ),
-            capsize=3,
-            figsize=(8.2, 3.6),
-            alpha=0.8,
-        ):
-    
-    outpath=f"plots/zero_shot_fig_{METRIC}.pdf"
-    
-    plt.rcParams.update({
-        "font.size": 12,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 10,
-    })
-    
-    fig, axes = plt.subplots(1, len(panel_order), figsize=figsize, sharey=True)
+    df,
+    panel_col="lang_setting",
+    x_col="resource",
+    resource_order=("Medium", "Low"),
+    panel_order=("Parallel", "Non-Parallel"),
+    model_order=(
+        ("mBert", "mBert_mean", "mBert_std"),
+        ("Llama3-8B (FTL)", "Llama3-8B (FTL)_mean", "Llama3-8B (FTL)_std"),
+        ("Llama3-8B (TOL)", "Llama3-8B (TOL)_mean", "Llama3-8B (TOL)_std"),
+        ("Llama3-8B (ES)", "Llama3-8B (ES)_mean", "Llama3-8B (ES)_std"),
+    ),
+    capsize=5,
+    figsize=(8.2, 3.6),
+    alpha=0.8,
+):
+    from matplotlib.ticker import MultipleLocator
+    outpath = f"plots/zero_shot_{METRIC}.pdf"
 
-    x = np.arange(len(resource_order))
+    plt.rcParams.update({
+        "font.size": 14,
+        "axes.titlesize": 14,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12,
+        "legend.fontsize": 12,
+    })
+
+    fig, axes = plt.subplots(1, len(panel_order), figsize=figsize, sharey=True)
+    if len(panel_order) == 1:
+        axes = [axes]
+
+    # -----------------------------
+    # Spacing controls (main change)
+    # -----------------------------
+    group_gap = 0.6   # smaller -> less space between resource groups (Low/Medium)
+    intra_gap = 1.35  # larger  -> more space between bars within a group
+
+    x = np.arange(len(resource_order)) * group_gap
     n_models = len(model_order)
-    bar_width = 0.15
-    offsets = (np.arange(n_models) - (n_models - 1) / 2) * bar_width
+
+    bar_width = 0.08
+    offsets = (
+        (np.arange(n_models) - (n_models - 1) / 2)
+        * bar_width
+        * intra_gap
+    )
+    # -----------------------------
 
     for ax, panel in zip(axes, panel_order):
         sub = df[df[panel_col] == panel].set_index(x_col)
@@ -338,7 +352,8 @@ def zero_shot_plot(
                 marker="o",
                 linewidth=1,
                 markersize=4,
-                color="gray",
+                color="gr" \
+                "ay",
                 alpha=0.6,
                 zorder=4,
             )
@@ -356,8 +371,18 @@ def zero_shot_plot(
             zorder=0,
         )
 
-    axes[0].set_ylabel("F1 score")
-    fig.supxlabel("Resource level", y=.15)
+        ax.yaxis.set_minor_locator(MultipleLocator(10))
+        ax.grid(
+            axis="y",
+            which="minor",
+            linestyle=":",
+            linewidth=0.5,
+            alpha=0.3,
+            zorder=0,
+        )
+
+    axes[0].set_ylabel(f"{METRIC.replace('_', ' ').title()}")
+    fig.supxlabel("Resource level", y=0.15)
 
     # common legend
     handles, labels = axes[0].get_legend_handles_labels()
@@ -372,7 +397,9 @@ def zero_shot_plot(
 
     fig.tight_layout(rect=(0, 0.1, 1, 1))
     fig.savefig(outpath, bbox_inches="tight")
-    # plt.show()
+
+
+
         
 # ----------------------------------------------------------------------
 # Few-shot
@@ -582,11 +609,11 @@ def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.D
     df = pd.DataFrame(rows)
 
 
-    # ------------------------
+    # ======================================================
     # CHECK TABLE
-    # ------------------------
+    # ======================================================
     few_results_check = (
-        df[(df['learning_rate'] != 0.000005)]
+        df[(df['learning_rate'] != 5e-6)]
         .groupby(["lang_setting", "model_name", "lang", "shots", "learning_rate"])
         .agg(
             metric_mean=("metric", "mean"),
@@ -599,12 +626,231 @@ def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.D
         .sort_values(['lang_setting', 'lang', 'model_name', "shots", "learning_rate"]).reset_index()
     )
 
-    print("="*60)
-    print("="*60)
-    print("CHECK FEW-SHOT RESULTS")    
-    print(few_results_check)
-    print("="*60)
-    print("="*60)
+    # print("="*60)
+    # print("="*60)
+    # print("CHECK FEW-SHOT RESULTS")    
+    # print(few_results_check)
+    # print("="*60)
+    # print("="*60)
+
+
+    # ======================================================
+    # Helper df zero
+    # ======================================================
+
+    df_zero_helper = df.copy()
+    df_zero_helper = df_zero_helper[
+        (df_zero_helper["shots"] == 0)
+        & (df_zero_helper['learning_rate'] != 5e-6)
+        & (df_zero_helper['lang_setting'] == lang_setting)
+    ]
+
+    df_zero_helper = (df_zero_helper.
+                      groupby(["model_name", "lang"],
+                              ).agg(
+                        zero_mean=("metric", "mean"),
+                      ).reset_index()
+    )
+
+    # clean column,s
+    df_zero_helper.columns = ["model_name", "lang", "zero_shot_mean"]
+
+    print("ZERO HELPER")
+    print(df_zero_helper)
+
+
+    # ======================================================
+    # Pick best lr per model and resource level
+    # ======================================================
+    df_zero = df.copy()
+
+    df_zero = (
+        df_zero[
+            (df_zero["shots"] == 0)
+            & (df_zero["learning_rate"] != 5e-6)
+            & (df_zero["lang_setting"] == lang_setting)
+        ]
+        .groupby(["model_name", "lang", "shots"])["metric"]
+        .agg(["mean", "std"])
+        .reset_index()
+    )
+
+
+
+    print("ZERO")
+    print(df_zero)
+
+    # ======================================================
+    # Pick best lr per model and resource level
+    # ======================================================
+    df_lr = df.copy()
+    df_lr = df_lr[(df_lr['lang_setting'] == lang_setting) & (df_lr['learning_rate'] != 5e-6) & (df_lr['shots'] > 0)]
+    df_lr['resource'] = df_lr['lang'].apply(get_resource)
+    df_lr = (df_lr
+                .groupby(["model_name", "resource", "learning_rate"])
+                .agg(metric_mean=("metric", "mean"),
+                )
+    )
+
+    # flatten columns
+    df_lr = df_lr.reset_index()
+    df_lr.columns = ["model_name", "resource", "learning_rate", "lr_avg"]
+
+    # pick highest lr per model name  and reousrce
+    df_lr = df_lr.loc[
+        df_lr.groupby(["model_name", "resource"])["lr_avg"].idxmax()
+    ].reset_index(drop=True)
+
+    print("BEST LR")
+    print(df_lr)
+    # ======================================================
+    # Gen main table using the best lr per model-resource
+    # ======================================================
+    df_main = df.copy()
+    df_main['resource'] = df['lang'].apply(get_resource)
+    df_main = df_main[(df_main['lang_setting'] == lang_setting) & (df_main['learning_rate'] != 5e-6) & (df_main['shots'] > 0)]
+    df_main = df_main.dropna(subset=['lang_setting'])
+
+    
+    df_main = (df_main
+               .groupby(["model_name", "resource", "lang", "shots", "learning_rate", "seed"])
+               .agg(metric_mean=("metric", "mean"),
+                    metric_std=("metric", "std")
+                ))
+
+    # flatten columns
+    df_main = df_main.reset_index()
+    df_main.columns = ["model_name", "resource", "lang", "shots", "learning_rate", "seed", "metric_mean", "metric_std"]
+
+    # select only rows with best lr per model and resource
+    df_main = df_main.merge(df_lr, on=["model_name", "resource", "learning_rate"], how="inner")
+
+    # merge zero shot values
+    df_main = df_main.drop(columns=['lr_avg', "learning_rate", "resource"])  
+    df_main= df_main.merge(
+                                df_zero_helper, on=["model_name", "lang"], how="left")
+    
+    
+    df_main['diff'] = df_main['metric_mean'] - df_main['zero_shot_mean']
+
+    df_main = (df_main
+               .groupby(["model_name", "lang", "shots"])['diff']
+               .agg(['mean', 'std'])
+               .reset_index())
+
+    df_main = pd.concat([df_main, df_zero], ignore_index=True, axis=0)
+
+    # pivot
+    df_main = (df_main 
+                .pivot_table(
+                    index=["model_name", "shots"],  
+                    columns=["lang"],
+                    values=["mean", "std"],
+                    aggfunc=["mean"]
+                ).reset_index()
+    )
+
+    # clean columns
+    df_main.columns = [
+        "_".join([str(x) for x in c if x])
+        for c in df_main.columns
+    ]
+
+    df_main.columns = [col.replace("mean_mean", "mean").replace("mean_std", "std") for col in df_main.columns]
+
+    # all times 100
+    for col in df_main.columns:
+        if col not in ["model_name", "shots"]:
+            df_main[col] = df_main[col] * 100.0
+
+
+    # test shot means
+    # for resource, lang in LANGS.items():
+    #     if resource == "high":
+    #         continue
+
+    #     lang_cols = [f"mean_{l}" for l in lang]
+    #     df_subset = df_main[["model_name", "shots"] + lang_cols]
+        
+    #     # row mean over all mean_langs
+    #     df_subset = df_subset.assign(lang_mean=df_subset[lang_cols].mean(axis=1))
+    #     print(f"RESOURCE: {resource}")
+    #     print(df_subset)
+        
+    # add resource means
+    for resource, lang in LANGS.items():
+        if resource == "high":
+            continue
+
+        lang_cols = [f"mean_{l}" for l in lang]
+        df_main[f"{resource}_mean"] = df_main[lang_cols].mean(axis=1)
+
+    
+    print("FINAL MAIN")
+    print(df_main)
+
+    df_main['model_name'] = pd.Categorical(df_main['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
+    df_main = df_main.sort_values(['model_name', 'shots']).reset_index(drop=True)
+
+
+    return df_main
+
+    sys.exit(0)
+
+
+    #=====================================
+    #=====================================
+    #=====================================
+    #=====================================
+    #=====================================
+
+    # now pivot to have langs as columns
+    df_main = df_main.drop(columns=['resource', 'learning_rate', 'lr_avg'])
+    df_main = (df_main
+               .pivot_table(
+                index=["model_name", "shots"],
+                columns=["lang"],
+                values="metric_mean",
+                aggfunc=["mean"] #"count"
+        ).reset_index())
+    
+    # clean columns
+    df_main.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_main.columns]
+
+    # # add zero shot values as rows not columns
+    df_main = pd.concat([df_main, df_zero], ignore_index=True, axis=0)
+
+    print("PIVOT MAIN")
+    print(df_main)
+    sys.exit(0)
+
+    df_main = (df_main
+        .drop(columns=['lang_setting'])       
+        .pivot_table(
+            index=["model_name", "shots", "learning_rate"],
+            columns=["lang"],
+            values="metric",
+            aggfunc=["mean"] #"count"
+        ).reset_index()
+    )
+
+    # clean columns
+    df_main.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_main.columns]
+
+
+
+
+    # score each (model, lr, seed) by averaging across shots + langs
+    # score each (model, lr) by averaging across shots + langs
+    lr_score = (
+        df_pivot[df_pivot["shots"] != 0]
+        .groupby(["model_name", "resource", "learning_rate"])[lang_cols]
+        .mean()          # avg over shots (and seeds if present)
+        .mean(axis=1)    # avg over langs
+        .rename("lr_score")
+        .reset_index()
+    )
+
 
     # save
     few_results_check.to_excel(f"checks/few_shot_check_{METRIC}.xlsx")
@@ -613,7 +859,7 @@ def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.D
     df_pivot = (df[(df['lang_setting'] == lang_setting) & (df['learning_rate'] != 0.000005)]
         .drop(columns=['lang_setting'])       
         .pivot_table(
-            index=["model_name", "shots", "learning_rate", "seed"],
+            index=["model_name", "shots", "learning_rate"],
             columns=["lang"],
             values="metric",
             aggfunc=["mean"] #"count"
@@ -623,17 +869,25 @@ def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.D
     # clean columns
     df_pivot.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_pivot.columns]
     
-    # gen lang mean across seeds!
-    # mean over all langs and seed (not sure whether perfect but ok for now)
-    lang_cols = [col for col in df_pivot.columns if col.startswith("mean_")]
-    df_pivot['metric_mean'] = df_pivot.groupby(['model_name', 'shots', 'learning_rate'])[lang_cols].transform('mean').mean(axis=1)
+   
 
-    # use this mean to pick best learning rate per model and shots; keep seeds
-    df_pivot = (df_pivot
-                .groupby(["model_name", "shots", "seed"])
-                .apply(lambda x: x.loc[x["metric_mean"].idxmax()])
-                .drop(columns=["metric_mean", "learning_rate"])
-                .reset_index(drop=True))
+    # pick best LR per model
+    best_lr = lr_score.loc[
+        lr_score.groupby("model_name")["lr_score"].idxmax()
+    ][["model_name", "learning_rate"]].reset_index(drop=True)
+
+    print("best")
+    print(best_lr)
+
+
+    print("PIVOT")
+    print(df_pivot)
+
+    # keep ALL shots rows, but only for the selected LR (per model+seed)
+    df_pivot = df_pivot.merge(best_lr, on=["model_name", "learning_rate"], how="inner")
+
+    print(df_pivot)
+    sys.exit(0)
 
     numeric_cols = [col for col in df_pivot.columns if col.startswith("mean_")]
 
@@ -666,10 +920,22 @@ def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.D
     result_df.columns = [f"{col[0]}_{col[1]}" if col[1] else col[0] for col in result_df.columns]
     result_df.columns = [col.replace("mean_", "") for col in result_df.columns]
 
+
+    # create resource group delta averages
+    low_resource_langs = [col for col in result_df.columns if col.endswith("_mean") and col[:2] in LANGS['low']]
+    medium_resource_langs = [col for col in result_df.columns if col.endswith("_mean") and col[:2] in LANGS['medium']]
+
+    result_df['low_mean'] = result_df[low_resource_langs].mean(axis=1)
+    result_df['medium_mean'] = result_df[medium_resource_langs].mean(axis=1)
+
     # multiply all by 100
     for col in result_df.columns:
         if col not in ["model_name", "shots"]:
             result_df[col] = result_df[col] * 100.0
+
+    # sort rows by model and shots
+    result_df['model_name'] = pd.Categorical(result_df['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
+    result_df = result_df.sort_values(['model_name', 'shots']).reset_index(drop=True)
 
     print("="*60)
     print("FEW-SHOT MAIN TABLE DF")
@@ -678,21 +944,229 @@ def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.D
     
     return result_df
 
+# OG
+# def few_shot_main_table_df(rows: list[dict], lang_setting: str = "main") -> pd.DataFrame:
+#     df = pd.DataFrame(rows)
+
+
+#     # ------------------------
+#     # CHECK TABLE
+#     # ------------------------
+#     few_results_check = (
+#         df[(df['learning_rate'] != 0.000005)]
+#         .groupby(["lang_setting", "model_name", "lang", "shots", "learning_rate"])
+#         .agg(
+#             metric_mean=("metric", "mean"),
+#             metric_std=("metric", "std"),
+#             metric_count=("metric", "count"),
+#             sources=("source", list),
+#             metrics_lst=("metric", list),
+#             seeds_lst=("seed", list),
+#         )
+#         .sort_values(['lang_setting', 'lang', 'model_name', "shots", "learning_rate"]).reset_index()
+#     )
+
+#     print("="*60)
+#     print("="*60)
+#     print("CHECK FEW-SHOT RESULTS")    
+#     print(few_results_check)
+#     print("="*60)
+#     print("="*60)
+
+#     # save
+#     few_results_check.to_excel(f"checks/few_shot_check_{METRIC}.xlsx")
+
+#     # filter and privor to get mean per model/shots/learning_rate/seed (seed! important as we want to get variation over seeds later)
+#     df_pivot = (df[(df['lang_setting'] == lang_setting) & (df['learning_rate'] != 0.000005)]
+#         .drop(columns=['lang_setting'])       
+#         .pivot_table(
+#             index=["model_name", "shots", "learning_rate", "seed"],
+#             columns=["lang"],
+#             values="metric",
+#             aggfunc=["mean"] #"count"
+#         ).reset_index()
+#     )
+    
+#     # clean columns
+#     df_pivot.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_pivot.columns]
+    
+#     # gen lang mean across seeds!
+#     # mean over all langs and seed (not sure whether perfect but ok for now)
+#     lang_cols = [col for col in df_pivot.columns if col.startswith("mean_")]
+#     df_pivot['metric_mean'] = df_pivot.groupby(['model_name', 'shots', 'learning_rate'])[lang_cols].transform('mean').mean(axis=1)
+
+#     # use this mean to pick best learning rate per model and shots; keep seeds
+#     df_pivot = (df_pivot
+#                 .groupby(["model_name", "shots", "seed"])
+#                 .apply(lambda x: x.loc[x["metric_mean"].idxmax()])
+#                 .drop(columns=["metric_mean", "learning_rate"])
+#                 .reset_index(drop=True))
+
+#     numeric_cols = [col for col in df_pivot.columns if col.startswith("mean_")]
+
+#     # Get shot 0 values for each model and seed
+#     zero_shot = df_pivot[df_pivot['shots'] == 0][['model_name', 'seed'] + numeric_cols].copy()
+#     zero_shot = zero_shot.rename(columns={col: f"{col}_zero" for col in numeric_cols})
+
+#     # Merge back on model_name and seed
+#     result_df = df_pivot.merge(zero_shot, on=['model_name', 'seed'])
+
+#     # Calculate differences only for non-zero shots, keep original for shot 0
+#     for col in numeric_cols:
+#         result_df[col] = result_df.apply(
+#             lambda row: row[col] if row['shots'] == 0 else row[col] - row[f"{col}_zero"],
+#             axis=1
+#         )
+
+
+#     # Drop the _zero columns
+#     result_df = result_df.drop(columns=[f"{col}_zero" for col in numeric_cols])
+    
+#     # now average over seeds
+#     result_df = (result_df
+#                 .groupby(["model_name", "shots"])[numeric_cols]
+#                 .agg(['mean', 'std'])
+#                 .reset_index(drop=False)
+#         )
+
+#     # flatten columns
+#     result_df.columns = [f"{col[0]}_{col[1]}" if col[1] else col[0] for col in result_df.columns]
+#     result_df.columns = [col.replace("mean_", "") for col in result_df.columns]
+
+
+#     # create resource group delta averages
+#     low_resource_langs = [col for col in result_df.columns if col.endswith("_mean") and col[:2] in LANGS['low']]
+#     medium_resource_langs = [col for col in result_df.columns if col.endswith("_mean") and col[:2] in LANGS['medium']]
+
+#     result_df['low_mean'] = result_df[low_resource_langs].mean(axis=1)
+#     result_df['medium_mean'] = result_df[medium_resource_langs].mean(axis=1)
+
+#     # multiply all by 100
+#     for col in result_df.columns:
+#         if col not in ["model_name", "shots"]:
+#             result_df[col] = result_df[col] * 100.0
+
+#     # sort rows by model and shots
+#     result_df['model_name'] = pd.Categorical(result_df['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
+#     result_df = result_df.sort_values(['model_name', 'shots']).reset_index(drop=True)
+
+#     print("="*60)
+#     print("FEW-SHOT MAIN TABLE DF")
+#     print(result_df)
+#     print("="*60)
+    
+#     return result_df
+
+# OG
+# def  few_shot_table(df: pd.DataFrame, lang_setting: str) -> None:
+    
+#     n_langs = 12 # 10 langs + 2 avgs
+    
+#     table = "\n\n"
+#     colspec = "lc" + "c" * (n_langs) # 10 langs + avgs
+
+#     panel_name = "Non-Parallel Data" if lang_setting == "main" else "Parallel Data"
+#     header = (
+#         " & & "
+#         + f"\\multicolumn{{12}}{{c}}{{\\textbf{{{panel_name}}}}} \\\\ \n"
+#     )
+#     header += "\\cmidrule(lr){3-14} \n"
+#     header += " & & \\multicolumn{" + str(n_langs // 2) + "}{c}{\\textbf{Medium-Resource}} & \\multicolumn{" + str(n_langs // 2) + "}{c}{\\textbf{Low-Resource}} \\\\ \n"
+#     header += "\\cmidrule(lr){3-8} \\cmidrule(lr){9-14} \n"
+#     header += (
+#         "\\textbf{Model} & \\textbf{Shots} & "
+#         + " & ".join(f"\\textbf{{{lang}}}" for lang in (LANGS["medium"]))
+#         + " & $\\Delta$ \\textbf{Avg} & "
+#         + " & ".join(f"\\textbf{{{lang}}}" for lang in (LANGS["low"]))
+#         + " & $\\Delta$ \\textbf{Avg} "
+#         + " \\\\ \n"
+#     )
+#     header += "\\toprule\n"
+
+#     table += "\\begin{tabular}{" + colspec + "}\n"
+#     table += header
+
+#     prev_model = None
+#     for _, row in df.iterrows():
+
+#         if prev_model != row['model_name'] and prev_model is not None:
+#             table += "\\cmidrule(lr){2-" + str(n_langs+2) + "}\n"
+
+#         if prev_model is None or prev_model != row['model_name']:
+#             n_model_rows = df[df['model_name'] == row['model_name']].shape[0]
+#             model_name = row['model_name'] if "mBert" in row['model_name'] else "Llama3-8B " + f"({row['model_name']})"
+#             line = f"\\multirow{{{n_model_rows}}}{{*}}{{{model_name}}} & \\cellcolor{{gray!25}} {row['shots']} "
+#         else:
+#             if row['shots'] == 50:
+#                 line = f" & $\\Delta$ \\; {row['shots']}"
+#             else:
+#                 line = f" & $\\Delta$ {row['shots']}"
+
+#         # MEDIUM
+#         for lang in (LANGS["medium"]):
+#             if row['shots'] == 0:
+#                 line += f"&  {row[f'{lang}_mean']:.2f} \\scriptsize{{($\\pm${row[f'{lang}_std']:.2f})}}"
+#             else:
+#                 line += f"&  \\posneg{{{row[f'{lang}_mean']:.2f}}} \\scriptsize{{($\\pm${row[f'{lang}_std']:.2f})}}"
+        
+#         # add medium avg
+#         if row['shots'] == 0:
+#             line += f" &  "
+#         else:
+#             line += f" &  \\posneg{{{row['medium_mean']:.2f}}} "
+        
+#         # LOW
+#         for lang in (LANGS["low"]):
+#             if row['shots'] == 0:
+#                 line += f"&  {row[f'{lang}_mean']:.2f} \\scriptsize{{($\\pm${row[f'{lang}_std']:.2f})}}"
+#             else:
+#                 line += f"&  \\posneg{{{row[f'{lang}_mean']:.2f}}} \\scriptsize{{($\\pm${row[f'{lang}_std']:.2f})}}"
+
+#         # add low avg
+#         if row['shots'] == 0:
+#             line += f" &  "
+#         else:
+#             line += f" &  \\posneg{{{row['low_mean']:.2f}}} "
+
+#         line += "\\\\\n"
+#         table += line
+
+        
+#         prev_model = row['model_name']
+
+#     table += "\\bottomrule\n"
+#     table += "\\end{tabular}\n"
+#     table += "\n\n"
+    
+#     print("="*80)
+#     print(f"{lang_setting.upper()} FEW-SHOT TABLE")
+#     print("="*80)
+#     print("\n\n")
+#     print(table)
+#     print("\n\n")
+#     print("="*80)
+
 def  few_shot_table(df: pd.DataFrame, lang_setting: str) -> None:
+    
+    n_langs = 12 # 10 langs + 2 avgs
+    
     table = "\n\n"
-    colspec = "lc" + "c" * (len(df.columns) - 1)
+    colspec = "lc" + "c" * (n_langs) # 10 langs + avgs
 
     panel_name = "Non-Parallel Data" if lang_setting == "main" else "Parallel Data"
     header = (
         " & & "
-        + f"\\multicolumn{{10}}{{c}}{{\\textbf{{{panel_name}}}}} \\\\ \n"
+        + f"\\multicolumn{{12}}{{c}}{{\\textbf{{{panel_name}}}}} \\\\ \n"
     )
-    header += "\\cmidrule(lr){3-12} \n"
-    header += " & & \\multicolumn{" + str(5) + "}{c}{\\textbf{Medium-Resource}} & \\multicolumn{" + str(5) + "}{c}{\\textbf{Low-Resource}} \\\\ \n"
-    header += "\\cmidrule(lr){3-7} \\cmidrule(lr){8-12} \n"
+    header += "\\cmidrule(lr){3-14} \n"
+    header += " & & \\multicolumn{" + str(n_langs // 2) + "}{c}{\\textbf{Medium-Resource}} & \\multicolumn{" + str(n_langs // 2) + "}{c}{\\textbf{Low-Resource}} \\\\ \n"
+    header += "\\cmidrule(lr){3-8} \\cmidrule(lr){9-14} \n"
     header += (
         "\\textbf{Model} & \\textbf{Shots} & "
-        + " & ".join(f"\\textbf{{{lang}}}" for lang in (LANGS["medium"] + LANGS["low"]))
+        + " & ".join(f"\\textbf{{{lang}}}" for lang in (LANGS["medium"]))
+        + " & $\\Delta$ \\textbf{Avg} & "
+        + " & ".join(f"\\textbf{{{lang}}}" for lang in (LANGS["low"]))
+        + " & $\\Delta$ \\textbf{Avg} "
         + " \\\\ \n"
     )
     header += "\\toprule\n"
@@ -704,22 +1178,44 @@ def  few_shot_table(df: pd.DataFrame, lang_setting: str) -> None:
     for _, row in df.iterrows():
 
         if prev_model != row['model_name'] and prev_model is not None:
-            table += "\\cmidrule(lr){2-" + str(len(df.columns)) + "}\n"
+            table += "\\cmidrule(lr){2-" + str(n_langs+2) + "}\n"
 
         if prev_model is None or prev_model != row['model_name']:
             n_model_rows = df[df['model_name'] == row['model_name']].shape[0]
-            line = f"\\multirow{{{n_model_rows}}}{{*}}{{{row['model_name']}}} & \\cellcolor{{gray!25}} {row['shots']} "
+            model_name = row['model_name'] if "mBert" in row['model_name'] else "Llama3-8B " + f"({row['model_name']})"
+            line = f"\\multirow{{{n_model_rows}}}{{*}}{{{model_name}}} & \\cellcolor{{gray!25}} {row['shots']} "
         else:
             if row['shots'] == 50:
                 line = f" & $\\Delta$ \\; {row['shots']}"
             else:
                 line = f" & $\\Delta$ {row['shots']}"
 
-        for lang in (LANGS["medium"] + LANGS["low"]):
+        # MEDIUM
+        for lang in (LANGS["medium"]):
             if row['shots'] == 0:
-                line += f"&  {row[f'{lang}_mean']:.2f} \\scriptsize{{($\\pm${row[f'{lang}_std']:.2f})}}"
+                line += f"&  {row[f'mean_{lang}']:.2f} \\scriptsize{{($\\pm${row[f'std_{lang}']:.2f})}}"
             else:
-                line += f"&  \\posneg{{{row[f'{lang}_mean']:.2f}}} \\scriptsize{{($\\pm${row[f'{lang}_std']:.2f})}}"
+                line += f"&  \\posneg{{{row[f'mean_{lang}']:.2f}}} \\scriptsize{{($\\pm${row[f'std_{lang}']:.2f})}}"
+        
+        # add medium avg
+        if row['shots'] == 0:
+            line += f" &  "
+        else:
+            line += f" &  \\posneg{{{row['medium_mean']:.2f}}} "
+        
+        # LOW
+        for lang in (LANGS["low"]):
+            if row['shots'] == 0:
+                line += f"&  {row[f'mean_{lang}']:.2f} \\scriptsize{{($\\pm${row[f'std_{lang}']:.2f})}}"
+            else:
+                line += f"&  \\posneg{{{row[f'mean_{lang}']:.2f}}} \\scriptsize{{($\\pm${row[f'std_{lang}']:.2f})}}"
+
+        # add low avg
+        if row['shots'] == 0:
+            line += f" &  "
+        else:
+            line += f" &  \\posneg{{{row['low_mean']:.2f}}} "
+
         line += "\\\\\n"
         table += line
 
@@ -747,16 +1243,18 @@ def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
 
+    print
     df_shots = df[
-        ((df["shots"] > 0)) & (df['learning_rate'] != 0.000005)
-        ]
-    
+        (df["shots"] > 0)
+        & (df["learning_rate"] != 5e-6)
+    ]
     # add resource level
+
     df_shots["resource"] = df_shots["lang"].apply(get_resource)
 
     df_shots = (df_shots
         .pivot_table(
-            index=["lang_setting", "model_name", "resource", "learning_rate"],
+            index=["lang_setting", "model_name", "resource", "lang", "learning_rate", "seed"],
             columns=["shots"],
             values="metric",
             aggfunc=["mean", "std"] #"count"
@@ -765,116 +1263,252 @@ def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
 
     # flatten column names
     df_shots.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_shots.columns]
-
     # get zero shot helper
     zero_results = zero_shot_helper_df(rows)
-    print("="*60)
-    print("ZERO SHOT RESULTS")
-    print(zero_results)
-    print("="*60)
-    
     # add zero-shot values
     df_shots = df_shots.merge(zero_results,
-                            on=["model_name", "resource", "lang_setting"],
+                            on=["lang_setting", "resource", "lang", "model_name"],
                             how="left")
 
-    # ------------------------
-    # LR Table
-    # ------------------------
+    # rename
+    df_shots = df_shots.rename(columns={"shot_0_mean":'mean_0', "shot_0_std":'std_0'})
 
-    df_learning_rate = df_shots[df_shots["model_name"].str.contains("Llama", case=False)]
-    # Genete differences between 0-shot and few-shot
-    for shot in SHOTS[1:]:
-        df_learning_rate[f'diff_shot_{shot}'] = df_learning_rate[f'mean_{shot}'] - df_learning_rate['shot_0_mean']
+    # # drop std
+    # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
     
-    # Add average diff
-    diff_cols = [f'diff_shot_{shot}' for shot in SHOTS[1:]]
-    df_learning_rate['avg_diff'] = df_learning_rate[diff_cols].mean(axis=1)
-    # srop mean,std
-    df_learning_rate = df_learning_rate.drop(columns=[col for col in df_learning_rate.columns if col.startswith("std_")])
-    
-    # multiply all scores by 100
-    for col in df_learning_rate.columns:
-        if col not in ["lang_setting", "model_name", "resource", "learning_rate"]:
-            df_learning_rate[col] = df_learning_rate[col] * 100.0
 
-    # Sory
-    df_learning_rate['resource'] = pd.Categorical(df_learning_rate['resource'], categories=['medium', 'low'], ordered=True)
-    df_learning_rate['model_name'] = pd.Categorical(df_learning_rate['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES'], ordered=True)
-    df_learning_rate = df_learning_rate.sort_values(['lang_setting', 'resource', 'model_name', 'learning_rate'],
-                                                    ascending=[True, True, True, False]).reset_index(drop=True)
+    print(df_shots)
+    print("AFTER")
+    df_shots = df_shots.pivot_table(
+        index=["model_name", "resource", "lang", "learning_rate", "seed"],
+        columns="lang_setting", 
+        values=[col for col in df_shots.columns if col.startswith("mean") or col.startswith("std")],
+        aggfunc="first"
+    ).reset_index()
+
+    # flatten columns
+    df_shots.columns = [
+        f"{metric}_{setting}" if setting else metric
+        for metric, setting in df_shots.columns
+    ]
+
+
+    # gen differences
+    for lang_setting in df['lang_setting'].unique():
+        for shot in SHOTS[1:]:
+            df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
+
+        df_shots[f'diff_avg_{lang_setting}'] = df_shots[[f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]].mean(axis=1)
+    # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
+    
+
+    # mean over langs and seeds
+    df_shots = (df_shots
+                .groupby(["model_name", "resource", "learning_rate"])
+                .mean(numeric_only=True)
+                .reset_index()
+        )
+    
+
+        # multiply all scores by 100
+    for col in df_shots.columns:
+        if col not in ["model_name", "resource", "learning_rate"]:
+            df_shots[col] = df_shots[col] * 100.0
+
+    # # drop seed and trans
+    # df_shots.to_excel("checks/TEST.xlsx")
+
+    # sys.exit(0)
+
+    # Sort rows
+    df_shots['resource'] = pd.Categorical(df_shots['resource'], categories=['medium', 'low'], ordered=True)
+    df_shots['model_name'] = pd.Categorical(df_shots['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
+    df_shots = df_shots.sort_values(['resource', 'model_name', 'learning_rate'],
+                                                    ascending=[True, True, False]).reset_index(drop=True)
+    
+
+    # print(df_shots)
+    # # Add averages
+    # for lang_setting in df['lang_setting'].unique():        
+    #     for shot in SHOTS[1:]:
+    #         df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
+    
+    #     diff_cols = [f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]
+    #     df_shots[f'diff_avg_{lang_setting}'] = df_shots[diff_cols].mean(axis=1)
+
     print("="*60)
     print("FEW-SHOT LEARNING RATE DF")
-    print(df_learning_rate)
+    print(df_shots)
     print("="*60)
 
+    return df_shots
 
-    return df_learning_rate
+
+# OG
+# def few_shot_lr_table_df(rows: list[dict]) -> pd.DataFrame:
+    
+
+#     df = pd.DataFrame(rows)
+
+#     print
+#     df_shots = df[
+#         (df["shots"] > 0)
+#         & (df["learning_rate"] != 5e-6)
+#     ]
+#     # add resource level
+
+#     df_shots["resource"] = df_shots["lang"].apply(get_resource)
+
+#     df_shots = (df_shots
+#         .pivot_table(
+#             index=["lang_setting", "model_name", "resource", "learning_rate"],
+#             columns=["shots"],
+#             values="metric",
+#             aggfunc=["mean", "std"] #"count"
+#         ).reset_index()
+#     )
+
+#     # flatten column names
+#     df_shots.columns = [f"{c[0]}_{c[1]}" if c[1] else c[0] for c in df_shots.columns]
+#     # get zero shot helper
+#     zero_results = zero_shot_helper_df(rows)
+#     # group by resource
+#     zero_results = zero_results.groupby(["lang_setting", "resource", "model_name"]).mean(numeric_only=True).reset_index()
+
+    
+
+#     # add zero-shot values
+#     df_shots = df_shots.merge(zero_results,
+#                             on=["lang_setting", "resource", "model_name"],
+#                             how="left")
+
+#     # rename
+#     df_shots = df_shots.rename(columns={"shot_0_mean":'mean_0', "shot_0_std":'std_0'})
+
+#     # # drop std
+#     # df_shots = df_shots.drop(columns=[col for col in df_shots.columns if col.startswith("std_")])
+    
+
+#     print(df_shots)
+#     print("AFTER")
+#     df_shots = df_shots.pivot_table(
+#         index=["model_name", "resource", "learning_rate"],
+#         columns="lang_setting", 
+#         values=[col for col in df_shots.columns if col.startswith("mean") or col.startswith("diff") or col.startswith("std")],
+#         aggfunc="first"
+#     ).reset_index()
+
+#     # flatten columns
+#     df_shots.columns = [
+#         f"{metric}_{setting}" if setting else metric
+#         for metric, setting in df_shots.columns
+#     ]
+
+#     # Sort rows
+#     df_shots['resource'] = pd.Categorical(df_shots['resource'], categories=['medium', 'low'], ordered=True)
+#     df_shots['model_name'] = pd.Categorical(df_shots['model_name'].apply(sft_names), categories=['FTL', 'TOL', 'ES', "mBert"], ordered=True)
+#     df_shots = df_shots.sort_values(['resource', 'model_name', 'learning_rate'],
+#                                                     ascending=[True, True, False]).reset_index(drop=True)
+    
+#     # multiply all scores by 100
+#     for col in df_shots.columns:
+#         if col not in ["model_name", "resource", "learning_rate"]:
+#             df_shots[col] = df_shots[col] * 100.0
+
+#     print(df_shots)
+#     # Add averages
+#     for lang_setting in df['lang_setting'].unique():        
+#         for shot in SHOTS[1:]:
+#             df_shots[f'diff_shot_{shot}_{lang_setting}'] = df_shots[f'mean_{shot}_{lang_setting}'] - df_shots[f'mean_0_{lang_setting}']
+    
+#         diff_cols = [f'diff_shot_{shot}_{lang_setting}' for shot in SHOTS[1:]]
+#         df_shots[f'diff_avg_{lang_setting}'] = df_shots[diff_cols].mean(axis=1)
+
+#     print("="*60)
+#     print("FEW-SHOT LEARNING RATE DF")
+#     print(df_shots)
+#     print("="*60)
+
+#     return df_shots
 
 def few_shot_learning_rate_table(df: pd.DataFrame) -> str:
     
+    shot_length = len(SHOTS) -2 + 2 # - 1 to excl zero and + 1 for avg column
+    table = "\n\n"
+    colspec = "ll" + "c" * ((2 * shot_length) + 2)
 
-    for lang_setting in df['lang_setting'].unique():
+    header = (
+        " & & "
+        + "\\multicolumn{" + str(shot_length) + "}{c}{\\textbf{Shots (Parallel Data)}} "
+        + "\\multicolumn{" + str(shot_length) + "}{c}{\\textbf{Shots (Non-Parallel Data)}} \\\\ \n"
+    )
+    header += "\\cmidrule(lr){3-" + str(2 + shot_length) + "}" + " \\cmidrule(lr){" + str(3 + shot_length) + "-" + str(2 + 2*shot_length) + "} \n"
+    header += "\\textbf{Model}   & \\textbf{LR} & $k=50$ & $k=100$ & $k=250$ & $k=500$ & \\textbf{Avg} $\\Delta$ & $k=50$ & $k=100$ & $k=250$ & $k=500$ & \\textbf{Avg} $\\Delta$ \\\\ \\toprule\n"
 
-        df_lang = df[df['lang_setting'] == lang_setting]
-        shot_length = len(SHOTS) - 1 + 1 # - 1 to excl zero and + 1 for avg column
-        table = "\n\n"
-        colspec = "ll" + "c" * shot_length
+    table += "\\begin{tabular}{" + colspec + "}\n"
+    table += header
 
-        header = " & & \\multicolumn{" + str(shot_length-1) + "}{c}{\\textbf{" + ("Shots (Parallel Data)" if lang_setting == "translation" else "Shots (Non-parallel Data)") + "}} \\\\ \n"
-        header += "\\cmidrule(lr){3-" + str(2 + shot_length-1) + "} \n"
-        header += "\\textbf{SFT}   & \\textbf{\\makecell{Learning \\\\ Rate}} & $k=50$ & $k=100$ & $k=250$ & $k=500$ & \\textbf{Avg} \\\\ \\toprule\n"
+    prev_resource = None
+    prev_models = None
+    for _, row in df.iterrows():
 
-        table += "\\begin{tabular}{" + colspec + "}\n"
-        table += header
+        # Panels
+        if prev_resource is None:
+            table += f"\\textbf{{Medium Resource }} " + " & " * (shot_length + 1) + " \\\\\n"
+            table += "\\midrule\n"
+        if prev_resource != row['resource'] and prev_resource is not None:
+            table += "\\midrule\n"
+            table += f"\\textbf{{Low Resource }} " + " & " * (shot_length + 1) + " \\\\\n"
+            table += "\\midrule\n"
 
-        prev_resource = None
-        prev_models = None
-        for _, row in df_lang.iterrows():
-
-            # Panels
-            if prev_resource is None:
-                table += f"\\textbf{{Medium Resource }} " + " & " * (shot_length + 1) + " \\\\\n"
-                table += "\\midrule\n"
-            if prev_resource != row['resource'] and prev_resource is not None:
-                table += "\\midrule\n"
-                table += f"\\textbf{{Low Resource }} " + " & " * (shot_length + 1) + " \\\\\n"
-                table += "\\midrule\n"
-
-            # Lines
-            if prev_models is None or prev_models != row['model_name']:
-                n_model_rows = df_lang[(df_lang['model_name'] == row['model_name']) & (df_lang['resource'] == row['resource'])].shape[0]
-                line = f"\\multirow{{{n_model_rows}}}{{*}}{{{row['model_name']}}} & {row['learning_rate']:.0e} "
-                if prev_models and row['resource'] == prev_resource:
-                    table += "\\cmidrule(lr){2-" + str(2 + shot_length) + "}\n"
+        # Lines
+        if prev_models is None or prev_models != row['model_name']:
+            n_model_rows = df[(df['model_name'] == row['model_name']) & (df['resource'] == row['resource'])].shape[0]
+            
+            if row['model_name'] != "mBert":
+                model_name  = "Llama 3-8B (" + sft_names(row['model_name']) + ")"
             else:
-                line = f" & {row['learning_rate']:.0e} "
+                model_name = row['model_name']
 
-            # add shots with diff
+            line = f"\\multirow{{{n_model_rows}}}{{*}}{{{model_name}}} & {row['learning_rate']:.0e} "
+            if prev_models and row['resource'] == prev_resource:
+                table += "\\cmidrule(lr){2-" + str(2 + 2 * shot_length) + "}\n"
+        else:
+            line = f" & {row['learning_rate']:.0e} "
+
+        # add shots with diff
+        for lang_setting in ['translation', 'main']:
             for shot in SHOTS[1:]:
-                diff = row[f'diff_shot_{shot}']
-                line += f"& {row[f'mean_{shot}']:.2f} \\scriptsize{{(\\posneg{{{diff:.2f}}})}} "
+                diff = row[f'diff_shot_{shot}_{lang_setting}']
+                line += f"& \\makecell{{{row[f'mean_{shot}_{lang_setting}']:.2f} \\\\[-3pt] \\small{{($\\pm${{{row[f'std_{shot}_{lang_setting}']:.2f}}})}}}}  \\small{{(\\posneg{{{diff:.2f}}})}} "
                 
             # add avg
-            if row['avg_diff'] == df_lang[(df_lang['model_name'] == row['model_name']) & (df_lang['resource'] == row['resource'])]['avg_diff'].max():
-                line += f"& \\textbf{{{row['avg_diff']:.2f}}} \\\\ \n"
-            else:
-                line += f"& {row['avg_diff']:.2f} \\\\ \n"
-        
-            table += line   
+            if lang_setting == 'main':
+                if row[f'diff_avg_{lang_setting}'] == df[(df['model_name'] == row['model_name']) & (df['resource'] == row['resource'])][f'diff_avg_{lang_setting}'].max():
+                    line += f"& \\textbf{{{row[f'diff_avg_{lang_setting}']:.2f}}} \\\\ \n"
+                else:
+                    line += f"& {row[f'diff_avg_{lang_setting}']:.2f} \\\\ \n"
 
-            
-            prev_resource = row['resource']
-            prev_models = row['model_name']
+            if lang_setting == 'translation':
+                if row[f'diff_avg_{lang_setting}'] == df[(df['model_name'] == row['model_name']) & (df['resource'] == row['resource'])][f'diff_avg_{lang_setting}'].max():
+                    line += f"& \\textbf{{{row[f'diff_avg_{lang_setting}']:.2f}}} "
+                else:
+                    line += f"& {row[f'diff_avg_{lang_setting}']:.2f} "
+    
+        table += line   
 
-        table += "\\bottomrule\n"
-        table += "\\end{tabular}\n"
-        table += "\n\n"
         
-        table = table.replace("nan", "-")
-        print("\n\n")
-        print(table)
-        print("\n\n")
+        prev_resource = row['resource']
+        prev_models = row['model_name']
+
+    table += "\\bottomrule\n"
+    table += "\\end{tabular}\n"
+    table += "\n\n"
+    
+    table = table.replace("nan", "-")
+    print("\n\n")
+    print(table)
+    print("\n\n")
 
 # ----------------------------------------------------------------------
 # Misc but old
@@ -1038,6 +1672,7 @@ def few_shot_learning_rate_table(df: pd.DataFrame) -> str:
             
 
 def main():
+
     rows = load_all_models(path=EXP2_DIR)
 
     if ITEM == "zero":

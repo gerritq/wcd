@@ -24,35 +24,78 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # ---------------------------------------------------------------------
 # Languages
 # ---------------------------------------------------------------------
+# Full language list (ISO 639-3 codes)
 languages = [
     "eng",  # English
-    "nld",  # Dutch
-    "nob",  # Norwegian Bokmål
-    "ita",  # Italian
     "por",  # Portuguese
-    "ron",  # Romanian
+    "deu",  # German
     "rus",  # Russian
-    "ukr",  # Ukrainian
-    "bul",  # Bulgarian
-    "ind",  # Indonesian
+    "ita",  # Italian
     "vie",  # Vietnamese
     "tur",  # Turkish
+    "nld",  # Dutch
+    "ukr",  # Ukrainian
+    "ron",  # Romanian
+    "ind",  # Indonesian
+    "bul",  # Bulgarian
+    "uzb",  # Uzbek
+    "nob",  # Norwegian Bokmål
+    "aze",  # Azerbaijani
+    "mkd",  # Macedonian
+    "hye",  # Armenian
+    "sqi",  # Albanian
 ]
 
+# Display / ISO 639-1 codes
 languages_display = [
     "en",
-    "nl",
-    "no",
-    "it",
     "pt",
-    "ro",
+    "de",
     "ru",
-    "uk",
-    "bg",
-    "id",
+    "it",
     "vi",
     "tr",
+    "nl",
+    "uk",
+    "ro",
+    "id",
+    "bg",
+    "uz",
+    "no",
+    "az",
+    "mk",
+    "hy",
+    "sq",
 ]
+# languages = [
+#     "eng",  # English
+#     "nld",  # Dutch
+#     "nob",  # Norwegian Bokmål
+#     "ita",  # Italian
+#     "por",  # Portuguese
+#     "ron",  # Romanian
+#     "rus",  # Russian
+#     "ukr",  # Ukrainian
+#     "bul",  # Bulgarian
+#     "ind",  # Indonesian
+#     "vie",  # Vietnamese
+#     "tur",  # Turkish
+# ]
+
+# languages_display = [
+#     "en",
+#     "nl",
+#     "no",
+#     "it",
+#     "pt",
+#     "ro",
+#     "ru",
+#     "uk",
+#     "bg",
+#     "id",
+#     "vi",
+#     "tr",
+# ]
 
 # Use the 2-letter codes for all topic-based stuff
 topic_langs = languages_display
@@ -71,11 +114,11 @@ topics_display = {"regions": "Regions",
 # ---------------------------------------------------------------------
 # E-linguistics and lang2vec distances
 # ---------------------------------------------------------------------
-def get_l2v_distances(distance_type: str) -> pd.DataFrame:
-    data = l2v.distance(distance_type, languages)
-    df = pd.DataFrame(data, index=languages_display, columns=languages_display)
-    df = df * 100.0
-    return df
+# def get_l2v_distances(distance_type: str) -> pd.DataFrame:
+#     data = l2v.distance(distance_type, languages)
+#     df = pd.DataFrame(data, index=languages_display, columns=languages_display)
+#     df = df * 100.0
+#     return df
 
 
 def load_elinguistics() -> pd.DataFrame:
@@ -154,31 +197,31 @@ def plot_combined(
     cos_sim: np.ndarray,
     langs: list[str],
 ):
-    fig, axes = plt.subplots(1, 4, figsize=(20, 6), dpi=200)
+    fig, axes = plt.subplots(1, 3, figsize=(20, 6), dpi=200)
 
-    # 1) E-linguistics heatmap (lower triangle)
-    mask_eling = np.triu(np.ones(df_eling.shape, dtype=bool), k=1)
-    sns.heatmap(
-        df_eling,
-        mask=mask_eling,
-        ax=axes[0],
-        square=False,
-        vmin=0,
-        vmax=100,
-        annot=True, 
-        annot_kws={"size": 12},
-        cbar=False,
-    )
-    axes[0].set_title("(a) eLinguistics.net (Genetic Distance [0,1])")
-    axes[0].set_xticklabels(langs)
-    axes[0].set_yticklabels(langs, rotation=0)
+    # # 1) E-linguistics heatmap (lower triangle)
+    # mask_eling = np.triu(np.ones(df_eling.shape, dtype=bool), k=1)
+    # sns.heatmap(
+    #     df_eling,
+    #     mask=mask_eling,
+    #     ax=axes[0],
+    #     square=False,
+    #     vmin=0,
+    #     vmax=100,
+    #     annot=True, 
+    #     annot_kws={"size": 12},
+    #     cbar=False,
+    # )
+    # axes[0].set_title("(a) eLinguistics.net (Genetic Distance [0,1])")
+    # axes[0].set_xticklabels(langs)
+    # axes[0].set_yticklabels(langs, rotation=0)
 
     # 2) lang2vec heatmap (lower triangle)
     mask_l2v = np.triu(np.ones(df_l2v.shape, dtype=bool), k=1)
     sns.heatmap(
         df_l2v,
         mask=mask_l2v,
-        ax=axes[1],
+        ax=axes[0],
         square=False,
         cbar=False,
         vmin=0,
@@ -186,9 +229,9 @@ def plot_combined(
         annot=True, 
         annot_kws={"size": 12}
     )
-    axes[1].set_title("(b) lang2vec (Syntactic Distance [0,1])")
-    axes[1].set_xticklabels(langs)
-    axes[1].set_yticklabels(langs, rotation=0)
+    axes[0].set_title("(b) lang2vec (Syntactic Distance [0,1])")
+    axes[0].set_xticklabels(langs)
+    axes[0].set_yticklabels(langs, rotation=0)
 
     # 3) Cosine similarity matrix
     mask_cos = np.triu(np.ones(cos_sim.shape, dtype=bool), k=1)
@@ -197,7 +240,7 @@ def plot_combined(
     sns.heatmap(
         cos_sim,
         mask=mask_cos,
-        ax=axes[2],
+        ax=axes[1],
         square=False,
         cbar=False,
         vmin=0.0,
@@ -206,20 +249,20 @@ def plot_combined(
         annot=True, 
         annot_kws={"size": 8}
     )
-    axes[2].set_title("(c) Topic Similarity (Cosine Similarity [-1,1])")
-    axes[2].set_xticklabels(langs)
-    axes[2].set_yticklabels(langs, rotation=0)
+    axes[1].set_title("(c) Topic Similarity (Cosine Similarity [-1,1])")
+    axes[1].set_xticklabels(langs)
+    axes[1].set_yticklabels(langs, rotation=0)
 
     # 4) Top-10 topics across languages
     top_topics = topic_counts.most_common(10)
     topics, counts = zip(*top_topics)
-    axes[3].barh(range(len(topics)), counts)
-    axes[3].set_yticks(range(len(topics)))
-    axes[3].set_yticklabels(topics)
-    axes[3].invert_yaxis()
-    axes[3].set_title("(d) Top-10 Topics (All Languages)")
-    axes[3].set_xlabel("Frequency")
-    axes[3].set_yticklabels([topics_display.get(t[0], t) for t in top_topics])
+    axes[32].barh(range(len(topics)), counts)
+    axes[2].set_yticks(range(len(topics)))
+    axes[2].set_yticklabels(topics)
+    axes[2].invert_yaxis()
+    axes[2].set_title("(d) Top-10 Topics (All Languages)")
+    axes[2].set_xlabel("Frequency")
+    axes[2].set_yticklabels([topics_display.get(t[0], t) for t in top_topics])
 
 
 
@@ -231,8 +274,8 @@ def plot_combined(
 
 
 def main():
-    # 1) Distances from external resources
-    df_l2v = get_l2v_distances("syntactic")
+    # # 1) Distances from external resources
+    # df_l2v = get_l2v_distances("syntactic")
     df_eling = load_elinguistics()
 
     # 2) Topic-based data
@@ -250,7 +293,7 @@ def main():
     # 3) Final combined plot
     plot_combined(
         df_eling=df_eling,
-        df_l2v=df_l2v,
+        df_l2v=None,
         topic_counts=global_counts,
         cos_sim=cos_sim,
         langs=topic_langs,
