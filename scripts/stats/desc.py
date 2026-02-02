@@ -229,7 +229,7 @@ def plot_combined(
         annot=True, 
         annot_kws={"size": 12}
     )
-    axes[0].set_title("(b) lang2vec (Syntactic Distance [0,1])")
+    axes[0].set_title("(a) lang2vec (Syntactic Distance [0,1])")
     axes[0].set_xticklabels(langs)
     axes[0].set_yticklabels(langs, rotation=0)
 
@@ -249,18 +249,18 @@ def plot_combined(
         annot=True, 
         annot_kws={"size": 8}
     )
-    axes[1].set_title("(c) Topic Similarity (Cosine Similarity [-1,1])")
+    axes[1].set_title("(b) Topic Similarity (Cosine Similarity [-1,1])")
     axes[1].set_xticklabels(langs)
     axes[1].set_yticklabels(langs, rotation=0)
 
     # 4) Top-10 topics across languages
     top_topics = topic_counts.most_common(10)
     topics, counts = zip(*top_topics)
-    axes[32].barh(range(len(topics)), counts)
+    axes[2].barh(range(len(topics)), counts)
     axes[2].set_yticks(range(len(topics)))
     axes[2].set_yticklabels(topics)
     axes[2].invert_yaxis()
-    axes[2].set_title("(d) Top-10 Topics (All Languages)")
+    axes[2].set_title("(c) Top-10 Topics (All Languages)")
     axes[2].set_xlabel("Frequency")
     axes[2].set_yticklabels([topics_display.get(t[0], t) for t in top_topics])
 
@@ -274,9 +274,9 @@ def plot_combined(
 
 
 def main():
-    # # 1) Distances from external resources
-    # df_l2v = get_l2v_distances("syntactic")
-    df_eling = load_elinguistics()
+    # 1) Distances from external resources
+    df_l2v = get_l2v_distances("syntactic")
+    # df_eling = load_elinguistics()
 
     # 2) Topic-based data
     lang_data = {lang: load_topic_data(lang) for lang in topic_langs}
@@ -292,8 +292,8 @@ def main():
 
     # 3) Final combined plot
     plot_combined(
-        df_eling=df_eling,
-        df_l2v=None,
+        df_eling=None,
+        df_l2v=df_l2v,
         topic_counts=global_counts,
         cos_sim=cos_sim,
         langs=topic_langs,

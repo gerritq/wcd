@@ -20,8 +20,8 @@ METRIC="f1"  # accuracy | f1_macro | f1_weighted | exact_match
 COUNT = defaultdict(list)
 SHOTS = [0, 50, 100, 250, 500]
 
-LANG_SETTING = "main"  # main | translation
-ITEM = "LR"  # zero | LR | FEW
+LANG_SETTING = "translation"  # main | translation
+ITEM = "FEW"  # zero | LR | FEW
 
 # ----------------------------------------------------------------------
 # COLLECTORS AND HELPERS
