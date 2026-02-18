@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=mbart_ft_id
+#SBATCH --job-name=mbart_ft_en
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
 #SBATCH --time=10:00:00
@@ -17,7 +17,7 @@ set -e
 nvidia-smi
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 
-LANG="id"
+LANG="en"
 MODEL_NAME="facebook/mbart-large-50"
 SEED="42"
 SMOKE_TEST=0
@@ -32,13 +32,13 @@ MAX_NEW_TOKENS="8"
 EVAL_STEPS="100"
 
 # Hyperparameter grid.
-BATCH_SIZE_LIST=(16)
-LEARNING_RATE_LIST=(2e-4)
-EPOCHS_LIST=(3)
+# BATCH_SIZE_LIST=(16)
+# LEARNING_RATE_LIST=(2e-4)
+# EPOCHS_LIST=(3)
 
-# BATCH_SIZE_LIST=(8 16)
-# LEARNING_RATE_LIST=(2e-4 5e-5 5e-6)
-# EPOCHS_LIST=(1 2 3)
+BATCH_SIZE_LIST=(8 16)
+LEARNING_RATE_LIST=(2e-4 5e-5 5e-6)
+EPOCHS_LIST=(1 2 3)
 
 RUN_IDX=0
 for BS in "${BATCH_SIZE_LIST[@]}"; do
