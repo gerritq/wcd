@@ -23,6 +23,9 @@ from transformers import (
 MODEL_DICT = {
     "google/mt5-base": "mt5_base",
     'google/umt5-small': "umt5_small",
+    "google/mt5-xl": "mt5_xl", 
+    "google/mt5-large": "mt5_large", 
+    "facebook/mbart-large-50": "mbart_large_50", 
 }
 
 CONTEXT_TEMPLATE = (
@@ -79,18 +82,28 @@ def load_language_splits(base_dir: str, lang: str) -> DatasetDict:
     return ds
 
 
+# def to_text(example: dict, default_lang: str) -> dict:
+#     lang_code = str(example.get("lang", default_lang))[:2]
+#     lang_name = LANGUAGE_NAME.get(lang_code, lang_code)
+#     context = CONTEXT_TEMPLATE.format(
+#         section=str(example.get("section", "")),
+#         previous_sentence=str(example.get("previous_sentence", "")),
+#         claim=str(example.get("claim", "")),
+#         subsequent_sentence=str(example.get("subsequent_sentence", "")),
+#     )
+#     label = str(int(example["label"]))
+#     return {"input_text": f"classify: {context}", "target_text": label}
+
 def to_text(example: dict, default_lang: str) -> dict:
-    lang_code = str(example.get("lang", default_lang))[:2]
-    lang_name = LANGUAGE_NAME.get(lang_code, lang_code)
-    context = CONTEXT_TEMPLATE.format(
-        section=str(example.get("section", "")),
-        previous_sentence=str(example.get("previous_sentence", "")),
-        claim=str(example.get("claim", "")),
-        subsequent_sentence=str(example.get("subsequent_sentence", "")),
-    )
+    prev = str(example.get("previous_sentence", ""))
+    claim = str(example.get("claim", ""))
+    next_sent = str(example.get("subsequent_sentence", ""))
+    
+    # Simple concatenation with spaces
+    context = f"{prev} {claim} {next_sent}".strip()
+    
     label = str(int(example["label"]))
     return {"input_text": f"classify: {context}", "target_text": label}
-
 
 def tokenize_dataset(
     args,
@@ -153,13 +166,19 @@ def build_model(model_name: str, use_qlora: bool) -> torch.nn.Module:
     if use_qlora:
         model = prepare_model_for_kbit_training(model)
 
+    if "mbart" in model_name.lower():
+        target_modules = ["q_proj", "k_proj", "v_proj", "out_proj"]
+    else:
+        # mT5, T5, UMT5
+        target_modules = ["q", "k", "v", "o"]
+
     peft_config = LoraConfig(
         task_type=TaskType.SEQ_2_SEQ_LM,
         r=16,
         lora_alpha=32,
         lora_dropout=0.05,
         bias="none",
-        target_modules=["q", "k", "v", "o"],
+        target_modules=target_modules,
     )
     model = get_peft_model(model, peft_config)
     model.config.use_cache = False
@@ -167,11 +186,15 @@ def build_model(model_name: str, use_qlora: bool) -> torch.nn.Module:
     return model
 
 
-def parse_label(text: str) -> int:
+def parse_label(text: str) -> int | None:
+    # Remove T5 sentinel tokens first
+    text = re.sub(r"<extra_id_\d+>", "", text)
+    
+    # Now search for 0 or 1
     m = re.search(r"[01]", text)
     if m:
         return int(m.group(0))
-    return 0
+    return None
 
 
 def compute_binary_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, float]:
@@ -188,6 +211,35 @@ def compute_binary_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, fl
     }
 
 
+# def evaluate_with_generation(
+#     args,
+#     trainer: Seq2SeqTrainer,
+#     tokenized_test,
+#     raw_test,
+#     tokenizer,
+#     max_new_tokens: int,
+# ) -> tuple[dict[str, float]]:
+    
+#     out = trainer.predict(tokenized_test, max_new_tokens=max_new_tokens)
+#     pred_ids = out.predictions
+#     if isinstance(pred_ids, tuple):
+#         pred_ids = pred_ids[0]
+
+#     pred_texts = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+#     print("test")
+#     print(pred_texts[:5])
+#     y_pred = [parse_label(t) for t in pred_texts]
+#     y_true = [int(x["label"]) for x in raw_test]
+#     metrics = compute_binary_metrics(y_true, y_pred)
+
+#     if args.smoke_test:
+#         print("=" * 20)
+#         print("PREDICTIONS (SMOKE TEST)")
+#         for x in pred_texts[:3]:
+#             print(x)
+#         print("=" * 20)
+#     return metrics
+
 def evaluate_with_generation(
     args,
     trainer: Seq2SeqTrainer,
@@ -195,7 +247,7 @@ def evaluate_with_generation(
     raw_test,
     tokenizer,
     max_new_tokens: int,
-) -> tuple[dict[str, float], list[dict]]:
+) -> tuple[dict[str, float]]:
     
     out = trainer.predict(tokenized_test, max_new_tokens=max_new_tokens)
     pred_ids = out.predictions
@@ -205,8 +257,15 @@ def evaluate_with_generation(
     pred_texts = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
     print("test")
     print(pred_texts[:5])
+    
     y_pred = [parse_label(t) for t in pred_texts]
     y_true = [int(x["label"]) for x in raw_test]
+    
+    # Check if all predictions are valid
+    if None in y_pred:
+        print(f"Invalid predictions found: {y_pred.count(None)}/{len(y_pred)}")
+        return {}
+    
     metrics = compute_binary_metrics(y_true, y_pred)
 
     if args.smoke_test:
@@ -215,22 +274,11 @@ def evaluate_with_generation(
         for x in pred_texts[:3]:
             print(x)
         print("=" * 20)
-
-    rows = []
-    for i, x in enumerate(raw_test):
-        rows.append(
-            {
-                "claim": x.get("claim", ""),
-                "gold": int(x["label"]),
-                "pred": y_pred[i],
-                "raw_generation": pred_texts[i].strip(),
-            }
-        )
-    return metrics, rows
+    return metrics
 
 
 def maybe_smoke(ds: DatasetDict) -> DatasetDict:
-    n_train = min(96, len(ds["train"]))
+    n_train = min(512, len(ds["train"]))
     n_dev = min(32, len(ds["dev"]))
     n_test = min(32, len(ds["test"]))
     return DatasetDict(
@@ -248,7 +296,7 @@ def main():
     parser.add_argument("--model_name", type=str, default="google/mt5-base")
     parser.add_argument("--smoke_test", type=int, required=True)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output_dir", type=str, default="data/exp2/rebuttal_mt5")
+    parser.add_argument("--run_idx", type=int, required=True)
 
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--learning_rate", type=float, default=2e-4)
@@ -260,7 +308,7 @@ def main():
 
     parser.add_argument("--max_source_length", type=int, default=512)
     parser.add_argument("--max_target_length", type=int, default=8)
-    parser.add_argument("--max_new_tokens", type=int, default=16)
+    parser.add_argument("--max_new_tokens", type=int, default=8)
     parser.add_argument("--eval_steps", type=int, default=100)
 
     parser.add_argument("--use_qlora", required=True, type=int)
@@ -274,8 +322,8 @@ def main():
     random.seed(args.seed)
 
     base_dir = os.getenv("BASE_WCD", os.getcwd())
-    args.out_dir = os.path.join(base_dir, "rebuttal", "results")
-    os.makedirs(args.out_dir, exist_ok=True)
+    args.output_dir = os.path.join(base_dir, "scripts" , "rebuttal", "results")
+    os.makedirs(args.output_dir, exist_ok=True)
     device = get_device()
 
     print("=" * 60)
@@ -347,7 +395,7 @@ def main():
 
     trainer.train()
 
-    metrics, rows = evaluate_with_generation(
+    metrics = evaluate_with_generation(
         args=args,
         trainer=trainer,
         tokenized_test=tokenized["test"],
@@ -362,12 +410,19 @@ def main():
         print(f"{k}: {v}")
     print("=" * 20)
 
-    pred_path = os.path.join(args.output_dir, f"metrics_{args.lang}_{MODEL_DICT[args.model_name]}.jsonl")
-    with open(pred_path, "w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-    print(f"Saved predictions to: {pred_path}")
+    results = {
+        "run_idx": args.run_idx,
+        "lang": args.lang,
+        "model": args.model_name,
+        "epochs": args.epochs,
+        "learning_rate": args.learning_rate,
+        "batch_size": args.batch_size,
+        "metrics": metrics,
+    }
 
+    metrics_path = os.path.join(args.output_dir, f"{args.lang}_{MODEL_DICT[args.model_name]}_{args.run_idx}.jsonl")
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
 
 if __name__ == "__main__":
     main()
