@@ -2,19 +2,18 @@
 #SBATCH --job-name=exp1-api
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=10:00:00
+#SBATCH --time=02:00:00
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=1GB
 
-LANGUAGE_LST=("id")
-MODEL_LST=("google/gemini-2.5-flash") # openai/gpt-5.1 google/gemini-2.5-flash "openai/gpt-5.1"
-# SHOTS_LST=(2 4 8 12 16) # must be even; use 0 for zero-shot
-SHOTS_LST=(2 4)
+LANGUAGE_LST=("az" "id")
+MODEL_LST=("openai/gpt-5.1") # openai/gpt-5.1 google/gemini-2.5-flash "openai/gpt-5.1"
+SHOTS_LST=(2 4 8 12 16) # must be even; use 0 for zero-shot
 CONTEXT_LST=(1)
 VERBOSE_LST=(0)
-SMOKE_TEST=1
+SMOKE_TEST=0
 
-MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/rebuttal/llm_results"
+MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/scripts/rebuttal/llm_results"
 
 
 for LANGUAGE in "${LANGUAGE_LST[@]}"; do
