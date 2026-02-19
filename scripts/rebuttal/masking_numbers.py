@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 
 BASE_DIR = os.getenv("BASE_WCD")
 DATA_DIR = os.path.join(BASE_DIR, "data/sets/main")
-MODEL_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_auect1in"
+MODEL_DIR = "/scratch/prj/inf_nlg_ai_detection/wcd/data/exp2/models/run_79ydn6gi"
 
 # Device setup
 if torch.backends.mps.is_available():
@@ -65,6 +65,18 @@ def load_test_data_with_masked_claims(lang: str) -> Dataset:
     
     # Mask numbers in claims
     test = test.map(mask_numbers_in_claim)
+
+
+    print("="*20)
+    print("EXAMPLES")
+    idx=0
+    for i, x in enumerate(test):
+        print(x['claim'])
+        if "[MASK]" in x['claim']:
+            idx+=1
+        if idx==5:
+            break
+    print("="*20)
     
     print("="*20)
     print(f"Loaded and masked {len(test)} test examples")
@@ -76,6 +88,28 @@ def load_test_data_with_masked_claims(lang: str) -> Dataset:
 # ------------------------------------------------------------------------
 # Evaluation
 # ------------------------------------------------------------------------
+def tokenize_fn(example: dict, 
+                tokenizer
+                ):
+    """
+    Basic tok function.
+    Returns input_ids, am, and labels.
+    """
+    # enc = tokenizer(
+    #     example["text"],
+    #     truncation=True,
+    #     max_length=max_length,
+    #     padding="max_length",
+    #     return_attention_mask=True,
+    # )
+    enc = tokenizer(
+            example["text"],
+            truncation=True,
+            max_length=tokenizer.model_max_length,
+            return_attention_mask=True,
+        )
+    enc["labels"] = enc["input_ids"].copy()
+    return enc    
 
 def evaluate_masked_claims(args: Namespace):
     """
@@ -108,18 +142,25 @@ def evaluate_masked_claims(args: Namespace):
     test_ds = load_test_data_with_masked_claims(args.lang)
     
     # Apply prompt template
-    prompt_template = getattr(prompts, args.prompt_template)
+    prompt = prompts.INSTRUCT_PROMPT
+    prompt['user'] = prompt['user_context']
+
     test_ds = ds_apply_chat_templates(
         ds=test_ds,
         tokenizer=tokenizer_test,
-        prompt_template=prompt_template,
+        prompt_template=prompt,
         preprocess_function=preprocess_function_generation
     )
+
+    test_tok = test_ds.map(tokenize_fn, 
+                                    fn_kwargs={"tokenizer": tokenizer_test}, 
+                                               batched=False
+                                           )
     
     # Create dataloader
     eval_collate_fn = init_eval_collate_fn(tokenizer_test)
     test_dataloader = DataLoader(
-        test_ds,
+        test_tok,
         batch_size=8,  # EVAL_BATCH from data.py
         collate_fn=eval_collate_fn,
         shuffle=False
@@ -166,7 +207,6 @@ def main():
     parser.add_argument("--model_type", type=str, required=True, help="Model type: slm, clf, or plm")
     parser.add_argument("--model_name", type=str, required=True, help="Model name (e.g., llama3_8b)")
     parser.add_argument("--lang", type=str, required=True, help="Language code (e.g., en, pt)")
-    parser.add_argument("--prompt_template", type=str, default="minimal", help="Prompt template: minimal, instruct, or verbose")
     parser.add_argument("--context", type=int, default=1, help="Use context (0 or 1)")
     parser.add_argument("--quantization", type=int, default=1, help="Use quantization (0 or 1)")
     parser.add_argument("--max_length", type=int, default=512, help="Max sequence length")
@@ -195,7 +235,7 @@ def main():
     results = evaluate_masked_claims(args)
     
     # Save results (optional)
-    output_path = f"masked_eval_{args.lang}_{args.model_type}.json"
+    output_path = f"nums_results/nums_eval_{args.lang}_{args.model_type}.json"
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     

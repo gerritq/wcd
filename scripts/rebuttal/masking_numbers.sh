@@ -16,10 +16,9 @@ nvidia-smi
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 
 # Configuration variables
-LANGS=("en" "pt" "de" "ru" "it" "vi" "tr" "nl" "uk" "ro" "id" "bg" "uz" "no" "az" "mk" "hy" "sq")
+LANGS=("en")
 MODEL_TYPE="slm"
 MODEL_NAME="llama3_8b"
-PROMPT_TEMPLATE="minimal"
 CONTEXT=1
 QUANTIZATION=1
 MAX_LENGTH=512
@@ -38,7 +37,6 @@ for LANG in "${LANGS[@]}"; do
     echo "  MODEL_TYPE      = $MODEL_TYPE"
     echo "  MODEL_NAME      = $MODEL_NAME"
     echo "  LANG            = $LANG"
-    echo "  PROMPT_TEMPLATE = $PROMPT_TEMPLATE"
     echo "  CONTEXT         = $CONTEXT"
     echo "  QUANTIZATION    = $QUANTIZATION"
     echo "  MAX_LENGTH      = $MAX_LENGTH"
@@ -51,7 +49,6 @@ for LANG in "${LANGS[@]}"; do
         --model_type "$MODEL_TYPE" \
         --model_name "$MODEL_NAME" \
         --lang "$LANG" \
-        --prompt_template "$PROMPT_TEMPLATE" \
         --context "$CONTEXT" \
         --quantization "$QUANTIZATION" \
         --max_length "$MAX_LENGTH" \
