@@ -7,8 +7,10 @@ from skip_sections import DROP_SECTIONS
 import unicodedata
 
 BASE_DIR = os.getenv("BASE_WCD")
-INPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
-OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/parsed")
+# GQ: changed this to htmls_random
+INPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls_random")
+OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/parsed_random")
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 INFO_PATH = os.path.join(BASE_DIR, "data/info/parsing_stats.json")
 
 parser = argparse.ArgumentParser()

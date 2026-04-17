@@ -6,10 +6,12 @@
 #SBATCH --partition=cpu,nmes_cpu
 #SBATCH --mem=20GB
 
-# "en" "nl" "no" "it"
-# "pt" "ro" "ru" "uk"
-# "sr" "bg" "id" "vi" "tr"
-# "sq" "az" "mk" "hy"
-LANGUAGES=("zh" "th")
+# "en" "de" "id"
+# "nl" "no" "it"
+# "pt" "ro" "ru"
+# "uk" "bg" "vi"
+# "tr" "uz" "sq"
+# "az" "mk" "hy"
+LANGUAGES=("en" "de" "id")
 
 uv run parse.py --languages "${LANGUAGES[@]}"

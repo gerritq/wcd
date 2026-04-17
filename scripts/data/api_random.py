@@ -4,7 +4,8 @@ import os
 import sys
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
-OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
+OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/api_random")
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 def query_random_articles(lang: str, n: int):
     
@@ -47,24 +48,31 @@ def query_random_articles(lang: str, n: int):
 
 
 def main():
-    languages  = [
-    "en",  # English
-    "nl",  # Dutch
-    "no",  # Norwegian 
-    "it",  # Italian
-    "pt",  # Portuguese
-    "ro",  # Romanian
-    "ru",  # Russian
-    "uk",  # Ukrainian
-    "bg",  # Bulgarian
+    languages = [
+    "en",
+    "de",
+    "nl",
+    "no",
+    "it",
+    "pt",
+    "ro",
+    "ru",
+    "uk",
+    "sr",
+    "bg",
+    "th",
     "id",
     "vi",
     "tr",
-
-    ]
+    "uz",
+    "sq",
+    "az",
+    "mk",
+    "hy",
+]
     for lang in languages:
         print(f"\nQuerying random articles for {lang} ===")
-        query_random_articles(lang, n=2500)  # adjust `n` if needed
+        query_random_articles(lang, n=5000)  # adjust `n` if needed
 
 
 if __name__ == "__main__":

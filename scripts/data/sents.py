@@ -8,8 +8,10 @@ import torch
 import argparse
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
-INPUT_DIR = os.path.join(BASE_DIR, f"data/raw/parsed") 
-OUTPUT_DIR = os.path.join(BASE_DIR, f"data/sents")
+# GQ: changed this to parsed_random for the random claim analysis
+INPUT_DIR = os.path.join(BASE_DIR, f"data/raw/parsed_random")
+OUTPUT_DIR = os.path.join(BASE_DIR, f"data/sents_random")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 INFO_DIR = os.path.join(BASE_DIR, f"data/info")
 
 parser = argparse.ArgumentParser()

@@ -14,8 +14,11 @@ parser.add_argument("--languages", nargs="+", required=True)
 args = parser.parse_args()
 
 BASE_DIR = os.getenv("BASE_WCD")
-INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
-OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls")
+# GQ: changed this to api_random for the random claim analysis
+# INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api")
+INPUT_PATH = os.path.join(BASE_DIR, "data/raw/api_random")
+OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls_random")
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 headers = {
     "User-Agent": "Collecting FA and Good articles"
