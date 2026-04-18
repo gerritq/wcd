@@ -3,13 +3,15 @@ import json
 import random
 from datasets import Dataset, DatasetDict, load_from_disk
 from collections import defaultdict, Counter
+import pandas as pd
 
 SEED = 42
 random.seed(SEED)
 
 BASE_DIR = os.getenv("BASE_WCD", ".")
-IN_DIR = os.path.join(BASE_DIR, "data/sents")
-OUT_DIR = os.path.join(BASE_DIR, "data/sets")
+# GQ: for random claim analysis, changed this to sets_random
+IN_DIR = os.path.join(BASE_DIR, "data/sents_random")
+OUT_DIR = os.path.join(BASE_DIR, "data/sets/random")
 
 def load_data(lang: str) -> list:
     """Load claims into a list of dicts"""
@@ -22,8 +24,9 @@ def load_data(lang: str) -> list:
     
     out_data = []
     for x in data:
-        if x['source'] in ['fa', 'good']:
-            out_data.append(x)
+        # GQ: for random claim analysis, we keep all sources, not just good and fa
+        # if x['source'] in ['fa', 'good']:
+        out_data.append(x)
     
     unique_titles = set([x['title'] for x in out_data])
     print("Unique titles:", len(unique_titles))
@@ -76,6 +79,20 @@ def split_claims_into_sets_by_article(lang: str,
         "test": test
     }   
 
+def random_test_set(lang: str, n=100) -> None:
+    claims_per_label = n // 2
+
+    claims = load_data(lang)
+    pos_claims = [claim for claim in claims if claim['label'] == 1]
+    neg_claims = [claim for claim in claims if claim['label'] == 0]
+
+    print(f"Total claims for {lang}: {len(claims)}")
+    print(f"Selected claims for {lang}: {len(pos_claims[:claims_per_label])} positive, {len(neg_claims[:claims_per_label])} negative")
+    selected_claims = pos_claims[:claims_per_label] + neg_claims[:claims_per_label]
+
+    # save as csv
+    out_path = os.path.join(OUT_DIR, f"{lang}_random_test.csv")
+    pd.DataFrame(selected_claims).to_csv(out_path, index=False)
 
 def build_monolingual_dataset(configs: dict,
                               lang: str) -> None:
@@ -167,6 +184,12 @@ def build_monolingual_dataset(configs: dict,
 def main():
 
     languages  = [
+        "az",
+        "en",
+        "it",
+        "no",
+        "ru",
+        "uk"
         # "en",  # English
         # "nl",  # Dutch
         # "no",  # Norwegian (Bokmål is 'nb', Nynorsk is 'nn', 'no' redirects to Bokmål)
@@ -184,8 +207,8 @@ def main():
         # "mk",
         # "hy",
         # "az",
-        "de",
-        "uz"
+        # "de",
+        # "uz"
     ]
     
     configs = {

@@ -2,6 +2,7 @@ import json
 import os
 import torch
 import random
+import csv
 
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 from torch.utils.data import DataLoader
@@ -101,6 +102,46 @@ def load_and_prepare_translated_data(lang: str) -> Dataset:
 
     return Dataset.from_list(items)
 
+def load_and_prepare_random_csv_data(lang: str) -> Dataset:
+    """
+    Load random csv test data and return it as a Dataset.
+    Keeps optional columns and ensures required fields exist.
+    """
+    data_path = os.path.join(DATA_DIR, "random", f"{lang}_random_test.csv")
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Random csv test set not found: {data_path}")
+
+    rows = []
+    with open(data_path, "r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for i, row in enumerate(reader, start=1):
+            if "claim" not in row or "label" not in row:
+                raise ValueError(
+                    f"Random csv is missing required columns ('claim', 'label'): {data_path}"
+                )
+
+            item = dict(row)
+            try:
+                item["label"] = int(item["label"])
+            except (TypeError, ValueError):
+                raise ValueError(f"Invalid label at row {i} in {data_path}: {item['label']}")
+
+            # Fill defaults used by context prompts if columns are absent.
+            item.setdefault("section", "")
+            item.setdefault("previous_sentence", "")
+            item.setdefault("subsequent_sentence", "")
+            item.setdefault("lang", lang)
+            if not item["lang"]:
+                item["lang"] = lang
+
+            rows.append(item)
+
+    print("=" * 20)
+    print(f"Loaded random csv test set: {data_path}")
+    print(f"N: {len(rows)}")
+    print("=" * 20)
+    return Dataset.from_list(rows)
+
 def get_monolingual_data_set(args: Namespace, 
                              data_path: str
                             ) -> List[Dataset]:
@@ -119,6 +160,8 @@ def get_monolingual_data_set(args: Namespace,
         print("Loaded translated test set with N:", len(test))
         print("="*20)
         # open the jsonl
+    elif args.lang_setting == "random_csv":
+        test = load_and_prepare_random_csv_data(lang=lang)
     else:
         test = ds["test"]
     

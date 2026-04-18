@@ -29,6 +29,7 @@ TRAINING_SIZE="${TRAINING_SIZE:-5000}"
 SEED="${SEED:-42}"
 EXPERIMENT="${EXPERIMENT:-binary}"
 SOURCE_LANGS="${SOURCE_LANGS:-""}"
+LANG_SETTING="${LANG_SETTING:-main}"
 
 echo "Running with:"
 echo "  LANG       = $LANG"
@@ -43,6 +44,7 @@ echo "  TRAINING_SIZE = $TRAINING_SIZE"
 echo "  SEED = $SEED"
 echo "  EXPERIMENT = $EXPERIMENT"
 echo "  SOURCE_LANGS = $SOURCE_LANGS"
+echo "  LANG_SETTING = $LANG_SETTING"
 echo
 
 # VARS
@@ -84,6 +86,9 @@ fi
 # --------------------------------------------------------------------------------------------------
 
 MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1"
+if [[ "$LANG_SETTING" == "random_csv" ]]; then
+  MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp_random"
+fi
 
 # if [[ "$MAIN" == "1" ]]; then
 #     MODEL_DIR="/scratch/prj/inf_nlg_ai_detection/wcd/data/exp1"
@@ -129,7 +134,8 @@ for BS in "${BATCH_SIZE_LIST[@]}"; do
         --max_grad_norm "$GN" \
         --weight_decay "$WEIGHT_DECAY" \
         --seed "$SEED" \
-        --source_langs "$SOURCE_LANGS"
+        --source_langs "$SOURCE_LANGS" \
+        --lang_setting "$LANG_SETTING"
 
         
     done
