@@ -2,13 +2,11 @@
 #SBATCH --job-name=exp1
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=04:00:00
-#SBATCH --mem=10GB
+#SBATCH --time=08:00:00
+#SBATCH --mem=30GB
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=a100
+#SBATCH --constraint=b200|h200|a100
 #SBATCH --partition=nmes_gpu,gpu
-#SBATCH --exclude=erc-hpc-comp054,erc-hpc-comp050,erc-hpc-comp040,erc-hpc-comp038
-#SBATCH --begin=now+5hours
 
 set -euo pipefail
 

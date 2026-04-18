@@ -12,6 +12,7 @@ BASE_DIR = os.getenv("BASE_WCD", ".")
 # GQ: for random claim analysis, changed this to sets_random
 IN_DIR = os.path.join(BASE_DIR, "data/sents_random")
 OUT_DIR = os.path.join(BASE_DIR, "data/sets/random")
+os.makedirs(OUT_DIR, exist_ok=True)
 
 def load_data(lang: str) -> list:
     """Load claims into a list of dicts"""
@@ -83,6 +84,8 @@ def random_test_set(lang: str, n=100) -> None:
     claims_per_label = n // 2
 
     claims = load_data(lang)
+    random.shuffle(claims)
+    
     pos_claims = [claim for claim in claims if claim['label'] == 1]
     neg_claims = [claim for claim in claims if claim['label'] == 0]
 
@@ -188,7 +191,7 @@ def main():
         "en",
         "it",
         "no",
-        "ru",
+        "ro",
         "uk"
         # "en",  # English
         # "nl",  # Dutch
@@ -224,7 +227,10 @@ def main():
 
         
         # mono main set
-        build_monolingual_dataset(configs=configs, lang=lang)
+        # build_monolingual_dataset(configs=configs, lang=lang)
+
+        # build random test data
+        random_test_set(lang=lang)
 
     # cross-lingual data
     # training_languages = ['en', 'it', 'ru']

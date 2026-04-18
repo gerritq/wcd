@@ -1,19 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-LANGS=("en")
+LANGS=("en" "it" "uk" "ro" "no" "az")
 MODEL_TYPES=("clf") # slm clf plm
 MODEL_NAMES=("llama3_8b")
 
-ATL=(1)
+ATL=(0)
 CONTEXT=1
-HP_SEARCH=0
+HP_SEARCH=1
 TRAINING_SIZE=5000
 SEED=42
 EXPERIMENT="binary"
 LANG_SETTING="random_csv"
 
-TIME="01:30:00"
+TIME="10:00:00"
 
 for lang in "${LANGS[@]}"; do
     for mtype in "${MODEL_TYPES[@]}"; do
