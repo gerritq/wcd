@@ -21,7 +21,11 @@ OUTPUT_PATH = os.path.join(BASE_DIR, "data/raw/htmls_random")
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 headers = {
-    "User-Agent": "Collecting FA and Good articles"
+    "User-Agent": "Collecting random articles for a research project. Why are the api limits so low?"
+}
+
+headers = {
+    "User-Agent": "WikiRandomPagesDownloader/0.1 (https://gerritq.github.io/; g.quaremba@gmail.com) requests/0.0"
 }
 
 # headers = {
@@ -62,16 +66,22 @@ def get_html(lang: str, title: str):
         data = response.json()
         return data["parse"]["text"]["*"]
     except Exception as e:
-        print(f"Failed to fetch {url}: {e}")
+        print(f"Failed to fetch {url}: {e}", flush=True)
+        print(response, flush=True)
         return None
 
 def main():
 
     print(f"All languages: {args.languages} ...", flush=True)
-    for lang in args.languages:
+    for i, lang in enumerate(args.languages):
         print(f"\tRunning {lang} ...", flush=True)
+        if i > 0:
+            time.sleep(300)
 
-        INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_all.jsonl")
+        
+        # GQ: change this to random
+        INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_random.jsonl")
+        # INPUT_FILE = os.path.join(INPUT_PATH, f"{lang}_all.jsonl")
         OUTPUT_FILE = os.path.join(OUTPUT_PATH, f"{lang}_htmls.jsonl")
         
         
@@ -92,8 +102,8 @@ def main():
 
         with open(OUTPUT_FILE, "a", encoding="utf-8") as out_f:
             for i, item in enumerate(tqdm(data)):
-                if i % 500 == 0 and i !=0:
-                    time.sleep(60)
+                # if i % 25 == 0 and i !=0:
+                #     time.sleep(120)
                 title = item['title']
                 
                 if title in processed_titles:
@@ -108,6 +118,8 @@ def main():
                 topic = get_topic(title, lang)
                 item.update({"topic": topic, "raw": raw})
                 out_f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+                time.sleep(3)
 
 if __name__ == "__main__":
     main()

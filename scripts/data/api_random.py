@@ -11,10 +11,13 @@ def query_random_articles(lang: str, n: int):
     
     S = requests.Session()
     URL = f"https://{lang}.wikipedia.org/w/api.php"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+    # headers = {
+    #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    # }
 
+    headers = {
+        "User-Agent": "Collecting random articles for a research project."
+    }
     titles = []
     rnlimit = 500
     fetched = 0
@@ -72,7 +75,7 @@ def main():
 ]
     for lang in languages:
         print(f"\nQuerying random articles for {lang} ===")
-        query_random_articles(lang, n=5000)  # adjust `n` if needed
+        query_random_articles(lang, n=1000)  # adjust `n` if needed
 
 
 if __name__ == "__main__":

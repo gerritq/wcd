@@ -238,7 +238,7 @@ def split_sentences(paragraph: str, nlp: Pipeline) -> list[str]:
     return corrected
 
 
-def drop_sentence(x: str) -> bool:
+def drop_sentence(x: str, lang: str) -> bool:
     """
     Takes a sentence @x. Check whether it needs to be dropped based on some basic data quality
     heursitics. These include length, if starts with a letter it should be uppercase=, etc.
@@ -246,6 +246,9 @@ def drop_sentence(x: str) -> bool:
     Returns a bool.    
     """
 
+    if not x:
+        return True
+        
     # Chinese aware
     if lang != "zh":
         if len(x.split()) < 4:
@@ -327,7 +330,9 @@ def proc_article(article: dict, nlp: Pipeline) -> list[dict]:
                         "title": article["title"],
                         "topic": article["topic"],
                         "section": section["header"],
-                        "source": article["source"],
+                        # GQ: change to 'random' 
+                        # "source": article["source"],
+                        "source": "random",
                         "p_ends_with_citation": p_ends_with_citation,
                         "p_any_citation": p_any_citation,
                         "previous_sentence": previous_sentence,
@@ -365,7 +370,7 @@ def proc_sentence(item: dict, lang: str) -> dict:
     sentence_clean = final_clean(sentence_clean)
     
     # Check if sentence is drop-worthy
-    if drop_sentence(sentence_clean, lang):
+    if drop_sentence(sentence_clean, lang=lang):
         return None
 
     # Clean the context (check for existence within the functions)

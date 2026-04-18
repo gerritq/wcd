@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=s-de-uz
+#SBATCH --job-name=s-en-it
 #SBATCH --output=../../logs/%j.out
 #SBATCH --error=../../logs/%j.err
-#SBATCH --time=05:30:00
+#SBATCH --time=02:30:00
 # SBATCH --partition=cpu,nmes_cpu
-#SBATCH --partition=nmes_gpu,gpu,interruptible_gpu
+#SBATCH --partition=nmes_gpu,gpu
 #SBATCH --mem=20GB
 #SBATCH --gres=gpu:1
+#SBATCH --exclude=erc-hpc-comp035
 
 # Takes about 2hrs for English. Other languages should take less time.
 
@@ -17,7 +18,7 @@ nvidia-smi
 # "ru" "uk" "bg" "sr"
 # "id" "vi" "tr"
 
-LANGUAGES=("de" "uz") # "az" "mk"
+LANGUAGES=("uk" "ro" "no" "az") # "az" "mk"
 
 start=$(date +%s)
 
