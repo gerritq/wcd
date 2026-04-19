@@ -5,6 +5,8 @@
 - Emphasize that we remove all citation markers
 - Include F1 as the main metric
 - Add examples of sentences to the intro
+- update www paper from wiki!!!
+
 
 - Generalizability
     - Show new results
