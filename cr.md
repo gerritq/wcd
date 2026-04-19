@@ -1,20 +1,14 @@
 # To do
 
-- check others' comments; eg adding examples to the main 
-- check Antonio's limitation comment 
-- make tables larger
+- Make table 2 bigger
+- Remove the significance wording
+- Emphasize that we remove all citation markers
+- Include F1 as the main metric
+- Add examples of sentences to the intro
 
-# One reviewer raises an important methodological concern: whether inline citation markers are removed from model inputs. If retained, models may learn citation presence rather than citation worthiness, fundamentally compromising the task validity. The authors must clarify this explicitly.
+- Generalizability
+    - Show new results
+    - Add this to the discussion
+    - lower quality; lots of text like references which should not be in the main text
+    - more spelling errors
 
-Just make this explicit in the revision
-
-# 2. Accuracy on balanced sets is insufficient as the sole metric; macro-F1, precision, and recall should be reported in the main text rather than relegated to the appendix.
-
-include f1 as the main
-
-# 3. Concern about sampling bias from Featured/Good Articles deserves acknowledgment and discussion of generalizability.
-
-
-# 4. require statistical testing; significance tests should be conducted and reported.
-
-remove significant 

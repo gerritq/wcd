@@ -107,7 +107,7 @@ def load_and_prepare_random_csv_data(lang: str) -> Dataset:
     Load random csv test data and return it as a Dataset.
     Keeps optional columns and ensures required fields exist.
     """
-    data_path = os.path.join(DATA_DIR, "random", f"{lang}_random_test.csv")
+    data_path = os.path.join(DATA_DIR, "random", f"{lang}_random_test_corrected.csv")
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Random csv test set not found: {data_path}")
 
